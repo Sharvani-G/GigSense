@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'playful_widgets.dart';
 
 class ChatMessage {
@@ -237,6 +238,14 @@ class _ChatScreenState extends State<ChatScreen> {
                   // Input Box
                   Row(
                     children: [
+                      PlayfulMicButton(
+                        onSpeechResult: (text) {
+                          setState(() {
+                            _inputController.text = text;
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: PlayfulInput(
                           labelText: "",
@@ -649,3 +658,5 @@ class _PlayfulSendButtonState extends State<PlayfulSendButton> {
     );
   }
 }
+
+

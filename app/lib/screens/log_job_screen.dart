@@ -77,6 +77,16 @@ class _LogJobScreenState extends State<LogJobScreen> {
     }
   }
 
+  void _parseAndSetNumber(String text, TextEditingController controller) {
+    final match = RegExp(r'(\d+(?:\.\d+)?)').firstMatch(text);
+    if (match != null) {
+      setState(() {
+        controller.text = match.group(1)!;
+      });
+      _checkFormValid();
+    }
+  }
+
   Future<void> _seedBenchmarksIfNeeded() async {
     try {
       final firestore = FirebaseFirestore.instance;
@@ -472,19 +482,33 @@ class _LogJobScreenState extends State<LogJobScreen> {
                           ),
                           const SizedBox(height: 20),
 
-                          PlayfulInput(
-                            labelText: "FARE (₹)",
-                            hintText: "Enter fare amount",
-                            controller: _fareController,
-                            prefixText: "₹ ",
-                            isHighlighted: _fareHighlighted,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            validator: (val) {
-                              if (val == null || val.isEmpty) return "Fare is required";
-                              final numVal = double.tryParse(val);
-                              if (numVal == null || numVal <= 0) return "Must be a positive number";
-                              return null;
-                            },
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Expanded(
+                                child: PlayfulInput(
+                                  labelText: "FARE (₹)",
+                                  hintText: "Enter fare amount",
+                                  controller: _fareController,
+                                  prefixText: "₹ ",
+                                  isHighlighted: _fareHighlighted,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  validator: (val) {
+                                    if (val == null || val.isEmpty) return "Fare is required";
+                                    final numVal = double.tryParse(val);
+                                    if (numVal == null || numVal <= 0) return "Must be a positive number";
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 2),
+                                child: PlayfulMicButton(
+                                  onSpeechResult: (text) => _parseAndSetNumber(text, _fareController),
+                                ),
+                              ),
+                            ],
                           ),
                           if (_fareOcrNote != null) ...[
                             Padding(
@@ -501,18 +525,32 @@ class _LogJobScreenState extends State<LogJobScreen> {
                           ],
                           const SizedBox(height: 20),
 
-                          PlayfulInput(
-                            labelText: "DISTANCE (KM)",
-                            hintText: "Enter trip distance",
-                            controller: _distanceController,
-                            isHighlighted: _distanceHighlighted,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            validator: (val) {
-                              if (val == null || val.isEmpty) return "Distance is required";
-                              final numVal = double.tryParse(val);
-                              if (numVal == null || numVal <= 0) return "Must be a positive decimal";
-                              return null;
-                            },
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Expanded(
+                                child: PlayfulInput(
+                                  labelText: "DISTANCE (KM)",
+                                  hintText: "Enter trip distance",
+                                  controller: _distanceController,
+                                  isHighlighted: _distanceHighlighted,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  validator: (val) {
+                                    if (val == null || val.isEmpty) return "Distance is required";
+                                    final numVal = double.tryParse(val);
+                                    if (numVal == null || numVal <= 0) return "Must be a positive decimal";
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 2),
+                                child: PlayfulMicButton(
+                                  onSpeechResult: (text) => _parseAndSetNumber(text, _distanceController),
+                                ),
+                              ),
+                            ],
                           ),
                           if (_distanceOcrNote != null) ...[
                             Padding(
@@ -529,18 +567,32 @@ class _LogJobScreenState extends State<LogJobScreen> {
                           ],
                           const SizedBox(height: 20),
 
-                          PlayfulInput(
-                            labelText: "DURATION (MIN)",
-                            hintText: "Enter duration in minutes",
-                            controller: _durationController,
-                            isHighlighted: _durationHighlighted,
-                            keyboardType: TextInputType.number,
-                            validator: (val) {
-                              if (val == null || val.isEmpty) return "Duration is required";
-                              final numVal = double.tryParse(val);
-                              if (numVal == null || numVal <= 0) return "Must be a positive number";
-                              return null;
-                            },
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Expanded(
+                                child: PlayfulInput(
+                                  labelText: "DURATION (MIN)",
+                                  hintText: "Enter duration in minutes",
+                                  controller: _durationController,
+                                  isHighlighted: _durationHighlighted,
+                                  keyboardType: TextInputType.number,
+                                  validator: (val) {
+                                    if (val == null || val.isEmpty) return "Duration is required";
+                                    final numVal = double.tryParse(val);
+                                    if (numVal == null || numVal <= 0) return "Must be a positive number";
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 2),
+                                child: PlayfulMicButton(
+                                  onSpeechResult: (text) => _parseAndSetNumber(text, _durationController),
+                                ),
+                              ),
+                            ],
                           ),
                           if (_durationOcrNote != null) ...[
                             Padding(

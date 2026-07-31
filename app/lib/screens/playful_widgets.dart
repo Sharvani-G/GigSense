@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 // Playful Geometric Design System Colors
 class PlayfulColors {
@@ -523,5 +524,163 @@ class _PlayfulSecondaryButtonState extends State<PlayfulSecondaryButton> {
         ),
       ),
     );
+  }
+}
+
+class PlayfulMicButton extends StatefulWidget {
+  final ValueChanged<String> onSpeechResult;
+
+  const PlayfulMicButton({super.key, required this.onSpeechResult});
+
+  @override
+  State<PlayfulMicButton> createState() => _PlayfulMicButtonState();
+}
+
+class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerProviderStateMixin {
+  late final stt.SpeechToText _speech;
+  bool _isListening = false;
+  bool _speechAvailable = false;
+  
+  late final AnimationController _pulseController;
+  late final Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _speech = stt.SpeechToText();
+    _initSpeech();
+
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+      CurvedAnimation(
+        parent: _pulseController,
+        curve: Curves.easeInOut,
+      ),
+    );
+  }
+
+  Future<void> _initSpeech() async {
+    try {
+      final available = await _speech.initialize(
+        onError: (val) => debugPrint('Speech initialize error: $val'),
+        onStatus: (val) => debugPrint('Speech status: $val'),
+      );
+      if (mounted) {
+        setState(() {
+          _speechAvailable = available;
+        });
+      }
+    } catch (e) {
+      debugPrint('Speech initialization failed: $e');
+    }
+  }
+
+  Future<void> _toggleListening() async {
+    if (!_speechAvailable) {
+      await _initSpeech();
+      if (!_speechAvailable) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "Speech recognition is not available on this device.",
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+            ),
+            backgroundColor: PlayfulColors.secondary,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: PlayfulColors.border, width: 2),
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    if (_isListening) {
+      await _speech.stop();
+      _pulseController.stop();
+      setState(() {
+        _isListening = false;
+      });
+    } else {
+      setState(() {
+        _isListening = true;
+      });
+      if (!MediaQuery.of(context).disableAnimations) {
+        _pulseController.repeat(reverse: true);
+      }
+      await _speech.listen(
+        onResult: (result) {
+          widget.onSpeechResult(result.recognizedWords);
+          if (result.finalResult) {
+            _pulseController.stop();
+            if (mounted) {
+              setState(() {
+                _isListening = false;
+              });
+            }
+          }
+        },
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final disableMotion = MediaQuery.of(context).disableAnimations;
+    final Color btnBg = _isListening
+        ? (disableMotion ? PlayfulColors.tertiary : PlayfulColors.accent)
+        : PlayfulColors.accent;
+
+    Widget buttonBody = GestureDetector(
+      onTap: _toggleListening,
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: btnBg,
+          shape: BoxShape.circle,
+          border: Border.all(color: PlayfulColors.border, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: PlayfulColors.border,
+              offset: _isListening ? const Offset(1, 1) : const Offset(2, 2),
+              blurRadius: 0,
+            ),
+          ],
+        ),
+        child: Icon(
+          _isListening ? Icons.mic : Icons.mic_none,
+          color: Colors.white,
+          size: 20,
+        ),
+      ),
+    );
+
+    if (_isListening && !disableMotion) {
+      return AnimatedBuilder(
+        animation: _pulseController,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _scaleAnimation.value,
+            child: child,
+          );
+        },
+        child: buttonBody,
+      );
+    }
+
+    return buttonBody;
   }
 }
