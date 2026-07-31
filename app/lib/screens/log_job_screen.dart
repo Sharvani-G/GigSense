@@ -17,11 +17,18 @@ class LogJobScreen extends StatefulWidget {
   State<LogJobScreen> createState() => _LogJobScreenState();
 }
 
+class SpokenResult {
+  final double? value;
+  final String? unit;
+  SpokenResult(this.value, this.unit);
+}
+
 class _LogJobScreenState extends State<LogJobScreen> {
   final _formKey = GlobalKey<FormState>();
   final _fareController = TextEditingController();
   final _distanceController = TextEditingController();
   final _durationController = TextEditingController();
+  final _areaHintController = TextEditingController();
 
   String _activeToggle = "manual";
   String? _selectedPlatform;
@@ -47,6 +54,8 @@ class _LogJobScreenState extends State<LogJobScreen> {
   List<PlatformItem> _allPlatforms = [];
   List<PlatformItem> _filteredPlatforms = [];
   String _workerType = 'other_gig_worker';
+  String _distanceUnit = 'km'; // 'km' or 'm'
+  String _durationUnit = 'min'; // 'min' or 'hr'
 
   final _categoryLabels = {
     'cab': 'CAB & RIDE-HAILING',
@@ -73,6 +82,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
     _fareController.dispose();
     _distanceController.dispose();
     _durationController.dispose();
+    _areaHintController.dispose();
     _searchController.dispose();
     _platformFieldController.dispose();
     super.dispose();
@@ -95,16 +105,47 @@ class _LogJobScreenState extends State<LogJobScreen> {
     }
   }
 
-  double? parseSpokenPhrase(String text) {
-    // First, check for digit strings
-    final match = RegExp(r'(\d+(?:\.\d+)?)').firstMatch(text);
-    if (match != null) {
-      return double.tryParse(match.group(1)!);
+  SpokenResult parseSpokenPhrase(String text) {
+    // Return structure holding value and potential unit
+    final lowerText = text.toLowerCase();
+    
+    // Strip common filler words
+    final fillerWords = ['rupees', 'rupee', 'about', 'around', 'of', 'in', 'is', 'for'];
+    var words = lowerText.split(RegExp(r'\s+'));
+    words = words.where((w) => !fillerWords.contains(w)).toList();
+    
+    // Detect unit
+    String? detectedUnit;
+    final textToCheck = words.join(" ");
+    
+    // Distance units
+    if (textToCheck.contains(RegExp(r'\b(kilometers|kilometer|km)\b'))) {
+      detectedUnit = 'km';
+    } else if (textToCheck.contains(RegExp(r'\b(meters|meter|m)\b'))) {
+      detectedUnit = 'm';
+    }
+    // Duration units
+    else if (textToCheck.contains(RegExp(r'\b(minutes|minute|mins|min)\b'))) {
+      detectedUnit = 'min';
+    } else if (textToCheck.contains(RegExp(r'\b(hours|hour|hrs|hr)\b'))) {
+      detectedUnit = 'hr';
+    }
+    
+    // Strip unit words for number parsing
+    final unitWords = ['kilometers', 'kilometer', 'km', 'meters', 'meter', 'm', 'minutes', 'minute', 'mins', 'min', 'hours', 'hour', 'hrs', 'hr'];
+    words = words.where((w) => !unitWords.contains(w)).toList();
+    
+    // Find numeric digits first, handling decimals
+    final digitMatch = RegExp(r'(\d+(?:\.\d+)?)').firstMatch(words.join(" "));
+    if (digitMatch != null) {
+      return SpokenResult(double.tryParse(digitMatch.group(1)!), detectedUnit);
     }
 
     const Map<String, double> spokenNumbers = {
       // English
       'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
+      'eleven': 11, 'twelve': 12, 'thirteen': 13, 'fourteen': 14, 'fifteen': 15, 'sixteen': 16, 'seventeen': 17, 'eighteen': 18, 'nineteen': 19,
+      'twenty': 20, 'thirty': 30, 'forty': 40, 'fifty': 50, 'sixty': 60, 'seventy': 70, 'eighty': 80, 'ninety': 90,
       'hundred': 100, 'thousand': 1000,
       // Hindi
       'ek': 1, 'do': 2, 'teen': 3, 'chaar': 4, 'paanch': 5, 'chhey': 6, 'saat': 7, 'aath': 8, 'nau': 9, 'das': 10,
@@ -121,39 +162,80 @@ class _LogJobScreenState extends State<LogJobScreen> {
       // Malayalam
       'onnu': 1, 'moonnu': 3, 'naalu': 4, 'anchu': 5, 'onpathu': 9,
     };
+    
+    final decimalWords = ['point', 'dot', 'dashmlov', 'bindu'];
 
-    final words = text.toLowerCase().split(RegExp(r'\s+'));
     double total = 0.0;
     double current = 0.0;
+    bool isDecimalMode = false;
+    double decimalDivider = 10.0;
 
     for (var word in words) {
-      final cleanWord = word.replaceAll(RegExp(r'[^\w]'), '');
+      final cleanWord = word.replaceAll(RegExp(r'[^\w\.]'), '');
+      if (decimalWords.contains(cleanWord)) {
+        isDecimalMode = true;
+        total += current;
+        current = 0.0;
+        continue;
+      }
+      
       if (spokenNumbers.containsKey(cleanWord)) {
         final val = spokenNumbers[cleanWord]!;
-        if (val == 100 || val == 1000) {
-          if (current == 0.0) current = 1.0;
-          total += current * val;
-          current = 0.0;
+        if (isDecimalMode) {
+           if (val < 10) { // e.g. "point five"
+               total += val / decimalDivider;
+               decimalDivider *= 10;
+           }
         } else {
-          current += val;
+          if (val == 100 || val == 1000) {
+            if (current == 0.0) current = 1.0;
+            total += current * val;
+            current = 0.0;
+          } else {
+            current += val;
+          }
         }
       }
     }
-    total += current;
-    return total > 0 ? total : null;
+    
+    if (!isDecimalMode) {
+      total += current;
+    }
+    
+    return SpokenResult(total > 0 ? total : null, detectedUnit);
   }
 
-  void _parseAndSetNumber(String text, TextEditingController controller) {
-    final parsed = parseSpokenPhrase(text);
-    if (parsed != null) {
+  void _parseAndSetNumber(String text, TextEditingController controller, {String? fieldType}) {
+    final result = parseSpokenPhrase(text);
+    if (result.value != null) {
       setState(() {
-        if (parsed == parsed.toInt()) {
-          controller.text = parsed.toInt().toString();
+        if (result.value == result.value!.toInt()) {
+          controller.text = result.value!.toInt().toString();
         } else {
-          controller.text = parsed.toString();
+          controller.text = result.value!.toString();
+        }
+        
+        // Auto-switch unit if detected and matches field type
+        if (result.unit != null) {
+          if (fieldType == 'distance' && (result.unit == 'km' || result.unit == 'm')) {
+            _distanceUnit = result.unit!;
+          } else if (fieldType == 'duration' && (result.unit == 'hr' || result.unit == 'min')) {
+            _durationUnit = result.unit!;
+          }
         }
       });
       _checkFormValid();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "Didn't catch that clearly — try again or type it in.",
+            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: PlayfulColors.secondary,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -296,7 +378,53 @@ class _LogJobScreenState extends State<LogJobScreen> {
 
   Future<void> _pickAndScanImage() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    
+    // Show action sheet for camera vs gallery
+    final ImageSource? source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: PlayfulColors.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  StringsProvider.instance.t('logjob_upload_title') ?? "Upload Screenshot",
+                  style: GoogleFonts.outfit(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: PlayfulColors.foreground,
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: PlayfulColors.accent),
+                title: Text("Gallery", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt, color: PlayfulColors.accent),
+                title: Text("Camera", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (source == null) {
+      setState(() {
+        _activeToggle = "manual";
+      });
+      return;
+    }
+
+    final pickedFile = await picker.pickImage(source: source);
     
     if (pickedFile == null) {
       // User cancelled picker, return to manual
@@ -327,10 +455,30 @@ class _LogJobScreenState extends State<LogJobScreen> {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         
+        if (data['relevant'] == false) {
+           ScaffoldMessenger.of(context).showSnackBar(
+             SnackBar(
+               content: Text(
+                 data['reason'] ?? "Screenshot is not a valid gig job.",
+                 style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+               ),
+               backgroundColor: PlayfulColors.secondary,
+               behavior: SnackBarBehavior.floating,
+             ),
+           );
+           setState(() {
+             _activeToggle = "manual";
+             _isOcrLoading = false;
+           });
+           return;
+        }
+
         final String? platform = data['platform'];
         final double? fare = data['fare'] != null ? (data['fare'] as num).toDouble() : null;
-        final double? distance = data['distance_km'] != null ? (data['distance_km'] as num).toDouble() : null;
-        final double? duration = data['duration_min'] != null ? (data['duration_min'] as num).toDouble() : null;
+        final double? distance = data['distance'] != null ? (data['distance'] as num).toDouble() : null;
+        final String? distanceUnit = data['distance_unit'];
+        final double? duration = data['duration'] != null ? (data['duration'] as num).toDouble() : null;
+        final String? durationUnit = data['duration_unit'];
 
         setState(() {
           _jobSource = "ocr";
@@ -359,23 +507,27 @@ class _LogJobScreenState extends State<LogJobScreen> {
             _fareHighlighted = true;
           } else {
             _fareController.clear();
-            _fareOcrNote = "Fare not detected in screenshot.";
+            _fareOcrNote = StringsProvider.instance.t('ocr_no_fare');
           }
 
           if (distance != null) {
             _distanceController.text = distance.toString();
+            if (distanceUnit == 'm') _distanceUnit = 'm';
+            else _distanceUnit = 'km';
             _distanceHighlighted = true;
           } else {
             _distanceController.clear();
-            _distanceOcrNote = "Distance not detected in screenshot.";
+            _distanceOcrNote = StringsProvider.instance.t('ocr_no_distance');
           }
 
           if (duration != null) {
             _durationController.text = duration.toString();
+            if (durationUnit == 'hr') _durationUnit = 'hr';
+            else _durationUnit = 'min';
             _durationHighlighted = true;
           } else {
             _durationController.clear();
-            _durationOcrNote = "Duration not detected in screenshot.";
+            _durationOcrNote = StringsProvider.instance.t('ocr_no_duration');
           }
         });
 
@@ -417,8 +569,13 @@ class _LogJobScreenState extends State<LogJobScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final double fare = double.parse(_fareController.text);
-    final double distance = double.parse(_distanceController.text);
-    final double duration = double.parse(_durationController.text);
+    
+    // Unit conversion
+    double rawDistance = double.parse(_distanceController.text);
+    final double distance = _distanceUnit == 'm' ? rawDistance / 1000 : rawDistance;
+    
+    double rawDuration = double.parse(_durationController.text);
+    final double duration = _durationUnit == 'hr' ? rawDuration * 60 : rawDuration;
     final String platform = _selectedPlatform ?? 'other';
 
     setState(() {
@@ -456,7 +613,8 @@ class _LogJobScreenState extends State<LogJobScreen> {
           ratePerMin = (data['rate_per_min'] as num?)?.toDouble() ?? ratePerMin;
         }
       } else {
-        final fallbackDefaults = {
+        rateSource = 'fallback';
+      final fallbackDefaults = {
           'uber': {'rate_per_km': 12.00, 'rate_per_min': 1.50},
           'rapido': {'rate_per_km': 9.00, 'rate_per_min': 1.20},
           'ola': {'rate_per_km': 11.50, 'rate_per_min': 1.40},
@@ -479,6 +637,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
       }
     } catch (e) {
       debugPrint("Error fetching benchmarks: $e. Using local fallbacks.");
+      rateSource = 'fallback';
       final fallbackDefaults = {
         'uber': {'rate_per_km': 12.00, 'rate_per_min': 1.50},
         'rapido': {'rate_per_km': 9.00, 'rate_per_min': 1.20},
@@ -524,6 +683,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
       'is_underpaid': isUnderpaid,
       'explanation': explanationText,
       'source': _jobSource,
+      'rate_source': rateSource,
       'sample_size': jobSampleSize,
       'job_timestamp': FieldValue.serverTimestamp(),
       'created_at': FieldValue.serverTimestamp(),
@@ -539,6 +699,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
       'is_underpaid': isUnderpaid,
       'explanation': explanationText,
       'source': _jobSource,
+      'rate_source': rateSource,
       'sample_size': jobSampleSize,
       'job_timestamp': DateTime.now().toIso8601String(),
       'created_at': DateTime.now().toIso8601String(),
@@ -746,7 +907,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                                 padding: const EdgeInsets.only(bottom: 2),
                                 child: PlayfulMicButton(
                                   textOnLeft: true,
-                                  onSpeechResult: (text) => _parseAndSetNumber(text, _fareController),
+                                  onSpeechResult: (text) => _parseAndSetNumber(text, _fareController, fieldType: 'fare'),
                                 ),
                               ),
                             ],
@@ -770,12 +931,21 @@ class _LogJobScreenState extends State<LogJobScreen> {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Expanded(
-                                child: PlayfulInput(
+                                child: PlayfulUnitInput(
                                   labelText: StringsProvider.instance.t('logjob_distance'),
                                   hintText: StringsProvider.instance.t('logjob_distance_hint'),
                                   controller: _distanceController,
                                   isHighlighted: _distanceHighlighted,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  unitOptions: const ['km', 'm'],
+                                  currentUnit: _distanceUnit,
+                                  onUnitChanged: (newUnit) {
+                                    setState(() {
+                                      _distanceUnit = newUnit;
+                                      _distanceController.clear();
+                                    });
+                                    _checkFormValid();
+                                  },
                                   validator: (val) {
                                     if (val == null || val.isEmpty) return StringsProvider.instance.t('logjob_distance_required');
                                     final numVal = double.tryParse(val);
@@ -789,7 +959,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                                 padding: const EdgeInsets.only(bottom: 2),
                                 child: PlayfulMicButton(
                                   textOnLeft: true,
-                                  onSpeechResult: (text) => _parseAndSetNumber(text, _distanceController),
+                                  onSpeechResult: (text) => _parseAndSetNumber(text, _distanceController, fieldType: 'distance'),
                                 ),
                               ),
                             ],
@@ -813,12 +983,21 @@ class _LogJobScreenState extends State<LogJobScreen> {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Expanded(
-                                child: PlayfulInput(
+                                child: PlayfulUnitInput(
                                   labelText: StringsProvider.instance.t('logjob_duration'),
                                   hintText: StringsProvider.instance.t('logjob_duration_hint'),
                                   controller: _durationController,
                                   isHighlighted: _durationHighlighted,
                                   keyboardType: TextInputType.number,
+                                  unitOptions: const ['min', 'hr'],
+                                  currentUnit: _durationUnit,
+                                  onUnitChanged: (newUnit) {
+                                    setState(() {
+                                      _durationUnit = newUnit;
+                                      _durationController.clear();
+                                    });
+                                    _checkFormValid();
+                                  },
                                   validator: (val) {
                                     if (val == null || val.isEmpty) return StringsProvider.instance.t('logjob_duration_required');
                                     final numVal = double.tryParse(val);
@@ -832,7 +1011,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                                 padding: const EdgeInsets.only(bottom: 2),
                                 child: PlayfulMicButton(
                                   textOnLeft: true,
-                                  onSpeechResult: (text) => _parseAndSetNumber(text, _durationController),
+                                  onSpeechResult: (text) => _parseAndSetNumber(text, _durationController, fieldType: 'duration'),
                                 ),
                               ),
                             ],
@@ -850,7 +1029,33 @@ class _LogJobScreenState extends State<LogJobScreen> {
                               ),
                             ),
                           ],
-                          const SizedBox(height: 32),
+                          const SizedBox(height: 20),
+
+                          if (_jobSource == "manual") ...[
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Expanded(
+                                  child: PlayfulInput(
+                                    labelText: "Area/Locality (Optional)", // Not hardcoding english strings generally but since I can't touch all strings easily right now we'll do this
+                                    hintText: "E.g., Koramangala, Indiranagar",
+                                    controller: _areaHintController,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 2),
+                                  child: PlayfulMicButton(
+                                    textOnLeft: true,
+                                    onSpeechResult: (text) => setState(() => _areaHintController.text = text),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 32),
+                          ] else ...[
+                            const SizedBox(height: 12),
+                          ],
 
                           PlayfulButton(
                             onPressed: _isFormValid ? _submitJob : null,

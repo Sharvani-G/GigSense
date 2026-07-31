@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'dart:async';
+import 'package:permission_handler/permission_handler.dart';
 import '../i18n/strings.dart';
 
 // Playful Geometric Design System Colors
@@ -122,6 +124,7 @@ class PlayfulInput extends StatefulWidget {
   final bool obscureText;
   final bool readOnly;
   final VoidCallback? onTap;
+  final Widget? suffixIcon;
 
   const PlayfulInput({
     super.key,
@@ -138,6 +141,7 @@ class PlayfulInput extends StatefulWidget {
     this.obscureText = false,
     this.readOnly = false,
     this.onTap,
+    this.suffixIcon,
   });
 
   @override
@@ -149,6 +153,16 @@ class _PlayfulInputState extends State<PlayfulInput> with SingleTickerProviderSt
   bool _isFocused = false;
   late final AnimationController _pulseController;
   late final Animation<Color?> _pulseAnimation;
+
+  @override
+  void didUpdateWidget(PlayfulMicButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Sync if global language changed and we haven't manually cycled
+    final globalLang = StringsProvider.instance.lang;
+    if (_supportedLanguages.contains(globalLang) && _currentOverrideLang != globalLang) {
+      _currentOverrideLang = globalLang;
+    }
+  }
 
   @override
   void initState() {
@@ -299,6 +313,7 @@ class _PlayfulInputState extends State<PlayfulInput> with SingleTickerProviderSt
                     ),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                     border: InputBorder.none,
+                    suffixIcon: widget.suffixIcon,
                   ),
                 ),
         ),
@@ -369,14 +384,17 @@ class _PlayfulBadgeState extends State<PlayfulBadge> with SingleTickerProviderSt
               ),
             ],
           ),
-          child: Text(
-            widget.text,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.outfit(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              letterSpacing: 1.0,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              widget.text,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.outfit(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                letterSpacing: 1.0,
+              ),
             ),
           ),
         ),
@@ -578,14 +596,24 @@ class PlayfulMicButton extends StatefulWidget {
 class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerProviderStateMixin {
   late final stt.SpeechToText _speech;
   bool _isListening = false;
+  bool _isProcessing = false;
   bool _speechAvailable = false;
   
   late final AnimationController _pulseController;
   late final Animation<double> _scaleAnimation;
+  Timer? _timeoutTimer;
+  
+  final List<String> _supportedLanguages = ['en', 'hi', 'kn', 'te', 'ta', 'ml'];
+  late String _currentOverrideLang;
 
   @override
   void initState() {
     super.initState();
+    _currentOverrideLang = StringsProvider.instance.lang;
+    if (!_supportedLanguages.contains(_currentOverrideLang)) {
+      _currentOverrideLang = 'en';
+    }
+    
     _speech = stt.SpeechToText();
     _initSpeech();
 
@@ -605,8 +633,23 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
   Future<void> _initSpeech() async {
     try {
       final available = await _speech.initialize(
-        onError: (val) => debugPrint('Speech initialize error: $val'),
-        onStatus: (val) => debugPrint('Speech status: $val'),
+        onError: (val) {
+          debugPrint('Speech initialize error: $val');
+          if (mounted) {
+             _handleSttError();
+          }
+        },
+        onStatus: (val) {
+          debugPrint('Speech status: $val');
+          if (val == 'done' && _isListening) {
+             if (mounted) {
+               setState(() {
+                 _isListening = false;
+                 _isProcessing = true;
+               });
+             }
+          }
+        },
       );
       if (mounted) {
         setState(() {
@@ -618,9 +661,74 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
     }
   }
 
+  void _handleSttError() {
+      _timeoutTimer?.cancel();
+      _pulseController.stop();
+      if (mounted) {
+          setState(() {
+             _isListening = false;
+             _isProcessing = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                StringsProvider.instance.t('stt_didnt_catch'),
+                style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+              ),
+              backgroundColor: PlayfulColors.secondary,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+      }
+  }
+
+  Future<bool> _requestMicrophonePermission() async {
+    var status = await Permission.microphone.status;
+    if (status.isDenied || status.isPermanentlyDenied) {
+      if (status.isPermanentlyDenied) {
+        _showPermissionDialog();
+        return false;
+      }
+      status = await Permission.microphone.request();
+      if (status.isDenied || status.isPermanentlyDenied) {
+        _showPermissionDialog();
+        return false;
+      }
+    }
+    return true;
+  }
+
+  void _showPermissionDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(StringsProvider.instance.t('stt_mic_access_req'), style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        content: Text(StringsProvider.instance.t('stt_mic_access_desc'), style: GoogleFonts.plusJakartaSans()),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: const BorderSide(color: PlayfulColors.border, width: 2)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(StringsProvider.instance.t('stt_cancel'), style: GoogleFonts.plusJakartaSans(color: PlayfulColors.mutedForeground)),
+          ),
+          PlayfulSecondaryButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              openAppSettings();
+            },
+            child: const Text(StringsProvider.instance.t('stt_open_settings')),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _toggleListening() async {
-    final resolvedLanguage = StringsProvider.instance.lang;
-    final resolvedLocale = getBCP47Locale(resolvedLanguage);
+    if (_isProcessing) return; // Prevent tapping while processing
+
+    final hasPerm = await _requestMicrophonePermission();
+    if (!hasPerm) return;
+
+    final resolvedLocale = getBCP47Locale(_currentOverrideLang);
 
     if (!_speechAvailable) {
       await _initSpeech();
@@ -628,7 +736,7 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              "Speech recognition is not available on this device.",
+              StringsProvider.instance.t('stt_not_available'),
               style: GoogleFonts.plusJakartaSans(
                 color: PlayfulColors.foreground,
                 fontWeight: FontWeight.bold,
@@ -649,8 +757,10 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
     if (_isListening) {
       await _speech.stop();
       _pulseController.stop();
+      _timeoutTimer?.cancel();
       setState(() {
         _isListening = false;
+        _isProcessing = false;
       });
     } else {
       // Locale availability check
@@ -665,12 +775,12 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
         }
 
         if (!isLocaleAvailable) {
-          final langName = getLanguageName(resolvedLanguage);
+          final langName = getLanguageName(_currentOverrideLang);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  "$langName voice input isn't available on this device yet — you can still type, or install $langName under your phone's language settings.",
+                  StringsProvider.instance.t('stt_voice_input_unavailable').replaceAll('{}', langName),
                   style: GoogleFonts.plusJakartaSans(
                     color: PlayfulColors.foreground,
                     fontWeight: FontWeight.bold,
@@ -693,30 +803,63 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
 
       setState(() {
         _isListening = true;
+        _isProcessing = false;
       });
       if (!MediaQuery.of(context).disableAnimations) {
         _pulseController.repeat(reverse: true);
       }
+      
+      // Start timeout
+      _timeoutTimer = Timer(const Duration(seconds: 6), () {
+         if (_isListening && mounted) {
+            _speech.stop();
+            _handleSttError();
+         }
+      });
+
       await _speech.listen(
         localeId: resolvedLocale,
         onResult: (result) {
-          widget.onSpeechResult(result.recognizedWords);
+          _timeoutTimer?.cancel();
           if (result.finalResult) {
             _pulseController.stop();
             if (mounted) {
               setState(() {
                 _isListening = false;
+                _isProcessing = false;
               });
             }
+            widget.onSpeechResult(result.recognizedWords);
+          } else {
+             // Partial results reset timeout
+             _timeoutTimer?.cancel();
+             _timeoutTimer = Timer(const Duration(seconds: 4), () {
+                 if (_isListening && mounted) {
+                    _speech.stop();
+                    _handleSttError();
+                 }
+             });
           }
         },
       );
     }
   }
 
+  void _cycleLanguage() {
+    if (_isListening || _isProcessing) return;
+    int idx = _supportedLanguages.indexOf(_currentOverrideLang);
+    setState(() {
+      _currentOverrideLang = _supportedLanguages[(idx + 1) % _supportedLanguages.length];
+    });
+  }
+
   @override
   void dispose() {
+    _timeoutTimer?.cancel();
     _pulseController.dispose();
+    if (_isListening) {
+      _speech.cancel();
+    }
     super.dispose();
   }
 
@@ -739,28 +882,32 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
           boxShadow: [
             BoxShadow(
               color: PlayfulColors.border,
-              offset: _isListening ? const Offset(1, 1) : const Offset(2, 2),
+              offset: _isListening || _isProcessing ? const Offset(1, 1) : const Offset(2, 2),
               blurRadius: 0,
             ),
           ],
         ),
-        child: Icon(
-          _isListening ? Icons.mic : Icons.mic_none,
-          color: Colors.white,
-          size: 20,
-        ),
+        child: _isProcessing 
+            ? const Padding(
+                padding: EdgeInsets.all(12.0),
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+              )
+            : Icon(
+                _isListening ? Icons.mic : Icons.mic_none,
+                color: Colors.white,
+                size: 20,
+              ),
       ),
     );
 
-    final resolvedLanguage = StringsProvider.instance.lang;
-    final activeLangName = getLanguageName(resolvedLanguage);
+    final activeLangName = getLanguageName(_currentOverrideLang);
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (_isListening && widget.textOnLeft) ...[
           Text(
-            "Listening in $activeLangName...",
+            StringsProvider.instance.t('stt_listening').replaceAll('{}', activeLangName),
             style: GoogleFonts.plusJakartaSans(
               fontSize: 12,
               fontWeight: FontWeight.bold,
@@ -769,6 +916,31 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
           ),
           const SizedBox(width: 8),
         ],
+        
+        // Language Chip
+        if (!_isListening && !_isProcessing) ...[
+           GestureDetector(
+             onTap: _cycleLanguage,
+             child: Container(
+               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+               decoration: BoxDecoration(
+                 color: PlayfulColors.secondary,
+                 borderRadius: BorderRadius.circular(4),
+                 border: Border.all(color: PlayfulColors.border, width: 1.5),
+               ),
+               child: Text(
+                 _currentOverrideLang.toUpperCase(),
+                 style: GoogleFonts.outfit(
+                   fontSize: 10,
+                   fontWeight: FontWeight.w900,
+                   color: Colors.white,
+                 ),
+               ),
+             ),
+           ),
+           const SizedBox(width: 6),
+        ],
+
         _isListening && !disableMotion
             ? AnimatedBuilder(
                 animation: _pulseController,
@@ -781,10 +953,11 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
                 child: buttonBody,
               )
             : buttonBody,
+            
         if (_isListening && !widget.textOnLeft) ...[
           const SizedBox(width: 8),
           Text(
-            "Listening in $activeLangName...",
+            StringsProvider.instance.t('stt_listening').replaceAll('{}', activeLangName),
             style: GoogleFonts.plusJakartaSans(
               fontSize: 12,
               fontWeight: FontWeight.bold,
@@ -1176,6 +1349,88 @@ class _PlayfulSafetyContextWidgetState extends State<PlayfulSafetyContextWidget>
           ),
         ],
       ],
+    );
+  }
+}
+
+class PlayfulUnitInput extends StatelessWidget {
+  final String labelText;
+  final String hintText;
+  final TextEditingController controller;
+  final bool isHighlighted;
+  final FormFieldValidator<String>? validator;
+  final TextInputType keyboardType;
+  final List<String> unitOptions;
+  final String currentUnit;
+  final ValueChanged<String> onUnitChanged;
+
+  const PlayfulUnitInput({
+    super.key,
+    required this.labelText,
+    required this.hintText,
+    required this.controller,
+    required this.isHighlighted,
+    this.validator,
+    this.keyboardType = TextInputType.text,
+    required this.unitOptions,
+    required this.currentUnit,
+    required this.onUnitChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PlayfulInput(
+      labelText: labelText,
+      hintText: hintText,
+      controller: controller,
+      isHighlighted: isHighlighted,
+      keyboardType: keyboardType,
+      validator: validator,
+      suffixIcon: Padding(
+        padding: const EdgeInsets.only(right: 8.0, top: 8.0, bottom: 8.0),
+        child: Container(
+          decoration: BoxDecoration(
+            color: PlayfulColors.tertiary,
+            borderRadius: BorderRadius.circular(9999),
+            border: Border.all(color: PlayfulColors.border, width: 2),
+            boxShadow: const [
+              BoxShadow(
+                color: PlayfulColors.border,
+                offset: Offset(2, 2),
+                blurRadius: 0,
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: unitOptions.map((unit) {
+              final isSelected = unit == currentUnit;
+              return GestureDetector(
+                onTap: () {
+                  if (!isSelected) {
+                    onUnitChanged(unit);
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isSelected ? PlayfulColors.accent : Colors.transparent,
+                    borderRadius: BorderRadius.circular(9999),
+                  ),
+                  child: Text(
+                    unit,
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: isSelected ? Colors.white : PlayfulColors.foreground,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      ),
     );
   }
 }

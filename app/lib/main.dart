@@ -291,6 +291,7 @@ class _LanguagePickerSheetState extends State<LanguagePickerSheet> {
     {'code': 'kn', 'key': 'lang_kn'},
     {'code': 'ta', 'key': 'lang_ta'},
     {'code': 'te', 'key': 'lang_te'},
+    {'code': 'ml', 'key': 'lang_ml'},
   ];
 
   @override

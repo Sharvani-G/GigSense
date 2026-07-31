@@ -7,6 +7,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import 'playful_widgets.dart';
 import 'history_screen.dart';
 import '../i18n/strings.dart';
@@ -39,6 +41,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // Fatigue nudge variables
   bool _showFatigueNudge = false;
   double _fatigueHours = 0.0;
+  String _fatigueMessage = "";
+  bool _isFatigueLoading = false;
   String? _anonymousLastNudgeDate;
 
   // User profile personalization
@@ -284,6 +288,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           setState(() {
             _showFatigueNudge = true;
             _fatigueHours = fatigueMinutes / 60.0;
+              _fetchFatigueMessage(user.uid, _fatigueHours);
           });
         } else {
           setState(() {
@@ -298,6 +303,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             setState(() {
               _showFatigueNudge = true;
               _fatigueHours = fatigueMinutes / 60.0;
+              _fetchFatigueMessage(user.uid, _fatigueHours);
             });
           } else {
             setState(() {
@@ -310,6 +316,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             setState(() {
               _showFatigueNudge = true;
               _fatigueHours = fatigueMinutes / 60.0;
+              _fetchFatigueMessage(user.uid, _fatigueHours);
             });
           } else {
             setState(() {
@@ -321,6 +328,45 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     } else {
       setState(() {
         _showFatigueNudge = false;
+      });
+    }
+  }
+
+
+  Future<void> _fetchFatigueMessage(String userId, double hours) async {
+    setState(() {
+      _isFatigueLoading = true;
+      _fatigueMessage = "";
+    });
+    try {
+      final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+      final Uri url = Uri.parse('$baseUrl/fatigue-nudge');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'user_id': userId,
+          'total_hours': hours,
+        }),
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          _fatigueMessage = data['message'] ?? "You've logged over 10 hours today! Remember to take a quick break.";
+        });
+      } else {
+        setState(() {
+          _fatigueMessage = "You've logged over 10 hours today! Remember to take a quick break.";
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching fatigue message: $e");
+      setState(() {
+        _fatigueMessage = "You've logged over 10 hours today! Remember to take a quick break.";
+      });
+    } finally {
+      setState(() {
+        _isFatigueLoading = false;
       });
     }
   }
@@ -375,6 +421,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final periodsElapsed = elapsedDays >= 0 ? (elapsedDays ~/ periodLength) : 0;
     final periodStart = startDateLocal.add(Duration(days: periodsElapsed * periodLength));
     final periodEnd = periodStart.add(Duration(days: periodLength));
+
+    // Permanently roll over the goal window if we've passed periods
+    if (periodsElapsed > 0) {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null && !user.isAnonymous) {
+        FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'savingsGoal': {
+            'startDate': Timestamp.fromDate(periodStart),
+          }
+        }, SetOptions(merge: true));
+      }
+      _savingsGoal!['startDate'] = Timestamp.fromDate(periodStart);
+    }
+
     
     // We add 1 to match expected inclusive days (e.g. today is 1 day remaining)
     final daysRemaining = periodEnd.difference(now).inDays + 1;
@@ -506,7 +566,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     children: [
                       const SizedBox(height: 16),
                       // Header
-                      Text(
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
                         "${StringsProvider.instance.t('greeting')}, $_userName!",
                         style: GoogleFonts.outfit(
                           fontWeight: FontWeight.w900,
@@ -514,6 +577,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           color: PlayfulColors.foreground,
                         ),
                       ),
+                      )
                       const SizedBox(height: 4),
                       Text(
                         dateRange,
@@ -559,8 +623,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            "You've logged ${_fatigueHours.toStringAsFixed(1)} hours in the last 24 hours — even a short break helps.",
+                                          _isFatigueLoading
+                                              ? const SizedBox(
+                                                  height: 20,
+                                                  width: 20,
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFD97706)),
+                                                  ),
+                                                )
+                                              : Text(
+                                                  _fatigueMessage,
+
                                             style: GoogleFonts.plusJakartaSans(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 14,
@@ -598,9 +672,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         child: Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: PlayfulColors.tertiary.withOpacity(0.15),
+                            color: _insightText.toLowerCase().contains("burnout") || _insightText.toLowerCase().contains("rest") 
+                                ? const Color(0xFFFEF2F2) // very light red
+                                : PlayfulColors.tertiary.withOpacity(0.15),
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: PlayfulColors.border, width: 2.0),
+                            border: Border.all(
+                              color: _insightText.toLowerCase().contains("burnout") || _insightText.toLowerCase().contains("rest") 
+                                  ? const Color(0xFFEF4444) // red border
+                                  : PlayfulColors.border,
+                              width: 2.0
+                            ),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1346,3 +1427,192 @@ class _PlayfulSkeletonState extends State<PlayfulSkeleton> with SingleTickerProv
     );
   }
 }
+
+
+  Future<void> _showSOSBottomSheet(BuildContext context) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.isAnonymous) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please sign in to use SOS features.")),
+      );
+      return;
+    }
+
+    // Fetch contacts
+    final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+    final data = doc.data();
+    final contacts = List<Map<String, dynamic>>.from((data?['emergencyContacts'] as List?)?.map((e) => Map<String,dynamic>.from(e)) ?? []);
+
+    if (contacts.isEmpty) {
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => Container(
+          padding: const EdgeInsets.all(24),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.warning_amber_rounded, size: 48, color: PlayfulColors.secondary),
+              const SizedBox(height: 16),
+              Text(
+                "No Emergency Contacts Set",
+                style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 20),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "You need to add at least one emergency contact in Settings before you can use the SOS feature.",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.plusJakartaSans(color: PlayfulColors.mutedForeground),
+              ),
+              const SizedBox(height: 24),
+              PlayfulButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("OK, I'LL ADD THEM LATER"),
+              ),
+            ],
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Show SOS prepare sheet
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setStateSheet) {
+            bool isLoading = false;
+            String? draftMessage;
+
+            return Container(
+              padding: const EdgeInsets.all(24),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                border: Border(top: BorderSide(color: PlayfulColors.border, width: 2)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    "SOS / I Feel Unsafe",
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 22, color: const Color(0xFFEF4444)),
+                  ),
+                  const SizedBox(height: 16),
+                  if (draftMessage == null) ...[
+                    Text(
+                      "Feeling unsafe? We'll prepare an alert message for your ${contacts.length} emergency contacts.",
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.plusJakartaSans(color: PlayfulColors.foreground, fontSize: 16),
+                    ),
+                    const SizedBox(height: 24),
+                    PlayfulButton(
+                      backgroundColor: const Color(0xFFEF4444),
+                      onPressed: isLoading
+                          ? null
+                          : () async {
+                              setStateSheet(() => isLoading = true);
+                              try {
+                                final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+                                final Uri url = Uri.parse('$baseUrl/sos-message');
+                                final response = await http.post(
+                                  url,
+                                  headers: {'Content-Type': 'application/json'},
+                                  body: json.encode({'user_id': user.uid}),
+                                );
+                                if (response.statusCode == 200) {
+                                  setStateSheet(() {
+                                    draftMessage = json.decode(response.body)['draft_message'];
+                                  });
+                                } else {
+                                  setStateSheet(() {
+                                    draftMessage = "I am feeling unsafe during my current gig work trip. Please check in on me or be ready to help.";
+                                  });
+                                }
+                              } catch (e) {
+                                setStateSheet(() {
+                                  draftMessage = "I am feeling unsafe during my current gig work trip. Please check in on me or be ready to help.";
+                                });
+                              } finally {
+                                setStateSheet(() => isLoading = false);
+                              }
+                            },
+                      child: isLoading
+                          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white))
+                          : Text(
+                              "PREPARE MESSAGE",
+                              style: GoogleFonts.outfit(fontWeight: FontWeight.w900, color: Colors.white),
+                            ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(
+                        "CANCEL",
+                        style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: PlayfulColors.mutedForeground),
+                      ),
+                    ),
+                  ] else ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: PlayfulColors.tertiary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: PlayfulColors.tertiary, width: 1.5),
+                      ),
+                      child: Text(
+                        draftMessage!,
+                        style: GoogleFonts.plusJakartaSans(fontSize: 16, height: 1.4),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    PlayfulButton(
+                      backgroundColor: PlayfulColors.primary,
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: draftMessage!));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Copied to clipboard!")),
+                        );
+                      },
+                      child: Text(
+                        "COPY MESSAGE",
+                        style: GoogleFonts.outfit(fontWeight: FontWeight.w900, color: PlayfulColors.foreground),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    PlayfulButton(
+                      backgroundColor: PlayfulColors.accent,
+                      onPressed: () {
+                        Share.share(draftMessage!);
+                      },
+                      child: Text(
+                        "SHARE ALERT",
+                        style: GoogleFonts.outfit(fontWeight: FontWeight.w900, color: Colors.white),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(
+                        "DONE",
+                        style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: PlayfulColors.mutedForeground),
+                      ),
+                    ),
+                  ]
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }

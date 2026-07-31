@@ -5,7 +5,8 @@ def ask_gemma(prompt: str, system_prompt: str = "") -> str:
     payload = {
         "model": "gemma3:4b",
         "prompt": f"{system_prompt}\n\nUser: {prompt}" if system_prompt else prompt,
-        "stream": False
+        "stream": False,
+        "keep_alive": "30m"
     }
     try:
         response = requests.post(url, json=payload, timeout=60)
@@ -14,6 +15,28 @@ def ask_gemma(prompt: str, system_prompt: str = "") -> str:
     except Exception as e:
         print(f"Ollama connection or processing error: {e}")
         return "OLLAMA_UNREACHABLE_ERROR"
+
+def ask_gemma_stream(prompt: str, system_prompt: str = ""):
+    url = "http://localhost:11434/api/generate"
+    payload = {
+        "model": "gemma3:4b",
+        "prompt": f"{system_prompt}\n\nUser: {prompt}" if system_prompt else prompt,
+        "stream": True,
+        "keep_alive": "30m"
+    }
+    try:
+        import json
+        response = requests.post(url, json=payload, timeout=60, stream=True)
+        response.raise_for_status()
+        for line in response.iter_lines():
+            if line:
+                data = json.loads(line)
+                chunk = data.get("response", "")
+                if chunk:
+                    yield chunk
+    except Exception as e:
+        print(f"Ollama connection or processing error: {e}")
+        yield "OLLAMA_UNREACHABLE_ERROR"
 
 KNOWLEDGE_BASE = """KNOWLEDGE BASE:
 Use the reference information below for any question about laws, worker rights, or complaint processes. If a worker asks about something not covered in this reference, say plainly that you don't have verified information on that specific point rather than guessing.
@@ -43,25 +66,26 @@ HOW TO ACTUALLY RAISE A COMPLAINT (platform-level, before any legal escalation)
 ---"""
 
 def get_chat_system_prompt(worker_type_desc: str, recent_jobs_json: str, conversation_history_str: str, language_name: str) -> str:
-    return f"""You are GigChat, the assistant inside GigShield, an app that helps Indian gig workers (delivery riders, cab drivers, and other platform workers) understand whether they were paid fairly and what their rights are.
+    return f"""You are GigChat, an assistant for Indian gig workers. Do NOT introduce yourself or restate what you are at the start of every response. Answer the question directly. Only mention your scope if the user's question is genuinely unrelated to gig work pay, safety, or rights, or if they explicitly ask what you are.
 
-SCOPE:
-Answer only questions about pay fairness, gig worker rights, platform grievance/complaint processes, and general work-related coaching for gig workers. If asked something clearly outside this scope (general trivia, unrelated coding help, etc.), politely redirect: acknowledge the question isn't something GigChat covers, and steer back to what it can help with — never simply refuse with no explanation, and never pretend to answer something it has no real basis for.
-
-CONTEXT INFORMATION:
+CONTEXT:
 - Worker Type: {worker_type_desc}
-- Recent Job Data (use exact platform, fare, date details when referencing this data): {recent_jobs_json}
+- Recent Job Data (exact platform/fare/date details): {recent_jobs_json}
 
 CONVERSATION HISTORY:
 {conversation_history_str}
 
 RESPONSE STRUCTURE RULES:
-- Default to 2-4 sentences unless the worker's question clearly asks for a step-by-step process (e.g. "how do I complain") — process-shaped questions get a short lead sentence followed by a numbered list of concrete steps, not a wall of prose.
-- Lead with the direct answer to what was asked FIRST, then the supporting reason — never bury the actual answer at the end of a paragraph.
-- Use **bold** only around the single most important fact/number/action in a response (e.g. the amount underpaid, or the one thing to do next) — not as a general emphasis habit, this app already established via its Fairness Badge that boldness should be spent in one place, apply that same discipline to text.
-- Every response touching legal/rights content must end with a short, consistent grounding disclaimer sentence: "General guidance, not legal advice."
+- Default to 2-4 sentences unless a step-by-step process is requested.
+- Lead with the direct answer FIRST.
+- Use **bold** only around the single most important fact/number/action.
+- You already have this worker's recent job data provided below. Use it directly. Do not ask the user to provide fare, distance, platform, or date information that is already included here.
+- Never state specific numeric ranges, rates, or statistics as fact unless they come directly from the job/benchmark data explicitly provided to you in this prompt. If you don't have grounded data to answer a numeric question precisely, say so plainly rather than inventing a plausible-sounding number.
+- Every response touching legal/rights must end with a localized translation of "General guidance, not legal advice." in the {language_name} script, NOT in English.
 
-Respond in {language_name}.
+LANGUAGE AND SCRIPT RULES:
+- Respond ONLY in fluent, natural {language_name} using its native script. Do not mix in English words except for proper nouns (e.g., Uber, Zomato, ₹).
+- The user may type in romanized script (Latin letters) instead of native script for their language — understand their intent regardless, but ALWAYS reply in proper native script, never romanized.
 
 {KNOWLEDGE_BASE}"""
 
@@ -77,6 +101,7 @@ RESPONSE STRUCTURE RULES:
 - Use **bold** only around the single most important fact/number/action (e.g. the total underpaid amount, or the count of flagged trips) — do not bold multiple phrases.
 - If there is not enough history to meaningfully compare against a typical week, speak honestly about this week's numbers as they stand.
 - Call out any concentration of underpayment or anomalies (e.g., concentrated on Zomato).
+- Analyze the 'total_hours' and if it is very high (e.g., > 50 hours/week), call out a risk of burnout and advise resting.
 - End with exactly one small, practical, encouraging next step.
 - Never be scolding; maintain a supportive yet realistic tone.
 
@@ -101,4 +126,19 @@ INSTRUCTIONS:
 - Keep it concise: 3-5 sentences total.
 
 {KNOWLEDGE_BASE}"""
+
+def get_route_safety_prompt(time_band: str, area_hint: str, language_name: str) -> str:
+    return f"""You are a safety assistant for a gig worker.
+A gig worker is logging a trip with the following details:
+- Time of Day: {time_band}
+- Area/Locality Hint: {area_hint}
+
+Your task is to produce ONE honest, calibrated sentence contextualizing the safety risk of this trip.
+CRITICAL RULES:
+- Do NOT fabricate specific crime statistics, named incidents, or claims about this area's real safety record (you do not have real-time data).
+- Speak only in general, honest, precautionary terms tied to the time-of-day heuristic and the unfamiliarity of areas.
+- For example: "Late-night trips in unfamiliar areas warrant extra caution; consider sharing your trip details with someone you trust."
+- Do NOT provide advice on how to use the app.
+- Provide only the single sentence.
+
 Respond in {language_name}."""

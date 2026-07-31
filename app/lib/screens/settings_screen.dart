@@ -25,6 +25,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _workerType = "other_gig_worker";
   String _langCode = "en";
   Map<String, dynamic>? _savingsGoal;
+  List<Map<String, dynamic>> _emergencyContacts = [];
 
   @override
   void initState() {
@@ -59,6 +60,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _workerType = data['workerType'] ?? "other_gig_worker";
           _langCode = data['preferredLanguage'] ?? StringsProvider.instance.lang;
           _savingsGoal = data['savingsGoal'] as Map<String, dynamic>?;
+              _emergencyContacts = List<Map<String, dynamic>>.from((data['emergencyContacts'] as List?)?.map((e) => Map<String,dynamic>.from(e)) ?? []);
           _isLoading = false;
         });
       }
@@ -247,6 +249,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 ),
                                 _buildDivider(),
 
+
+                                // Emergency Contacts row
+                                _buildSettingsRow(
+                                  icon: Icons.health_and_safety_outlined,
+                                  label: "Emergency Contacts",
+                                  trailingText: "${_emergencyContacts.length}/5",
+                                  onTap: () async {
+                                    final updated = await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => EmergencyContactsScreen(
+                                          contacts: _emergencyContacts,
+                                        ),
+                                      ),
+                                    );
+                                    if (updated == true) {
+                                      _fetchUserProfile();
+                                    }
+                                  },
+                                ),
+                                _buildDivider(),
                                 // About row
                                 _buildSettingsRow(
                                   icon: Icons.info_outline_rounded,
@@ -504,11 +527,15 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
     setState(() => _isSaving = true);
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
+
       final goalData = {
         'targetAmount': amount,
         'period': _period,
-        'startDate': Timestamp.now(),
+        'startDate': widget.initialGoal != null && widget.initialGoal!['startDate'] != null
+            ? widget.initialGoal!['startDate']
+            : Timestamp.now(),
       };
+
       
       try {
         if (!user.isAnonymous) {
@@ -1054,6 +1081,223 @@ class AboutScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+class EmergencyContactsScreen extends StatefulWidget {
+  final List<Map<String, dynamic>> contacts;
+  const EmergencyContactsScreen({super.key, required this.contacts});
+
+  @override
+  State<EmergencyContactsScreen> createState() => _EmergencyContactsScreenState();
+}
+
+class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
+  late List<Map<String, dynamic>> _contacts;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _contacts = List.from(widget.contacts.map((c) => Map<String, dynamic>.from(c)));
+  }
+
+  Future<void> _saveContacts() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.isAnonymous) {
+      Navigator.pop(context);
+      return;
+    }
+    setState(() => _isLoading = true);
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'emergencyContacts': _contacts,
+      }, SetOptions(merge: true));
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      debugPrint("Error saving contacts: $e");
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _showAddDialog() {
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: PlayfulColors.border, width: 2),
+        ),
+        title: Text(
+          "Add Contact",
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(
+                labelText: "Name",
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: phoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: "Phone Number",
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("CANCEL", style: TextStyle(color: PlayfulColors.mutedForeground)),
+          ),
+          PlayfulButton(
+            onPressed: () {
+              if (nameCtrl.text.isNotEmpty && phoneCtrl.text.isNotEmpty) {
+                setState(() {
+                  _contacts.add({
+                    'name': nameCtrl.text.trim(),
+                    'phone': phoneCtrl.text.trim(),
+                  });
+                });
+                Navigator.pop(ctx);
+              }
+            },
+            child: const Text("ADD"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: PlayfulColors.background,
+      appBar: AppBar(
+        backgroundColor: PlayfulColors.background,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: PlayfulColors.foreground),
+        title: Text(
+          "Emergency Contacts",
+          style: GoogleFonts.outfit(
+            color: PlayfulColors.foreground,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: PlayfulColors.tertiary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: PlayfulColors.tertiary, width: 2),
+                ),
+                child: Text(
+                  "Set up to 5 trusted contacts. If you ever feel unsafe on a job, you can quickly draft and send an SOS alert to them from the Home screen.",
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.bold,
+                    color: PlayfulColors.foreground,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _contacts.length,
+                  itemBuilder: (ctx, i) {
+                    final c = _contacts[i];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: PlayfulColors.border, width: 2),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: PlayfulColors.secondary,
+                            offset: Offset(3, 3),
+                            blurRadius: 0,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  c['name'],
+                                  style: GoogleFonts.outfit(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                                Text(
+                                  c['phone'],
+                                  style: GoogleFonts.plusJakartaSans(
+                                    color: PlayfulColors.mutedForeground,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline, color: Colors.red),
+                            onPressed: () {
+                              setState(() => _contacts.removeAt(i));
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              if (_contacts.length < 5)
+                PlayfulButton(
+                  onPressed: _showAddDialog,
+                  backgroundColor: PlayfulColors.secondary,
+                  child: Text(
+                    "ADD CONTACT",
+                    style: GoogleFonts.outfit(fontWeight: FontWeight.w900),
+                  ),
+                ),
+              const SizedBox(height: 16),
+              PlayfulButton(
+                onPressed: _isLoading ? null : _saveContacts,
+                child: _isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : Text(
+                        "SAVE CHANGES",
+                        style: GoogleFonts.outfit(fontWeight: FontWeight.w900),
+                      ),
+              ),
             ],
           ),
         ),

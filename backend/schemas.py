@@ -28,3 +28,20 @@ class ComplaintRequest(BaseModel):
 class DraftRequest(BaseModel):
     job_id: str
     user_id: str
+
+class FatigueRequest(BaseModel):
+    user_id: str
+    total_hours: float
+
+class SOSRequest(BaseModel):
+    user_id: str
+    job_id: Optional[str] = None
+
+class RouteSafetyRequest(BaseModel):
+    job_timestamp: str
+    area_hint: Optional[str] = None
+    language_name: Optional[str] = "English"
+
+class RouteSafetyResponse(BaseModel):
+    score: str # "low", "moderate", "higher"
+    message: str

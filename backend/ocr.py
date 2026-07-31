@@ -53,21 +53,26 @@ def extract_job_data(image_bytes: bytes) -> dict:
         except ValueError:
             pass
             
-    # 3. Distance (digits followed by km)
-    distance_km = None
-    dist_match = re.search(r'(\d+(?:\.\d+)?)\s*km', raw_text, re.IGNORECASE)
+    # 3. Distance
+    distance = None
+    distance_unit = "km"
+    dist_match = re.search(r'(\d+(?:\.\d+)?)\s*(km|m)\b', raw_text, re.IGNORECASE)
     if dist_match:
         try:
-            distance_km = float(dist_match.group(1))
+            distance = float(dist_match.group(1))
+            distance_unit = dist_match.group(2).lower()
         except ValueError:
             pass
             
-    # 4. Duration (digits followed by min)
-    duration_min = None
-    dur_match = re.search(r'(\d+(?:\.\d+)?)\s*min', raw_text, re.IGNORECASE)
+    # 4. Duration
+    duration = None
+    duration_unit = "min"
+    dur_match = re.search(r'(\d+(?:\.\d+)?)\s*(min|mins|minutes?|hr|hours?)\b', raw_text, re.IGNORECASE)
     if dur_match:
         try:
-            duration_min = float(dur_match.group(1))
+            duration = float(dur_match.group(1))
+            du = dur_match.group(2).lower()
+            duration_unit = "hr" if du.startswith("h") else "min"
         except ValueError:
             pass
 
@@ -75,20 +80,36 @@ def extract_job_data(image_bytes: bytes) -> dict:
     failed_fields = []
     if fare is None:
         failed_fields.append("fare")
-    if distance_km is None:
+    if distance is None:
         failed_fields.append("distance")
-    if duration_min is None:
+    if duration is None:
         failed_fields.append("duration")
         
     confidence_note = None
     if failed_fields:
         confidence_note = f"Could not confidently read: {', '.join(failed_fields)}"
 
+    # Relevance Checking
+    receipt_keywords = ["items", "order total", "restaurant", "add to cart", "delivery address"]
+    trip_keywords = ["trip", "ride", "km", "fare", "earnings"]
+    
+    has_receipt_word = any(kw in lower_text for kw in receipt_keywords)
+    has_trip_word = any(kw in lower_text for kw in trip_keywords)
+    
+    if has_receipt_word and not has_trip_word:
+        return {"relevant": False, "reason": "This looks like a food/shopping receipt, not a gig worker pay screenshot."}
+        
+    if fare is None and (distance is None and duration is None):
+        return {"relevant": False, "reason": "Could not detect fare and trip distance/duration on this image."}
+
     return {
+        "relevant": True,
         "platform": platform,
         "fare": fare,
-        "distance_km": distance_km,
-        "duration_min": duration_min,
+        "distance": distance,
+        "distance_unit": distance_unit,
+        "duration": duration,
+        "duration_unit": duration_unit,
         "confidence_note": confidence_note,
         "raw_text": raw_text
     }

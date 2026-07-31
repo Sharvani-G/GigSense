@@ -35,8 +35,41 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   
   String? _activeSessionId;
+  List<ChatMessage> _localMessages = [];
   bool _isLoading = false;
   bool _initializing = true;
+
+  Future<void> _fetchMessagesForSession(String sessionId) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous_user';
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('chatSessions')
+          .doc(sessionId)
+          .collection('messages')
+          .orderBy('timestamp', descending: false)
+          .get();
+
+      final messages = snapshot.docs.map((doc) {
+        final data = doc.data();
+        return ChatMessage(
+          text: data['content'] ?? '',
+          isUser: data['role'] == 'user',
+          isSystemError: data['is_system_error'] ?? false,
+        );
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _localMessages = messages;
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      debugPrint("Error fetching messages: $e");
+    }
+  }
 
   final FlutterTts _flutterTts = FlutterTts();
   String? _speakingMessageId;
@@ -88,7 +121,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    MainNavigationController.activeSessionId.addListener(_onDeepLinkSessionChanged);
+    MainNavigationController.activeSessionId.addListener(() => _onDeepLinkSessionChanged());
     _initTts();
     _checkLanguagesAvailability();
     _initializeChat();
@@ -154,19 +187,20 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-    MainNavigationController.activeSessionId.removeListener(_onDeepLinkSessionChanged);
+    MainNavigationController.activeSessionId.removeListener(() => _onDeepLinkSessionChanged());
     _flutterTts.stop();
     _inputController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  void _onDeepLinkSessionChanged() {
+  Future<void> _onDeepLinkSessionChanged() async {
     final deepLinkId = MainNavigationController.activeSessionId.value;
     if (deepLinkId != null && mounted) {
       setState(() {
         _activeSessionId = deepLinkId;
       });
+      await _fetchMessagesForSession(deepLinkId);
       // Clear it so it doesn't re-trigger
       MainNavigationController.activeSessionId.value = null;
       
@@ -187,6 +221,7 @@ class _ChatScreenState extends State<ChatScreen> {
         _activeSessionId = deepLinkId;
         _initializing = false;
       });
+      await _fetchMessagesForSession(deepLinkId);
       MainNavigationController.activeSessionId.value = null;
 
       final msg = MainNavigationController.initialMessageToSend;
@@ -223,6 +258,7 @@ class _ChatScreenState extends State<ChatScreen> {
           setState(() {
             _activeSessionId = snapshot.docs.first.id;
           });
+          await _fetchMessagesForSession(snapshot.docs.first.id);
         }
       } else {
         await _createNewSession();
@@ -314,6 +350,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
     setState(() {
       _isLoading = true;
+      _localMessages.add(ChatMessage(text: text, isUser: true));
+      _localMessages.add(ChatMessage(text: "", isUser: false)); // Empty assistant message for streaming
     });
     _inputController.clear();
     _scrollToBottom();
@@ -325,64 +363,65 @@ class _ChatScreenState extends State<ChatScreen> {
     final Uri url = Uri.parse('$baseUrl/chat');
 
     try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'message': text,
-          'user_id': userId,
-          'session_id': sessionId,
-        }),
-      );
-
+      final client = http.Client();
+      final request = http.Request('POST', url);
+      request.headers['Content-Type'] = 'application/json';
+      request.body = json.encode({
+        'message': text,
+        'user_id': userId,
+        'session_id': sessionId,
+      });
+      
+      final response = await client.send(request);
+      
       if (response.statusCode != 200) {
         throw Exception("Server returned status code ${response.statusCode}");
       }
+      
+      response.stream.transform(utf8.decoder).transform(const LineSplitter()).listen(
+        (line) {
+          if (line.trim().isEmpty) return;
+          try {
+            final data = json.decode(line);
+            if (data['error'] != null) {
+              if (mounted) {
+                setState(() {
+                  _localMessages.last = ChatMessage(text: data['error'], isUser: false, isSystemError: true);
+                });
+              }
+            } else if (data['chunk'] != null) {
+              if (mounted) {
+                setState(() {
+                  _localMessages.last = ChatMessage(text: _localMessages.last.text + data['chunk'], isUser: false);
+                });
+                _scrollToBottom();
+              }
+            }
+          } catch (_) {}
+        },
+        onDone: () {
+          if (mounted) setState(() { _isLoading = false; });
+          client.close();
+        },
+        onError: (e) {
+          if (mounted) {
+            setState(() {
+              _localMessages.last = ChatMessage(text: "I'm having trouble responding right now — try again in a moment.", isUser: false, isSystemError: true);
+              _isLoading = false;
+            });
+          }
+          client.close();
+        }
+      );
     } catch (e) {
       debugPrint("Chat query failed: $e");
-      // Server call failed, write both user message and system error locally so UI is synced
-      try {
-        final messagesColl = FirebaseFirestore.instance
-            .collection('users')
-            .doc(userId)
-            .collection('chatSessions')
-            .doc(sessionId)
-            .collection('messages');
-
-        await messagesColl.add({
-          'role': 'user',
-          'content': text,
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-
-        await messagesColl.add({
-          'role': 'assistant',
-          'content': "I'm having trouble responding right now — try again in a moment.",
-          'timestamp': FieldValue.serverTimestamp(),
-        });
-      } catch (firestoreError) {
-        debugPrint("Failed to log failure locally: $firestoreError");
-      }
-    } finally {
       if (mounted) {
         setState(() {
+          _localMessages.last = ChatMessage(text: "I'm having trouble responding right now — try again in a moment.", isUser: false, isSystemError: true);
           _isLoading = false;
         });
       }
-      _scrollToBottom();
     }
-  }
-
-  Stream<QuerySnapshot> _messagesStream() {
-    final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous_user';
-    return FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('chatSessions')
-        .doc(_activeSessionId)
-        .collection('messages')
-        .orderBy('timestamp', descending: false)
-        .snapshots();
   }
 
   Widget _buildDrawer() {
@@ -572,29 +611,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
             // Message Board
             Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: _messagesStream(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return Center(
-                      child: Text(
-                        StringsProvider.instance.t('chat_error_loading'),
-                        style: GoogleFonts.plusJakartaSans(
-                          fontWeight: FontWeight.bold,
-                          color: PlayfulColors.mutedForeground,
-                        ),
-                      ),
-                    );
-                  }
-
-                  final docs = snapshot.data?.docs ?? [];
-                  
-                  // Auto scroll when new messages arrive
-                  if (docs.isNotEmpty) {
-                    _scrollToBottom();
-                  }
-
-                  if (docs.isEmpty && !_isLoading) {
+              child: Builder(
+                builder: (context) {
+                  if (_localMessages.isEmpty && !_isLoading) {
                     return Center(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 40),
@@ -625,19 +644,15 @@ class _ChatScreenState extends State<ChatScreen> {
                   return ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.all(20),
-                    itemCount: docs.length + (_isLoading ? 1 : 0),
+                    itemCount: _localMessages.length,
                     itemBuilder: (context, index) {
-                      if (index == docs.length && _isLoading) {
+                      final message = _localMessages[index];
+                      // Show typing indicator if it's the last message, is assistant, is loading, and text is empty
+                      if (index == _localMessages.length - 1 && !message.isUser && _isLoading && message.text.isEmpty) {
                         return const _TypingIndicatorBubble();
                       }
 
-                      final data = docs[index].data() as Map<String, dynamic>;
-                      final message = ChatMessage(
-                        text: data['content'] ?? '',
-                        isUser: data['role'] == 'user',
-                        isSystemError: data['is_system_error'] ?? false,
-                      );
-                      final messageId = docs[index].id;
+                      final messageId = "local_$index";
                       final isSpeaking = _speakingMessageId == messageId;
                       final String messageLocale = detectLanguageLocale(message.text, StringsProvider.instance.lang);
                       final bool isLangAvailable = _availableLanguages[messageLocale] ?? true;
@@ -669,11 +684,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Quick reply chips
-                  StreamBuilder<QuerySnapshot>(
-                    stream: _messagesStream(),
-                    builder: (context, snapshot) {
-                      final docs = snapshot.data?.docs ?? [];
-                      final bool showQuickReplies = !_isLoading && docs.isEmpty;
+                  Builder(
+                    builder: (context) {
+                      final bool showQuickReplies = !_isLoading && _localMessages.isEmpty;
 
                       if (!showQuickReplies) return const SizedBox.shrink();
 

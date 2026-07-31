@@ -56,14 +56,15 @@ class FairnessResultScreen extends StatelessWidget {
         ? "This came in noticeably below what's typical for this distance and platform."
         : "This is about what's typical for a ${distanceKm.toStringAsFixed(1)}km $capitalizedPlatform trip.");
 
-    final String badgeText = isUnderpaid ? "⚠️ Possibly Underpaid" : "✅ Fair Pay";
+    final String badgeText = isUnderpaid ? "⚠️ ${StringsProvider.instance.t('badge_underpaid')}" : "✅ ${StringsProvider.instance.t('badge_fair_pay')}";
 
     return Scaffold(
       backgroundColor: PlayfulColors.background,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-          child: Column(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 24),
@@ -103,6 +104,7 @@ class FairnessResultScreen extends StatelessWidget {
                                   ? DateTime.tryParse(job['created_at'] as String)
                                   : null))
                           : null),
+                  areaHint: job['area_hint'] as String?,
                 ),
               ),
               const SizedBox(height: 24),
@@ -212,30 +214,78 @@ class FairnessResultScreen extends StatelessWidget {
                     future: _getSampleSize(platform, job['sample_size']),
                     builder: (context, snapshot) {
                       final size = snapshot.data ?? 0;
+                      final rateSource = job['rate_source'] ?? (size >= 15 ? 'community' : 'seed');
                       String text;
-                      if (size < 15) {
-                        text = "Estimated rate — still gathering real data for this platform";
+                      String status;
+                      if (rateSource == 'seed' || rateSource == 'fallback' || size < 15) {
+                        text = "Estimated rate (Seed)";
+                        status = "gathering data";
                       } else if (size < 50) {
-                        text = "Based on a growing set of real trips from other GigShield workers";
+                        text = "Community baseline";
+                        status = "growing dataset";
                       } else {
-                        text = "Based on a well-established set of real trips from other GigShield workers";
+                        text = "Community baseline";
+                        status = "well-established";
                       }
+                      
+                      String infoText = "";
+                      if (status == "gathering data") {
+                        infoText = "We are still collecting enough trips for this platform to calculate a reliable community median. Currently falling back to standard estimates.";
+                      } else if (status == "growing dataset") {
+                        infoText = "We have collected enough recent trips to start calculating a real community median, but the dataset is still growing.";
+                      } else {
+                        infoText = "We have a strong dataset of recent, fair trips for this platform, allowing us to compute a highly reliable community median.";
+                      }
+
                       return Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                        child: Text(
-                          text,
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.plusJakartaSans(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: PlayfulColors.mutedForeground,
-                          ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                "$text — $status ($size trips)",
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: PlayfulColors.mutedForeground,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            GestureDetector(
+                              onTap: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    backgroundColor: PlayfulColors.background,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      side: const BorderSide(color: PlayfulColors.border, width: 2),
+                                    ),
+                                    title: Text("Rate Source", style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+                                    content: Text(infoText, style: GoogleFonts.plusJakartaSans()),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: Text("Got it", style: GoogleFonts.plusJakartaSans(color: PlayfulColors.accent, fontWeight: FontWeight.bold)),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                              child: const Icon(Icons.info_outline, size: 16, color: PlayfulColors.mutedForeground),
+                            ),
+                          ],
                         ),
                       );
                     },
                   ),
                 ),
               ],
+
               const SizedBox(height: 32),
 
               // Description sentence
