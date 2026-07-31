@@ -36,6 +36,8 @@ GigShield is a mobile-first companion app designed for gig workers in India to i
   - **OCR Screenshot Import**: Scans files, auto-fills form inputs, details unparsed values with helper alerts, and triggers a 600ms highlight pulse.
   - **GigChat Thread**: Custom asymmetric message bubble layout, quick-reply outlined pills (tap-fill color), and bouncing dot typing indicators.
   - **Weekly AI Coach Summary**: Triggers async insight queries, displaying a loading indicator and popping in card text via ScaleTransition on load.
+  - **Job History Log**: Dedicated screen showing paginated, filterable logs of all past work, integrated seamlessly with read-only Fairness Results.
+  - **Settings Profile**: 4th navigation tab providing worker profile summaries and comprehensive app preferences using playful geometric cards.
 - **Bonus Features**:
   - **Offline Resilience**: Automatic cache fallback for database benchmarks and writes.
   - **Reduced Motion Accessibility**: Checks system settings and replaces bouncing dots with static `...` typing indicators.
@@ -70,7 +72,7 @@ Inside `app/.env`, configure your FastAPI URL:
 ```env
 API_URL=http://127.0.0.1:8000
 ```
-*(If running on an Android Emulator, change to `API_URL=http://10.0.2.2:8000`)*
+*(If running on an Android Emulator, change to `API_URL=http://10.0.2.2:8000`. If using Ngrok to host the backend publicly, set this to your Ngrok forwarding URL: `API_URL=https://your-ngrok-url.ngrok-free.dev`)*
 
 ### Run the project
 1. **Start Ollama** (Ensure `gemma3:4b` is installed):
