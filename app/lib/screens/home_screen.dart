@@ -46,6 +46,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _userFetched = false;
   StreamSubscription<DocumentSnapshot>? _userSubscription;
 
+  // Savings Goal variables
+  Map<String, dynamic>? _savingsGoal;
+  double _savingsProgress = 0.0;
+  double _savingsTarget = 0.0;
+  int _savingsDaysRemaining = 0;
+  double _savingsEarned = 0.0;
+
   // AI Weekly Insight
   String _insightText = "Log a few jobs and I'll have your first weekly insight ready.";
   bool _isInsightLoading = true;
@@ -79,10 +86,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             .snapshots()
             .listen((doc) {
           if (doc.exists && mounted) {
+            final data = doc.data()!;
             setState(() {
-              _userName = (doc.data()?['name'] as String?)?.toUpperCase() ?? "THERE";
+              _userName = (data['name'] as String?)?.toUpperCase() ?? "THERE";
+              _savingsGoal = data['savingsGoal'] as Map<String, dynamic>?;
               _userFetched = true;
             });
+            _calculateSavingsProgress();
           }
         });
       }
@@ -212,6 +222,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       _fetchUserProfile();
       _fetchWeeklyInsight(userId);
       _checkFatigueNudge();
+      _calculateSavingsProgress();
     } catch (e) {
       debugPrint("Error fetching jobs from Firestore: $e");
       setState(() {
@@ -236,10 +247,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         }
         final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
         if (doc.exists && mounted) {
+          final data = doc.data()!;
           setState(() {
-            _userName = (doc.data()?['name'] as String?)?.toUpperCase() ?? "THERE";
+            _userName = (data['name'] as String?)?.toUpperCase() ?? "THERE";
+            _savingsGoal = data['savingsGoal'] as Map<String, dynamic>?;
             _userFetched = true;
           });
+          _calculateSavingsProgress();
         }
       }
     } catch (e) {
@@ -333,6 +347,55 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         debugPrint("Error saving fatigue nudge timestamp to Firestore: $e");
         _anonymousLastNudgeDate = todayStr;
       }
+    }
+  }
+
+  void _calculateSavingsProgress() {
+    if (_savingsGoal == null) {
+      if (mounted) {
+        setState(() {
+          _savingsTarget = 0.0;
+          _savingsEarned = 0.0;
+          _savingsDaysRemaining = 0;
+          _savingsProgress = 0.0;
+        });
+      }
+      return;
+    }
+
+    final target = (_savingsGoal!['targetAmount'] as num?)?.toDouble() ?? 0.0;
+    final period = _savingsGoal!['period'] ?? "weekly";
+    final startDateVal = _savingsGoal!['startDate'];
+    final startDate = _parseTimestamp(startDateVal) ?? DateTime.now();
+
+    final now = DateTime.now();
+    final startDateLocal = startDate;
+    final elapsedDays = now.difference(startDateLocal).inDays;
+    final periodLength = period == 'weekly' ? 7 : 30;
+    final periodsElapsed = elapsedDays >= 0 ? (elapsedDays ~/ periodLength) : 0;
+    final periodStart = startDateLocal.add(Duration(days: periodsElapsed * periodLength));
+    final periodEnd = periodStart.add(Duration(days: periodLength));
+    
+    // We add 1 to match expected inclusive days (e.g. today is 1 day remaining)
+    final daysRemaining = periodEnd.difference(now).inDays + 1;
+
+    double periodEarnings = 0.0;
+    for (var job in _jobs) {
+      final jobDate = _parseTimestamp(job['job_timestamp'] ?? job['created_at']);
+      if (jobDate != null &&
+          jobDate.isAfter(periodStart.subtract(const Duration(seconds: 1))) &&
+          jobDate.isBefore(periodEnd.add(const Duration(seconds: 1)))) {
+        periodEarnings += (job['fare'] as num?)?.toDouble() ?? 0.0;
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _savingsTarget = target;
+        _savingsEarned = periodEarnings;
+        _savingsDaysRemaining = daysRemaining < 0 ? 0 : daysRemaining;
+        _savingsProgress = target > 0 ? (periodEarnings / target) : 0.0;
+      });
     }
   }
 
@@ -762,6 +825,135 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ],
         ),
         const SizedBox(height: 32),
+
+        // Savings Goal Card
+        if (_savingsGoal != null) ...[
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: PlayfulColors.border, width: 2.0),
+              boxShadow: const [
+                BoxShadow(
+                  color: PlayfulColors.border,
+                  offset: Offset(4, 4),
+                  blurRadius: 0,
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "SAVINGS TARGET",
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
+                        letterSpacing: 1.5,
+                        color: PlayfulColors.mutedForeground,
+                      ),
+                    ),
+                    if (_savingsEarned >= _savingsTarget)
+                      Text(
+                        "₹${_savingsEarned.toStringAsFixed(0)} of ₹${_savingsTarget.toStringAsFixed(0)} — Ahead! 🎉",
+                        style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          color: PlayfulColors.quaternary, // Mint
+                        ),
+                      )
+                    else
+                      Text(
+                        "${((_savingsProgress) * 100).clamp(0, 100).round()}% Completed",
+                        style: GoogleFonts.outfit(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          color: PlayfulColors.foreground,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: Container(
+                    height: 12,
+                    width: double.infinity,
+                    color: const Color(0xFFE2E8F0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: FractionallySizedBox(
+                        widthFactor: _savingsProgress.clamp(0.0, 1.0),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF8B5CF6), // Violet
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "₹${_savingsEarned.toStringAsFixed(0)} of ₹${_savingsTarget.toStringAsFixed(0)} this ${_savingsGoal!['period']}",
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: PlayfulColors.foreground,
+                      ),
+                    ),
+                    Text(
+                      "${_savingsDaysRemaining}d remaining",
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: PlayfulColors.mutedForeground,
+                      ),
+                    ),
+                  ],
+                ),
+                if (_savingsTarget > 0) ...[
+                  const SizedBox(height: 12),
+                  const Divider(color: Color(0xFFE2E8F0), height: 1),
+                  const SizedBox(height: 12),
+                  Text(
+                    () {
+                      final periodLength = _savingsGoal!['period'] == 'weekly' ? 7 : 30;
+                      final daysElapsed = periodLength - _savingsDaysRemaining;
+                      final dailyAvg = _savingsEarned / (daysElapsed > 0 ? daysElapsed : 1);
+                      final projection = dailyAvg * _savingsDaysRemaining + _savingsEarned;
+                      
+                      final String statusMsg;
+                      if (projection >= _savingsTarget) {
+                        statusMsg = "you are on track to reach your goal!";
+                      } else {
+                        final deficit = _savingsTarget - projection;
+                        statusMsg = "running about ₹${deficit.toStringAsFixed(0)} under pace.";
+                      }
+                      
+                      return "Pacing: At your current rate, you are projected to reach ₹${projection.toStringAsFixed(0)} — $statusMsg";
+                    }(),
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: PlayfulColors.mutedForeground,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+        ],
 
         // Chart Section
         Text(

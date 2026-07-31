@@ -58,6 +58,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _name = data['name'] ?? "THERE";
           _workerType = data['workerType'] ?? "other_gig_worker";
           _langCode = data['preferredLanguage'] ?? StringsProvider.instance.lang;
+          _savingsGoal = data['savingsGoal'] as Map<String, dynamic>?;
           _isLoading = false;
         });
       }
@@ -232,6 +233,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   label: s.t('settings_language'),
                                   trailingText: currentLanguage,
                                   onTap: () => showLanguagePicker(context),
+                                ),
+                                _buildDivider(),
+
+                                // Savings Goal row
+                                _buildSettingsRow(
+                                  icon: Icons.savings_outlined,
+                                  label: "Savings Goal",
+                                  trailingText: _savingsGoal != null
+                                      ? "₹${(_savingsGoal!['targetAmount'] as num).toInt()} / ${_savingsGoal!['period']}"
+                                      : "Not set",
+                                  onTap: () => _showSavingsGoalBottomSheet(context),
                                 ),
                                 _buildDivider(),
 
@@ -419,6 +431,333 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       height: 1.5,
       color: PlayfulColors.border.withOpacity(0.15),
+    );
+  }
+
+  void _showSavingsGoalBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return _SavingsGoalBottomSheetContent(
+          initialGoal: _savingsGoal,
+          onSave: (goal) {
+            setState(() {
+              _savingsGoal = goal;
+            });
+          },
+        );
+      },
+    );
+  }
+}
+
+class _SavingsGoalBottomSheetContent extends StatefulWidget {
+  final Map<String, dynamic>? initialGoal;
+  final ValueChanged<Map<String, dynamic>?> onSave;
+
+  const _SavingsGoalBottomSheetContent({
+    required this.initialGoal,
+    required this.onSave,
+  });
+
+  @override
+  State<_SavingsGoalBottomSheetContent> createState() => _SavingsGoalBottomSheetContentState();
+}
+
+class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetContent> {
+  late TextEditingController _amountController;
+  String _period = "weekly";
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final amountVal = widget.initialGoal != null ? widget.initialGoal!['targetAmount'].toString() : "";
+    _amountController = TextEditingController(text: amountVal);
+    _period = widget.initialGoal != null ? widget.initialGoal!['period'] ?? "weekly" : "weekly";
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _setGoal() async {
+    final amountText = _amountController.text.trim();
+    if (amountText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a target amount.")),
+      );
+      return;
+    }
+    final amount = double.tryParse(amountText);
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a valid amount greater than 0.")),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final goalData = {
+        'targetAmount': amount,
+        'period': _period,
+        'startDate': Timestamp.now(),
+      };
+      
+      try {
+        if (!user.isAnonymous) {
+          await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+            'savingsGoal': goalData,
+          }, SetOptions(merge: true));
+        }
+        widget.onSave(goalData);
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: PlayfulColors.accent,
+              content: Text("Savings goal updated successfully!"),
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint("Error setting savings goal: $e");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Failed to save goal. Please try again.")),
+          );
+        }
+      }
+    }
+    setState(() => _isSaving = false);
+  }
+
+  Future<void> _removeGoal() async {
+    setState(() => _isSaving = true);
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        if (!user.isAnonymous) {
+          await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+            'savingsGoal': null,
+          }, SetOptions(merge: true));
+        }
+        widget.onSave(null);
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: PlayfulColors.accent,
+              content: Text("Savings goal removed."),
+            ),
+          );
+        }
+      } catch (e) {
+        debugPrint("Error removing savings goal: $e");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Failed to remove goal.")),
+          );
+        }
+      }
+    }
+    setState(() => _isSaving = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: PlayfulColors.background,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        border: Border(
+          top: BorderSide(color: PlayfulColors.border, width: 2),
+          left: BorderSide(color: PlayfulColors.border, width: 2),
+          right: BorderSide(color: PlayfulColors.border, width: 2),
+        ),
+      ),
+      padding: EdgeInsets.only(
+        top: 16,
+        left: 24,
+        right: 24,
+        bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 48,
+              height: 6,
+              decoration: BoxDecoration(
+                color: PlayfulColors.border,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            "SET SAVINGS GOAL",
+            style: GoogleFonts.outfit(
+              fontWeight: FontWeight.w900,
+              fontSize: 18,
+              letterSpacing: 2.0,
+              color: PlayfulColors.foreground,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          Text(
+            "TARGET AMOUNT (₹)",
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: PlayfulColors.mutedForeground,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: PlayfulColors.border, width: 2),
+              boxShadow: const [
+                BoxShadow(
+                  color: PlayfulColors.border,
+                  offset: Offset(4, 4),
+                  blurRadius: 0,
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: PlayfulColors.foreground,
+              ),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                hintText: "e.g. 3000",
+                isDense: true,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            "GOAL PERIOD",
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: PlayfulColors.mutedForeground,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: PlayfulColors.border, width: 2),
+              boxShadow: const [
+                BoxShadow(
+                  color: PlayfulColors.border,
+                  offset: Offset(4, 4),
+                  blurRadius: 0,
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _period = "weekly"),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _period == "weekly" ? PlayfulColors.accent : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                        border: _period == "weekly" ? Border.all(color: PlayfulColors.border, width: 2) : null,
+                      ),
+                      child: Center(
+                        child: Text(
+                          "Weekly",
+                          style: GoogleFonts.outfit(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: PlayfulColors.foreground,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _period = "monthly"),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _period == "monthly" ? PlayfulColors.accent : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                        border: _period == "monthly" ? Border.all(color: PlayfulColors.border, width: 2) : null,
+                      ),
+                      child: Center(
+                        child: Text(
+                          "Monthly",
+                          style: GoogleFonts.outfit(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: PlayfulColors.foreground,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 36),
+          if (_isSaving) ...[
+            const Center(child: CircularProgressIndicator(color: PlayfulColors.accent)),
+          ] else ...[
+            PlayfulButton(
+              onPressed: _setGoal,
+              child: const Text("SET SAVINGS GOAL"),
+            ),
+            if (widget.initialGoal != null) ...[
+              const SizedBox(height: 16),
+              Center(
+                child: GestureDetector(
+                  onTap: _removeGoal,
+                  child: Text(
+                    "Remove Goal",
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: PlayfulColors.secondary,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
     );
   }
 }
