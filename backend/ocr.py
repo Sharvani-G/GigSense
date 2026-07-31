@@ -2,7 +2,11 @@ import re
 import io
 from PIL import Image
 import pytesseract
+import os
 
+# Explicitly set the path for Windows
+if os.name == 'nt':
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 def extract_job_data(image_bytes: bytes) -> dict:
     try:
         # Load image from bytes
