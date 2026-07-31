@@ -54,6 +54,26 @@ class _LoginScreenState extends State<LoginScreen> {
           password: password,
         );
       } else {
+        // Sign up password requirements:
+        // - At least 8 characters long
+        // - Contain at least one special character
+        final errors = <String>[];
+        if (password.length < 8) {
+          errors.add("Password must be at least 8 characters long.");
+        }
+        final hasSpecial = password.contains(RegExp(r'[!@#\$%^&\*\(\)_\+\-=\[\]\{\};:\x27",\.<>\?\/\\\|~`]'));
+        if (!hasSpecial) {
+          errors.add("Password must contain at least one special character.");
+        }
+
+        if (errors.isNotEmpty) {
+          setState(() {
+            _errorMessage = errors.join("\n");
+            _isLoading = false;
+          });
+          return;
+        }
+
         await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: email,
           password: password,
@@ -141,9 +161,8 @@ class _LoginScreenState extends State<LoginScreen> {
   String _getFriendlyErrorMessage(FirebaseAuthException e) {
     switch (e.code) {
       case 'user-not-found':
-        return 'No account exists for this email.';
       case 'wrong-password':
-        return 'Incorrect password. Please try again.';
+        return 'Invalid email or password.';
       case 'email-already-in-use':
         return 'An account already exists with this email.';
       case 'invalid-email':
