@@ -2,6 +2,10 @@ from fastapi import FastAPI, UploadFile, File, status
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 import os
+
+# Load environment variables FIRST before importing other modules
+load_dotenv()
+
 import json
 import datetime
 from ocr import extract_job_data
@@ -9,9 +13,6 @@ from llm import ask_gemma
 from schemas import JobScanResponse, ChatRequest, ComplaintRequest
 from firebase_client import db
 from firebase_admin import firestore
-
-# Load environment variables
-load_dotenv()
 
 app = FastAPI(title="GigShield API")
 
