@@ -3,6 +3,8 @@ Submission for the Synaptrix Hackathon
 
 [![Direct Download](https://img.shields.io/badge/Download-APK-green?style=for-the-badge&logo=android)](https://github.com/Sharvani-G/GigSense/releases/download/v1.0.0/gigSense_v1.0.0.apk)
 
+📲 **[Download the GigSense v1.0.0 APK Directly Here](https://github.com/Sharvani-G/GigSense/releases/download/v1.0.0/gigSense_v1.0.0.apk)**
+
 ## Problem Statement Chosen
 **Domain:** GigShield
 **Problem Statement:** Let the worker log each job manually, or scan a screenshot of their delivery/ride app using OCR to auto-extract the earnings data. Check if it's fair compared to benchmarks, provide an AI chatbot, and build a unified multi-platform dashboard with weekly insights to protect gig workers from underpayment.
