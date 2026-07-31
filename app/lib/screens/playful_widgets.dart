@@ -116,6 +116,7 @@ class PlayfulInput extends StatefulWidget {
   final void Function(String?)? onDropdownChanged;
   final String? selectedDropdownValue;
   final String? prefixText;
+  final bool isHighlighted;
 
   const PlayfulInput({
     super.key,
@@ -128,15 +129,18 @@ class PlayfulInput extends StatefulWidget {
     this.onDropdownChanged,
     this.selectedDropdownValue,
     this.prefixText,
+    this.isHighlighted = false,
   });
 
   @override
   State<PlayfulInput> createState() => _PlayfulInputState();
 }
 
-class _PlayfulInputState extends State<PlayfulInput> {
+class _PlayfulInputState extends State<PlayfulInput> with SingleTickerProviderStateMixin {
   final FocusNode _focusNode = FocusNode();
   bool _isFocused = false;
+  late final AnimationController _pulseController;
+  late final Animation<Color?> _pulseAnimation;
 
   @override
   void initState() {
@@ -146,11 +150,34 @@ class _PlayfulInputState extends State<PlayfulInput> {
         _isFocused = _focusNode.hasFocus;
       });
     });
+
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+
+    _pulseAnimation = ColorTween(
+      begin: PlayfulColors.accent,
+      end: const Color(0xFFCBD5E1),
+    ).animate(_pulseController);
+
+    if (widget.isHighlighted) {
+      _pulseController.forward();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant PlayfulInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isHighlighted && !oldWidget.isHighlighted) {
+      _pulseController.forward(from: 0.0);
+    }
   }
 
   @override
   void dispose() {
     _focusNode.dispose();
+    _pulseController.dispose();
     super.dispose();
   }
 
@@ -169,24 +196,43 @@ class _PlayfulInputState extends State<PlayfulInput> {
           ),
         ),
         const SizedBox(height: 8),
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: _isFocused ? PlayfulColors.accent : const Color(0xFFCBD5E1),
-              width: 2.0,
-            ),
-            boxShadow: [
-              if (_isFocused)
-                const BoxShadow(
-                  color: PlayfulColors.accent,
-                  offset: Offset(4, 4),
-                  blurRadius: 0,
+        AnimatedBuilder(
+          animation: _pulseController,
+          builder: (context, child) {
+            Color borderColor = const Color(0xFFCBD5E1);
+            if (_isFocused) {
+              borderColor = PlayfulColors.accent;
+            } else if (_pulseController.isAnimating) {
+              borderColor = _pulseAnimation.value ?? borderColor;
+            }
+
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: borderColor,
+                  width: 2.0,
                 ),
-            ],
-          ),
+                boxShadow: [
+                  if (_isFocused)
+                    const BoxShadow(
+                      color: PlayfulColors.accent,
+                      offset: Offset(4, 4),
+                      blurRadius: 0,
+                    )
+                  else if (_pulseController.isAnimating)
+                    BoxShadow(
+                      color: PlayfulColors.accent.withOpacity(0.3 * (1.0 - _pulseController.value)),
+                      offset: const Offset(4, 4),
+                      blurRadius: 0,
+                    ),
+                ],
+              ),
+              child: child,
+            );
+          },
           child: widget.dropdownItems != null
               ? DropdownButtonFormField<String>(
                   value: widget.selectedDropdownValue,
@@ -379,47 +425,33 @@ class PlayfulToggle extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: Opacity(
-              opacity: 0.5,
-              child: GestureDetector(
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        "Scan Screenshot will be available in Phase 3!",
-                        style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+            child: GestureDetector(
+              onTap: () => onChanged("scan"),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: activeOption == "scan" ? PlayfulColors.accent : Colors.transparent,
+                  borderRadius: BorderRadius.circular(9999),
+                ),
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.camera_alt,
+                        size: 16,
+                        color: activeOption == "scan" ? Colors.white : PlayfulColors.foreground,
                       ),
-                      backgroundColor: PlayfulColors.accent,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: const BorderSide(color: PlayfulColors.border, width: 2),
-                      ),
-                    ),
-                  );
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: activeOption == "scan" ? PlayfulColors.accent : Colors.transparent,
-                    borderRadius: BorderRadius.circular(9999),
-                  ),
-                  child: Center(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.camera_alt, size: 16, color: PlayfulColors.foreground),
-                        const SizedBox(width: 6),
-                        Text(
-                          "Scan Screenshot",
-                          style: GoogleFonts.outfit(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                            color: PlayfulColors.foreground,
-                          ),
+                      const SizedBox(width: 6),
+                      Text(
+                        "Scan Screenshot",
+                        style: GoogleFonts.outfit(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: activeOption == "scan" ? Colors.white : PlayfulColors.foreground,
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
