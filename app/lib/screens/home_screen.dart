@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,6 +8,9 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'playful_widgets.dart';
+import 'history_screen.dart';
+import '../i18n/strings.dart';
+import '../main.dart' show showLanguagePicker;
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback onNavigateToLogJob;
@@ -32,6 +36,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   List<MapEntry<String, double>> _chartData = [];
   List<PlatformBreakdown> _platformsBreakdown = [];
 
+  // User profile personalization
+  String _userName = "THERE";
+  bool _userFetched = false;
+  StreamSubscription<DocumentSnapshot>? _userSubscription;
+
   // AI Weekly Insight
   String _insightText = "Log a few jobs and I'll have your first weekly insight ready.";
   bool _isInsightLoading = true;
@@ -52,10 +61,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       ),
     );
     _fetchAndProcessJobs();
+    
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      if (user.isAnonymous) {
+        _userName = "THERE";
+        _userFetched = true;
+      } else {
+        _userSubscription = FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .snapshots()
+            .listen((doc) {
+          if (doc.exists && mounted) {
+            setState(() {
+              _userName = (doc.data()?['name'] as String?)?.toUpperCase() ?? "THERE";
+              _userFetched = true;
+            });
+          }
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
+    _userSubscription?.cancel();
     _insightAnimationController.dispose();
     super.dispose();
   }
@@ -145,15 +176,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         final platformRaw = (job['platform'] as String?) ?? 'other';
         final platform = platformRaw.toLowerCase();
         final fare = (job['fare'] as num?)?.toDouble() ?? 0.0;
+        final isUnderpaid = job['is_underpaid'] == true;
 
         if (platformMap.containsKey(platform)) {
           platformMap[platform]!.total += fare;
           platformMap[platform]!.count += 1;
+          if (isUnderpaid) {
+            platformMap[platform]!.underpaidCount += 1;
+          }
         } else {
           platformMap[platform] = PlatformBreakdown(
             name: platformRaw,
             total: fare,
             count: 1,
+            underpaidCount: isUnderpaid ? 1 : 0,
           );
         }
       }
@@ -168,6 +204,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _isLoading = false;
       });
 
+      _fetchUserProfile();
       _fetchWeeklyInsight(userId);
     } catch (e) {
       debugPrint("Error fetching jobs from Firestore: $e");
@@ -176,6 +213,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _isLoading = false;
         _isInsightLoading = false;
       });
+    }
+  }
+
+  Future<void> _fetchUserProfile() async {
+    if (_userFetched) return;
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        if (user.isAnonymous) {
+          setState(() {
+            _userName = "THERE";
+            _userFetched = true;
+          });
+          return;
+        }
+        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        if (doc.exists && mounted) {
+          setState(() {
+            _userName = (doc.data()?['name'] as String?)?.toUpperCase() ?? "THERE";
+            _userFetched = true;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching user profile: $e");
     }
   }
 
@@ -218,6 +280,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     return Scaffold(
       backgroundColor: PlayfulColors.background,
+      appBar: AppBar(
+        backgroundColor: PlayfulColors.background,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.language, color: PlayfulColors.foreground),
+            tooltip: 'Language',
+            onPressed: () => showLanguagePicker(context),
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout, color: PlayfulColors.foreground),
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+            },
+          ),
+        ],
+      ),
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _fetchAndProcessJobs,
@@ -238,7 +318,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            "Database sync issue. Using offline cache.",
+                            StringsProvider.instance.t('home_error'),
                             style: GoogleFonts.plusJakartaSans(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -249,7 +329,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         TextButton(
                           onPressed: _fetchAndProcessJobs,
                           child: Text(
-                            "RETRY",
+                            StringsProvider.instance.t('retry'),
                             style: GoogleFonts.outfit(
                               color: Colors.white,
                               fontWeight: FontWeight.w900,
@@ -269,7 +349,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       const SizedBox(height: 16),
                       // Header
                       Text(
-                        "HELLO RIDER!",
+                        "${StringsProvider.instance.t('greeting')}, $_userName!",
                         style: GoogleFonts.outfit(
                           fontWeight: FontWeight.w900,
                           fontSize: 28,
@@ -311,7 +391,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                       border: Border.all(color: PlayfulColors.border, width: 2),
                                     ),
                                     child: Text(
-                                      "AI INSIGHT",
+                                      StringsProvider.instance.t('ai_insight'),
                                       style: GoogleFonts.outfit(
                                         fontSize: 10,
                                         fontWeight: FontWeight.w900,
@@ -413,7 +493,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         ),
         const SizedBox(height: 24),
         Text(
-          "No jobs logged yet — tap below and let's check your first payout",
+          StringsProvider.instance.t('home_empty'),
           textAlign: TextAlign.center,
           style: GoogleFonts.plusJakartaSans(
             fontSize: 16,
@@ -431,12 +511,54 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              StringsProvider.instance.t('home_summary').toUpperCase(),
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+                letterSpacing: 1.0,
+                color: PlayfulColors.mutedForeground,
+              ),
+            ),
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const HistoryScreen()),
+                );
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    StringsProvider.instance.t('view_all'),
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: PlayfulColors.accent,
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right,
+                    size: 16,
+                    color: PlayfulColors.accent,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
         // Stats Cards Row
         Row(
           children: [
             Expanded(
               child: _buildStatCard(
-                label: "EARNINGS",
+                label: StringsProvider.instance.t('stat_earnings'),
                 value: "₹${_totalEarnings.toStringAsFixed(0)}",
                 icon: Icons.currency_rupee,
                 iconColor: PlayfulColors.accent,
@@ -446,7 +568,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             const SizedBox(width: 8),
             Expanded(
               child: _buildStatCard(
-                label: "HOURS",
+                label: StringsProvider.instance.t('stat_hours'),
                 value: "${_totalHours}h",
                 icon: Icons.access_time,
                 iconColor: PlayfulColors.quaternary,
@@ -455,12 +577,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: _buildStatCard(
-                label: "FLAGGED",
-                value: "$_flaggedCount",
-                icon: Icons.warning_amber_rounded,
-                iconColor: PlayfulColors.secondary,
-                shadowColor: PlayfulColors.secondary,
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const HistoryScreen(
+                        initialFairnessFilter: 'Possibly Underpaid',
+                      ),
+                    ),
+                  );
+                },
+                child: _buildStatCard(
+                  label: StringsProvider.instance.t('stat_flagged'),
+                  value: "$_flaggedCount",
+                  icon: Icons.warning_amber_rounded,
+                  iconColor: PlayfulColors.secondary,
+                  shadowColor: PlayfulColors.secondary,
+                ),
               ),
             ),
           ],
@@ -469,7 +603,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
         // Chart Section
         Text(
-          "DAILY EARNINGS",
+          StringsProvider.instance.t('daily_earnings'),
           style: GoogleFonts.plusJakartaSans(
             fontWeight: FontWeight.w800,
             fontSize: 12,
@@ -556,7 +690,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
         // Platform Breakdown Section
         Text(
-          "PLATFORM BREAKDOWN",
+          StringsProvider.instance.t('platform_breakdown'),
           style: GoogleFonts.plusJakartaSans(
             fontWeight: FontWeight.w800,
             fontSize: 12,
@@ -591,7 +725,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ],
               ),
               child: Text(
-                "$nameCapitalized · ₹${pb.total.toStringAsFixed(0)} · ${pb.count} jobs",
+                "$nameCapitalized · ₹${pb.total.toStringAsFixed(0)} · ${pb.count} jobs (Trust: ${pb.trustScore}%)",
                 style: GoogleFonts.outfit(
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
@@ -715,12 +849,19 @@ class PlatformBreakdown {
   final String name;
   double total;
   int count;
+  int underpaidCount;
 
   PlatformBreakdown({
     required this.name,
     required this.total,
     required this.count,
+    this.underpaidCount = 0,
   });
+
+  int get trustScore {
+    if (count == 0) return 100;
+    return (100 * (count - underpaidCount) / count).round();
+  }
 }
 
 // Painter for empty state calm decorative line + shapes

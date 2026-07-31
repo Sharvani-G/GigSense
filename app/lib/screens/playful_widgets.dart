@@ -118,6 +118,9 @@ class PlayfulInput extends StatefulWidget {
   final String? selectedDropdownValue;
   final String? prefixText;
   final bool isHighlighted;
+  final bool obscureText;
+  final bool readOnly;
+  final VoidCallback? onTap;
 
   const PlayfulInput({
     super.key,
@@ -131,6 +134,9 @@ class PlayfulInput extends StatefulWidget {
     this.selectedDropdownValue,
     this.prefixText,
     this.isHighlighted = false,
+    this.obscureText = false,
+    this.readOnly = false,
+    this.onTap,
   });
 
   @override
@@ -270,6 +276,9 @@ class _PlayfulInputState extends State<PlayfulInput> with SingleTickerProviderSt
                   focusNode: _focusNode,
                   validator: widget.validator,
                   keyboardType: widget.keyboardType,
+                  obscureText: widget.obscureText,
+                  readOnly: widget.readOnly,
+                  onTap: widget.onTap,
                   style: GoogleFonts.plusJakartaSans(
                     color: PlayfulColors.foreground,
                     fontSize: 16,

@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'playful_widgets.dart';
 import 'fairness_result_screen.dart';
+import '../i18n/strings.dart';
 
 class LogJobScreen extends StatefulWidget {
   const LogJobScreen({super.key});
@@ -23,7 +24,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
   final _durationController = TextEditingController();
 
   String _activeToggle = "manual";
-  String? _selectedPlatform = "uber";
+  String? _selectedPlatform;
   bool _isFormValid = false;
   bool _isLoading = false;
   bool _isOcrLoading = false;
@@ -41,7 +42,17 @@ class _LogJobScreenState extends State<LogJobScreen> {
   bool _durationHighlighted = false;
   bool _platformHighlighted = false;
 
-  final List<String> _platforms = ["Uber", "Rapido", "Zomato", "Swiggy", "Other"];
+  final _searchController = TextEditingController();
+  final _platformFieldController = TextEditingController();
+  List<PlatformItem> _allPlatforms = [];
+  List<PlatformItem> _filteredPlatforms = [];
+  String _workerType = 'other_gig_worker';
+
+  final _categoryLabels = {
+    'cab': 'CAB & RIDE-HAILING',
+    'delivery': 'DELIVERY',
+    'other_gig': 'OTHER GIG WORK',
+  };
 
   @override
   void initState() {
@@ -49,7 +60,12 @@ class _LogJobScreenState extends State<LogJobScreen> {
     _fareController.addListener(_checkFormValid);
     _distanceController.addListener(_checkFormValid);
     _durationController.addListener(_checkFormValid);
-    _seedBenchmarksIfNeeded();
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
+    await _seedBenchmarksIfNeeded();
+    await _loadUserProfileAndPlatforms();
   }
 
   @override
@@ -57,6 +73,8 @@ class _LogJobScreenState extends State<LogJobScreen> {
     _fareController.dispose();
     _distanceController.dispose();
     _durationController.dispose();
+    _searchController.dispose();
+    _platformFieldController.dispose();
     super.dispose();
   }
 
@@ -90,14 +108,24 @@ class _LogJobScreenState extends State<LogJobScreen> {
   Future<void> _seedBenchmarksIfNeeded() async {
     try {
       final firestore = FirebaseFirestore.instance;
-      final query = await firestore.collection('benchmarks').limit(1).get();
-      if (query.docs.isEmpty) {
+      final query = await firestore.collection('benchmarks').get();
+      if (query.docs.length < 10) {
         final defaults = {
-          'uber': {'rate_per_km': 12.00, 'rate_per_min': 1.50},
-          'rapido': {'rate_per_km': 9.00, 'rate_per_min': 1.20},
-          'zomato': {'rate_per_km': 8.00, 'rate_per_min': 1.00},
-          'swiggy': {'rate_per_km': 8.00, 'rate_per_min': 1.00},
-          'other': {'rate_per_km': 10.00, 'rate_per_min': 1.30},
+          'uber': {'displayName': 'Uber', 'rate_per_km': 12.00, 'rate_per_min': 1.50, 'category': 'cab'},
+          'rapido': {'displayName': 'Rapido', 'rate_per_km': 9.00, 'rate_per_min': 1.20, 'category': 'cab'},
+          'ola': {'displayName': 'Ola', 'rate_per_km': 11.50, 'rate_per_min': 1.40, 'category': 'cab'},
+          'indrive': {'displayName': 'InDrive', 'rate_per_km': 10.00, 'rate_per_min': 1.10, 'category': 'cab'},
+          'zomato': {'displayName': 'Zomato', 'rate_per_km': 8.00, 'rate_per_min': 1.00, 'category': 'delivery'},
+          'swiggy': {'displayName': 'Swiggy', 'rate_per_km': 8.00, 'rate_per_min': 1.00, 'category': 'delivery'},
+          'dunzo': {'displayName': 'Dunzo', 'rate_per_km': 8.50, 'rate_per_min': 1.10, 'category': 'delivery'},
+          'blinkit': {'displayName': 'Blinkit', 'rate_per_km': 9.00, 'rate_per_min': 1.05, 'category': 'delivery'},
+          'zepto': {'displayName': 'Zepto', 'rate_per_km': 8.50, 'rate_per_min': 1.00, 'category': 'delivery'},
+          'bigbasket': {'displayName': 'BigBasket', 'rate_per_km': 9.50, 'rate_per_min': 1.15, 'category': 'delivery'},
+          'amazon_flex': {'displayName': 'Amazon Flex', 'rate_per_km': 10.50, 'rate_per_min': 1.20, 'category': 'delivery'},
+          'urban_company': {'displayName': 'Urban Company', 'rate_per_km': 14.00, 'rate_per_min': 1.70, 'category': 'other_gig'},
+          'porter': {'displayName': 'Porter', 'rate_per_km': 13.00, 'rate_per_min': 1.50, 'category': 'other_gig'},
+          'housejoy': {'displayName': 'Housejoy', 'rate_per_km': 12.50, 'rate_per_min': 1.40, 'category': 'other_gig'},
+          'other': {'displayName': 'Other', 'rate_per_km': 10.00, 'rate_per_min': 1.30, 'category': 'other_gig'},
         };
         for (var entry in defaults.entries) {
           await firestore.collection('benchmarks').doc(entry.key).set(entry.value);
@@ -106,6 +134,83 @@ class _LogJobScreenState extends State<LogJobScreen> {
       }
     } catch (e) {
       debugPrint("Auto-seeding benchmarks failed (expected if Firebase is offline): $e");
+    }
+  }
+
+  Future<void> _loadUserProfileAndPlatforms() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null && !user.isAnonymous) {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        if (doc.exists && mounted) {
+          setState(() {
+            _workerType = doc.data()?['workerType'] ?? 'other_gig_worker';
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("Error loading workerType: $e");
+    }
+
+    try {
+      final firestore = FirebaseFirestore.instance;
+      final snapshot = await firestore.collection('benchmarks').get();
+      if (snapshot.docs.isNotEmpty) {
+        final List<PlatformItem> loaded = [];
+        for (var doc in snapshot.docs) {
+          final data = doc.data();
+          loaded.add(PlatformItem(
+            id: doc.id,
+            displayName: data['displayName'] ?? doc.id.toUpperCase(),
+            category: data['category'] ?? 'other_gig',
+            ratePerKm: (data['rate_per_km'] as num?)?.toDouble() ?? 10.0,
+            ratePerMin: (data['rate_per_min'] as num?)?.toDouble() ?? 1.3,
+          ));
+        }
+        setState(() {
+          _allPlatforms = loaded;
+          _filteredPlatforms = List.from(loaded);
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading benchmarks: $e. Using local fallback list.");
+    }
+
+    if (_allPlatforms.isEmpty) {
+      final defaults = [
+        PlatformItem(id: 'uber', displayName: 'Uber', category: 'cab', ratePerKm: 12.0, ratePerMin: 1.50),
+        PlatformItem(id: 'rapido', displayName: 'Rapido', category: 'cab', ratePerKm: 9.0, ratePerMin: 1.20),
+        PlatformItem(id: 'ola', displayName: 'Ola', category: 'cab', ratePerKm: 11.50, ratePerMin: 1.40),
+        PlatformItem(id: 'indrive', displayName: 'InDrive', category: 'cab', ratePerKm: 10.0, ratePerMin: 1.10),
+        PlatformItem(id: 'zomato', displayName: 'Zomato', category: 'delivery', ratePerKm: 8.0, ratePerMin: 1.00),
+        PlatformItem(id: 'swiggy', displayName: 'Swiggy', category: 'delivery', ratePerKm: 8.0, ratePerMin: 1.00),
+        PlatformItem(id: 'dunzo', displayName: 'Dunzo', category: 'delivery', ratePerKm: 8.50, ratePerMin: 1.10),
+        PlatformItem(id: 'blinkit', displayName: 'Blinkit', category: 'delivery', ratePerKm: 9.0, ratePerMin: 1.05),
+        PlatformItem(id: 'zepto', displayName: 'Zepto', category: 'delivery', ratePerKm: 8.50, ratePerMin: 1.00),
+        PlatformItem(id: 'bigbasket', displayName: 'BigBasket', category: 'delivery', ratePerKm: 9.50, ratePerMin: 1.15),
+        PlatformItem(id: 'amazon_flex', displayName: 'Amazon Flex', category: 'delivery', ratePerKm: 10.50, ratePerMin: 1.20),
+        PlatformItem(id: 'urban_company', displayName: 'Urban Company', category: 'other_gig', ratePerKm: 14.00, ratePerMin: 1.70),
+        PlatformItem(id: 'porter', displayName: 'Porter', category: 'other_gig', ratePerKm: 13.00, ratePerMin: 1.50),
+        PlatformItem(id: 'housejoy', displayName: 'Housejoy', category: 'other_gig', ratePerKm: 12.50, ratePerMin: 1.40),
+        PlatformItem(id: 'other', displayName: 'Other', category: 'other_gig', ratePerKm: 10.0, ratePerMin: 1.30),
+      ];
+      setState(() {
+        _allPlatforms = defaults;
+        _filteredPlatforms = List.from(defaults);
+      });
+    }
+
+    if (_selectedPlatform == null) {
+      if (_workerType == 'cab_driver') {
+        _selectedPlatform = 'uber';
+        _platformFieldController.text = 'Uber';
+      } else if (_workerType == 'delivery_rider') {
+        _selectedPlatform = 'zomato';
+        _platformFieldController.text = 'Zomato';
+      } else {
+        _selectedPlatform = 'other';
+        _platformFieldController.text = 'Other';
+      }
     }
   }
 
@@ -151,11 +256,22 @@ class _LogJobScreenState extends State<LogJobScreen> {
           _jobSource = "ocr";
           _activeToggle = "manual"; // Back to manual form prefilled
           
-          if (platform != null && _platforms.map((e) => e.toLowerCase()).contains(platform.toLowerCase())) {
-            _selectedPlatform = platform.toLowerCase();
-            _platformHighlighted = true;
+          if (platform != null) {
+            final matched = _allPlatforms.firstWhere(
+              (p) => p.id == platform.toLowerCase(),
+              orElse: () => PlatformItem(id: 'other', displayName: 'Other', category: 'other_gig', ratePerKm: 10.0, ratePerMin: 1.30),
+            );
+            if (matched.id != 'other') {
+              _selectedPlatform = matched.id;
+              _platformFieldController.text = matched.displayName;
+              _platformHighlighted = true;
+            } else {
+              _selectedPlatform = "other";
+              _platformFieldController.text = "Other";
+            }
           } else {
             _selectedPlatform = "other";
+            _platformFieldController.text = "Other";
           }
 
           if (fare != null) {
@@ -207,7 +323,8 @@ class _LogJobScreenState extends State<LogJobScreen> {
         _fareController.clear();
         _distanceController.clear();
         _durationController.clear();
-        _selectedPlatform = "uber";
+        _selectedPlatform = "other";
+        _platformFieldController.text = "Other";
       });
     } finally {
       setState(() {
@@ -245,8 +362,18 @@ class _LogJobScreenState extends State<LogJobScreen> {
         final fallbackDefaults = {
           'uber': {'rate_per_km': 12.00, 'rate_per_min': 1.50},
           'rapido': {'rate_per_km': 9.00, 'rate_per_min': 1.20},
+          'ola': {'rate_per_km': 11.50, 'rate_per_min': 1.40},
+          'indrive': {'rate_per_km': 10.00, 'rate_per_min': 1.10},
           'zomato': {'rate_per_km': 8.00, 'rate_per_min': 1.00},
           'swiggy': {'rate_per_km': 8.00, 'rate_per_min': 1.00},
+          'dunzo': {'rate_per_km': 8.50, 'rate_per_min': 1.10},
+          'blinkit': {'rate_per_km': 9.00, 'rate_per_min': 1.05},
+          'zepto': {'rate_per_km': 8.50, 'rate_per_min': 1.00},
+          'bigbasket': {'rate_per_km': 9.50, 'rate_per_min': 1.15},
+          'amazon_flex': {'rate_per_km': 10.50, 'rate_per_min': 1.20},
+          'urban_company': {'rate_per_km': 14.00, 'rate_per_min': 1.70},
+          'porter': {'rate_per_km': 13.00, 'rate_per_min': 1.50},
+          'housejoy': {'rate_per_km': 12.50, 'rate_per_min': 1.40},
           'other': {'rate_per_km': 10.00, 'rate_per_min': 1.30},
         };
         final rates = fallbackDefaults[platform] ?? fallbackDefaults['other']!;
@@ -258,8 +385,18 @@ class _LogJobScreenState extends State<LogJobScreen> {
       final fallbackDefaults = {
         'uber': {'rate_per_km': 12.00, 'rate_per_min': 1.50},
         'rapido': {'rate_per_km': 9.00, 'rate_per_min': 1.20},
+        'ola': {'rate_per_km': 11.50, 'rate_per_min': 1.40},
+        'indrive': {'rate_per_km': 10.00, 'rate_per_min': 1.10},
         'zomato': {'rate_per_km': 8.00, 'rate_per_min': 1.00},
         'swiggy': {'rate_per_km': 8.00, 'rate_per_min': 1.00},
+        'dunzo': {'rate_per_km': 8.50, 'rate_per_min': 1.10},
+        'blinkit': {'rate_per_km': 9.00, 'rate_per_min': 1.05},
+        'zepto': {'rate_per_km': 8.50, 'rate_per_min': 1.00},
+        'bigbasket': {'rate_per_km': 9.50, 'rate_per_min': 1.15},
+        'amazon_flex': {'rate_per_km': 10.50, 'rate_per_min': 1.20},
+        'urban_company': {'rate_per_km': 14.00, 'rate_per_min': 1.70},
+        'porter': {'rate_per_km': 13.00, 'rate_per_min': 1.50},
+        'housejoy': {'rate_per_km': 12.50, 'rate_per_min': 1.40},
         'other': {'rate_per_km': 10.00, 'rate_per_min': 1.30},
       };
       final rates = fallbackDefaults[platform] ?? fallbackDefaults['other']!;
@@ -271,6 +408,13 @@ class _LogJobScreenState extends State<LogJobScreen> {
     final roundedExpectedFare = double.parse(expectedFare.toStringAsFixed(2));
     final isUnderpaid = fare < (roundedExpectedFare * 0.85);
 
+    final String capitalizedPlatform = platform.isNotEmpty
+        ? platform[0].toUpperCase() + platform.substring(1)
+        : '';
+    final String explanationText = isUnderpaid
+        ? "This came in noticeably below what's typical for this distance and platform."
+        : "This is about what's typical for a ${distance.toStringAsFixed(1)}km $capitalizedPlatform trip.";
+
     final userId = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous_user';
 
     final jobData = {
@@ -281,6 +425,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
       'duration_min': duration,
       'expected_fare': roundedExpectedFare,
       'is_underpaid': isUnderpaid,
+      'explanation': explanationText,
       'source': _jobSource,
       'job_timestamp': FieldValue.serverTimestamp(),
       'created_at': FieldValue.serverTimestamp(),
@@ -294,6 +439,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
       'duration_min': duration,
       'expected_fare': roundedExpectedFare,
       'is_underpaid': isUnderpaid,
+      'explanation': explanationText,
       'source': _jobSource,
       'job_timestamp': DateTime.now().toIso8601String(),
       'created_at': DateTime.now().toIso8601String(),
@@ -308,7 +454,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            "Running in offline mode: Job calculation completed successfully!",
+            StringsProvider.instance.t('logjob_offline'),
             style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
           ),
           backgroundColor: PlayfulColors.secondary,
@@ -370,7 +516,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                       children: [
                         const SizedBox(height: 16),
                         Text(
-                          "GIGSHIELD",
+                          StringsProvider.instance.t('app_name'),
                           textAlign: TextAlign.center,
                           style: GoogleFonts.outfit(
                             fontWeight: FontWeight.w900,
@@ -381,7 +527,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          "Log your trip to verify your pay instantly.",
+                          StringsProvider.instance.t('logjob_subtitle'),
                           textAlign: TextAlign.center,
                           style: GoogleFonts.plusJakartaSans(
                             fontWeight: FontWeight.w500,
@@ -419,17 +565,17 @@ class _LogJobScreenState extends State<LogJobScreen> {
                                 ),
                               ],
                             ),
-                            child: const Center(
+                            child: Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  CircularProgressIndicator(
+                                  const CircularProgressIndicator(
                                     color: PlayfulColors.accent,
                                   ),
-                                  SizedBox(height: 16),
+                                  const SizedBox(height: 16),
                                   Text(
-                                    "Analyzing screenshot...",
-                                    style: TextStyle(
+                                    StringsProvider.instance.t('logjob_analyzing'),
+                                    style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       color: PlayfulColors.foreground,
                                     ),
@@ -468,17 +614,12 @@ class _LogJobScreenState extends State<LogJobScreen> {
                           ],
 
                           PlayfulInput(
-                            labelText: "PLATFORM",
-                            hintText: "Select Platform",
-                            dropdownItems: _platforms,
-                            selectedDropdownValue: _selectedPlatform,
+                            labelText: StringsProvider.instance.t('logjob_platform'),
+                            hintText: StringsProvider.instance.t('logjob_platform_hint'),
+                            controller: _platformFieldController,
+                            readOnly: true,
                             isHighlighted: _platformHighlighted,
-                            onDropdownChanged: (val) {
-                              setState(() {
-                                _selectedPlatform = val;
-                              });
-                              _checkFormValid();
-                            },
+                            onTap: () => _showPlatformPickerBottomSheet(context),
                           ),
                           const SizedBox(height: 20),
 
@@ -487,16 +628,16 @@ class _LogJobScreenState extends State<LogJobScreen> {
                             children: [
                               Expanded(
                                 child: PlayfulInput(
-                                  labelText: "FARE (₹)",
-                                  hintText: "Enter fare amount",
+                                  labelText: StringsProvider.instance.t('logjob_fare'),
+                                  hintText: StringsProvider.instance.t('logjob_fare_hint'),
                                   controller: _fareController,
                                   prefixText: "₹ ",
                                   isHighlighted: _fareHighlighted,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                   validator: (val) {
-                                    if (val == null || val.isEmpty) return "Fare is required";
+                                    if (val == null || val.isEmpty) return StringsProvider.instance.t('logjob_fare_required');
                                     final numVal = double.tryParse(val);
-                                    if (numVal == null || numVal <= 0) return "Must be a positive number";
+                                    if (numVal == null || numVal <= 0) return StringsProvider.instance.t('logjob_positive');
                                     return null;
                                   },
                                 ),
@@ -530,15 +671,15 @@ class _LogJobScreenState extends State<LogJobScreen> {
                             children: [
                               Expanded(
                                 child: PlayfulInput(
-                                  labelText: "DISTANCE (KM)",
-                                  hintText: "Enter trip distance",
+                                  labelText: StringsProvider.instance.t('logjob_distance'),
+                                  hintText: StringsProvider.instance.t('logjob_distance_hint'),
                                   controller: _distanceController,
                                   isHighlighted: _distanceHighlighted,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                   validator: (val) {
-                                    if (val == null || val.isEmpty) return "Distance is required";
+                                    if (val == null || val.isEmpty) return StringsProvider.instance.t('logjob_distance_required');
                                     final numVal = double.tryParse(val);
-                                    if (numVal == null || numVal <= 0) return "Must be a positive decimal";
+                                    if (numVal == null || numVal <= 0) return StringsProvider.instance.t('logjob_positive_decimal');
                                     return null;
                                   },
                                 ),
@@ -572,15 +713,15 @@ class _LogJobScreenState extends State<LogJobScreen> {
                             children: [
                               Expanded(
                                 child: PlayfulInput(
-                                  labelText: "DURATION (MIN)",
-                                  hintText: "Enter duration in minutes",
+                                  labelText: StringsProvider.instance.t('logjob_duration'),
+                                  hintText: StringsProvider.instance.t('logjob_duration_hint'),
                                   controller: _durationController,
                                   isHighlighted: _durationHighlighted,
                                   keyboardType: TextInputType.number,
                                   validator: (val) {
-                                    if (val == null || val.isEmpty) return "Duration is required";
+                                    if (val == null || val.isEmpty) return StringsProvider.instance.t('logjob_duration_required');
                                     final numVal = double.tryParse(val);
-                                    if (numVal == null || numVal <= 0) return "Must be a positive number";
+                                    if (numVal == null || numVal <= 0) return StringsProvider.instance.t('logjob_positive');
                                     return null;
                                   },
                                 ),
@@ -611,7 +752,9 @@ class _LogJobScreenState extends State<LogJobScreen> {
 
                           PlayfulButton(
                             onPressed: _isFormValid ? _submitJob : null,
-                            child: Text(_jobSource == "ocr" ? "CONFIRM & LOG JOB" : "LOG JOB"),
+                            child: Text(_jobSource == "ocr"
+                                ? StringsProvider.instance.t('logjob_btn_confirm')
+                                : StringsProvider.instance.t('logjob_btn')),
                           ),
                           const SizedBox(height: 24),
                         ],
@@ -623,4 +766,187 @@ class _LogJobScreenState extends State<LogJobScreen> {
       ),
     );
   }
+
+  void _showPlatformPickerBottomSheet(BuildContext context) {
+    _searchController.clear();
+    _filteredPlatforms = List.from(_allPlatforms);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateSheet) {
+            // Update filtered platforms inside bottom sheet
+            void searchListener() {
+              if (context.mounted) {
+                setStateSheet(() {
+                  _filteredPlatforms = _allPlatforms
+                      .where((p) =>
+                          p.displayName.toLowerCase().contains(_searchController.text.toLowerCase()) ||
+                          p.id.toLowerCase().contains(_searchController.text.toLowerCase()))
+                      .toList();
+                });
+              }
+            }
+
+            _searchController.removeListener(searchListener);
+            _searchController.addListener(searchListener);
+
+            final sortedCategories = _getSortedCategories();
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.75,
+              padding: const EdgeInsets.only(top: 12, left: 24, right: 24, bottom: 24),
+              decoration: const BoxDecoration(
+                color: PlayfulColors.background,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+                border: Border(
+                  top: BorderSide(color: PlayfulColors.border, width: 2),
+                  left: BorderSide(color: PlayfulColors.border, width: 2),
+                  right: BorderSide(color: PlayfulColors.border, width: 2),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 48,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: PlayfulColors.border,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    "SELECT PLATFORM",
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                      letterSpacing: 2.0,
+                      color: PlayfulColors.foreground,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Search Field
+                  PlayfulInput(
+                    labelText: "Search",
+                    hintText: "Type platform name...",
+                    controller: _searchController,
+                    onTap: () {},
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Grouped platform list
+                  Expanded(
+                    child: ListView(
+                      children: sortedCategories.map((cat) {
+                        final itemsInCat = _filteredPlatforms.where((p) => p.category == cat).toList();
+                        if (itemsInCat.isEmpty) return const SizedBox.shrink();
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8.0),
+                              child: Text(
+                                _categoryLabels[cat] ?? cat.toUpperCase(),
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 11,
+                                  letterSpacing: 1.5,
+                                  color: PlayfulColors.mutedForeground,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: PlayfulColors.border, width: 2.0),
+                              ),
+                              child: Column(
+                                children: List.generate(itemsInCat.length, (idx) {
+                                  final p = itemsInCat[idx];
+                                  final isLast = idx == itemsInCat.length - 1;
+
+                                  return Container(
+                                    decoration: BoxDecoration(
+                                      border: isLast
+                                          ? null
+                                          : const Border(
+                                              bottom: BorderSide(color: PlayfulColors.border, width: 1),
+                                            ),
+                                    ),
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: ListTile(
+                                        onTap: () {
+                                          setState(() {
+                                            _selectedPlatform = p.id;
+                                            _platformFieldController.text = p.displayName;
+                                          });
+                                          _checkFormValid();
+                                          Navigator.pop(context);
+                                        },
+                                        title: Text(
+                                          p.displayName,
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.bold,
+                                            color: PlayfulColors.foreground,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  List<String> _getSortedCategories() {
+    if (_workerType == 'cab_driver') {
+      return ['cab', 'delivery', 'other_gig'];
+    } else if (_workerType == 'delivery_rider') {
+      return ['delivery', 'cab', 'other_gig'];
+    } else {
+      return ['other_gig', 'delivery', 'cab'];
+    }
+  }
+}
+
+class PlatformItem {
+  final String id;
+  final String displayName;
+  final String category;
+  final double ratePerKm;
+  final double ratePerMin;
+
+  PlatformItem({
+    required this.id,
+    required this.displayName,
+    required this.category,
+    required this.ratePerKm,
+    required this.ratePerMin,
+  });
 }

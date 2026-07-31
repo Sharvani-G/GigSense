@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter_tts/flutter_tts.dart';
+import '../main.dart';
+import '../i18n/strings.dart';
 import 'playful_widgets.dart';
 
 class ChatMessage {
@@ -27,28 +30,193 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final List<ChatMessage> _messages = [];
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  
+  String? _activeSessionId;
   bool _isLoading = false;
+  bool _initializing = true;
+
+  final FlutterTts _flutterTts = FlutterTts();
+  String? _speakingMessageId;
+  bool _isTtsAvailable = true;
 
   @override
   void initState() {
     super.initState();
-    // Add default intro message from the app
-    _messages.add(
-      ChatMessage(
-        text: "Hey — ask me anything about your pay, your rights, or how to raise a complaint. I'll look at your recent jobs if it's relevant.",
-        isUser: false,
-      ),
-    );
+    MainNavigationController.activeSessionId.addListener(_onDeepLinkSessionChanged);
+    _initTts();
+    _initializeChat();
+  }
+
+  void _initTts() {
+    _flutterTts.setCompletionHandler(() {
+      if (mounted) {
+        setState(() {
+          _speakingMessageId = null;
+        });
+      }
+    });
+    _flutterTts.setCancelHandler(() {
+      if (mounted) {
+        setState(() {
+          _speakingMessageId = null;
+        });
+      }
+    });
+    _flutterTts.setErrorHandler((msg) {
+      debugPrint("TTS error: $msg");
+      if (mounted) {
+        setState(() {
+          _speakingMessageId = null;
+        });
+      }
+    });
+  }
+
+  Future<void> _speakMessage(String messageId, String text) async {
+    if (_speakingMessageId == messageId) {
+      await _flutterTts.stop();
+      setState(() {
+        _speakingMessageId = null;
+      });
+      return;
+    }
+
+    if (_speakingMessageId != null) {
+      await _flutterTts.stop();
+    }
+
+    setState(() {
+      _speakingMessageId = messageId;
+    });
+
+    try {
+      await _flutterTts.speak(text);
+    } catch (e) {
+      debugPrint("Failed to play TTS: $e");
+      if (mounted) {
+        setState(() {
+          _speakingMessageId = null;
+          _isTtsAvailable = false;
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
+    MainNavigationController.activeSessionId.removeListener(_onDeepLinkSessionChanged);
+    _flutterTts.stop();
     _inputController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onDeepLinkSessionChanged() {
+    final deepLinkId = MainNavigationController.activeSessionId.value;
+    if (deepLinkId != null && mounted) {
+      setState(() {
+        _activeSessionId = deepLinkId;
+      });
+      // Clear it so it doesn't re-trigger
+      MainNavigationController.activeSessionId.value = null;
+      
+      final msg = MainNavigationController.initialMessageToSend;
+      if (msg != null) {
+        MainNavigationController.initialMessageToSend = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _sendMessage(msg);
+        });
+      }
+    }
+  }
+
+  Future<void> _initializeChat() async {
+    final deepLinkId = MainNavigationController.activeSessionId.value;
+    if (deepLinkId != null) {
+      setState(() {
+        _activeSessionId = deepLinkId;
+        _initializing = false;
+      });
+      MainNavigationController.activeSessionId.value = null;
+
+      final msg = MainNavigationController.initialMessageToSend;
+      if (msg != null) {
+        MainNavigationController.initialMessageToSend = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _sendMessage(msg);
+        });
+      }
+      return;
+    }
+
+    await _loadRecentSession();
+    if (mounted) {
+      setState(() {
+        _initializing = false;
+      });
+    }
+  }
+
+  Future<void> _loadRecentSession() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous_user';
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('chatSessions')
+          .orderBy('updatedAt', descending: true)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _activeSessionId = snapshot.docs.first.id;
+          });
+        }
+      } else {
+        await _createNewSession();
+      }
+    } catch (e) {
+      debugPrint("Error loading recent session: $e");
+      // Fallback: create offline temp session ID
+      if (mounted) {
+        setState(() {
+          _activeSessionId = 'temp_offline_session';
+        });
+      }
+    }
+  }
+
+  Future<String> _createNewSession({String title = "New Chat"}) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous_user';
+    final docRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('chatSessions')
+        .doc();
+
+    final sessionId = docRef.id;
+
+    try {
+      await docRef.set({
+        'title': title,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint("Failed to save new session to Firestore: $e");
+    }
+
+    if (mounted) {
+      setState(() {
+        _activeSessionId = sessionId;
+      });
+    }
+    return sessionId;
   }
 
   void _scrollToBottom() {
@@ -63,19 +231,51 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  Future<void> _autoTitleIfNeeded(String sessionId, String text) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous_user';
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('chatSessions')
+          .doc(sessionId)
+          .get();
+
+      if (doc.exists) {
+        final currentTitle = doc.data()?['title'] ?? 'New Chat';
+        if (currentTitle == 'New Chat') {
+          final words = text.trim().split(RegExp(r'\s+'));
+          final truncated = words.take(6).join(' ');
+          final finalTitle = words.length > 6 ? '$truncated...' : truncated;
+          await doc.reference.update({'title': finalTitle});
+        }
+      }
+    } catch (e) {
+      debugPrint("Error auto-titling: $e");
+    }
+  }
+
   Future<void> _sendMessage(String text) async {
     if (text.trim().isEmpty) return;
 
+    if (_activeSessionId == null) {
+      await _createNewSession(title: "New Chat");
+    }
+
+    final sessionId = _activeSessionId!;
+    final String userId = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous_user';
+
     setState(() {
-      _messages.add(ChatMessage(text: text, isUser: true));
       _isLoading = true;
     });
     _inputController.clear();
     _scrollToBottom();
 
+    // Auto title asynchronously
+    _autoTitleIfNeeded(sessionId, text);
+
     final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
     final Uri url = Uri.parse('$baseUrl/chat');
-    final String userId = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous_user';
 
     try {
       final response = await http.post(
@@ -84,58 +284,192 @@ class _ChatScreenState extends State<ChatScreen> {
         body: json.encode({
           'message': text,
           'user_id': userId,
+          'session_id': sessionId,
         }),
       );
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        setState(() {
-          _messages.add(ChatMessage(
-            text: data['response'] ?? 'I could not generate a response.',
-            isUser: false,
-          ));
-        });
-      } else if (response.statusCode == 503) {
-        final data = json.decode(response.body);
-        setState(() {
-          _messages.add(ChatMessage(
-            text: data['error'] ?? 'Assistant is temporarily unavailable — please try again in a moment.',
-            isUser: false,
-            isSystemError: true,
-          ));
-        });
-      } else {
+      if (response.statusCode != 200) {
         throw Exception("Server returned status code ${response.statusCode}");
       }
     } catch (e) {
       debugPrint("Chat query failed: $e");
-      setState(() {
-        _messages.add(ChatMessage(
-          text: "I'm having trouble responding right now — try again in a moment.",
-          isUser: false,
-          isSystemError: true,
-        ));
-      });
+      // Server call failed, write both user message and system error locally so UI is synced
+      try {
+        final messagesColl = FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .collection('chatSessions')
+            .doc(sessionId)
+            .collection('messages');
+
+        await messagesColl.add({
+          'role': 'user',
+          'content': text,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+
+        await messagesColl.add({
+          'role': 'assistant',
+          'content': "I'm having trouble responding right now — try again in a moment.",
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+      } catch (firestoreError) {
+        debugPrint("Failed to log failure locally: $firestoreError");
+      }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
       _scrollToBottom();
     }
   }
 
+  Stream<QuerySnapshot> _messagesStream() {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous_user';
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('chatSessions')
+        .doc(_activeSessionId)
+        .collection('messages')
+        .orderBy('timestamp', descending: false)
+        .snapshots();
+  }
+
+  Widget _buildDrawer() {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous_user';
+    return Drawer(
+      backgroundColor: PlayfulColors.background,
+      elevation: 0,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.zero,
+      ),
+      child: Container(
+        decoration: const BoxDecoration(
+          border: Border(
+            right: BorderSide(color: PlayfulColors.border, width: 2),
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // New Chat Button
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: PlayfulButton(
+                  onPressed: () async {
+                    Navigator.pop(context); // close drawer
+                    await _createNewSession();
+                  },
+                  child: Text(StringsProvider.instance.t('chat_new')),
+                ),
+              ),
+              const Divider(color: PlayfulColors.border, height: 2, thickness: 2),
+
+              // Sessions list
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(uid)
+                      .collection('chatSessions')
+                      .orderBy('updatedAt', descending: true)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(
+                        child: CircularProgressIndicator(color: PlayfulColors.accent),
+                      );
+                    }
+
+                    final docs = snapshot.data!.docs;
+                    if (docs.isEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.chat_bubble_outline,
+                              size: 48,
+                              color: PlayfulColors.mutedForeground,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              StringsProvider.instance.t('chat_empty_drawer'),
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.plusJakartaSans(
+                                color: PlayfulColors.mutedForeground,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return ListView.builder(
+                      itemCount: docs.length,
+                      itemBuilder: (context, index) {
+                        final doc = docs[index];
+                        final data = doc.data() as Map<String, dynamic>;
+                        final sessionId = doc.id;
+                        final title = data['title'] ?? 'New Chat';
+                        final updatedAt = (data['updatedAt'] as Timestamp?)?.toDate();
+                        final isSelected = sessionId == _activeSessionId;
+
+                        return _SessionRow(
+                          sessionId: sessionId,
+                          title: title,
+                          updatedAt: updatedAt,
+                          isSelected: isSelected,
+                          onSelect: () {
+                            setState(() {
+                              _activeSessionId = sessionId;
+                            });
+                            Navigator.pop(context); // Close drawer
+                          },
+                          onRename: (newTitle) async {
+                            await doc.reference.update({'title': newTitle});
+                          },
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final showQuickReplies = !_isLoading && (_messages.length <= 1 || !_messages.last.isUser);
+    if (_initializing) {
+      return const Scaffold(
+        backgroundColor: PlayfulColors.background,
+        body: Center(
+          child: CircularProgressIndicator(color: PlayfulColors.accent),
+        ),
+      );
+    }
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: PlayfulColors.background,
+      drawer: _buildDrawer(),
       body: SafeArea(
         child: Column(
           children: [
-            // App Bar
+            // App Bar with Hamburger Drawer Trigger
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: const BoxDecoration(
                 color: Colors.white,
                 border: Border(
@@ -144,6 +478,13 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               child: Row(
                 children: [
+                  IconButton(
+                    icon: const Icon(Icons.menu, color: PlayfulColors.foreground),
+                    onPressed: () {
+                      _scaffoldKey.currentState?.openDrawer();
+                    },
+                  ),
+                  const SizedBox(width: 8),
                   Container(
                     width: 40,
                     height: 40,
@@ -155,26 +496,28 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: const Icon(Icons.chat_bubble_outline, color: Colors.white),
                   ),
                   const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "GIGCHAT",
-                        style: GoogleFonts.outfit(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          color: PlayfulColors.foreground,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "GIGCHAT",
+                          style: GoogleFonts.outfit(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: PlayfulColors.foreground,
+                          ),
                         ),
-                      ),
-                      Text(
-                        "Worker pay & rights assistant",
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: PlayfulColors.mutedForeground,
+                        Text(
+                          StringsProvider.instance.t('chat_subtitle'),
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: PlayfulColors.mutedForeground,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -182,17 +525,84 @@ class _ChatScreenState extends State<ChatScreen> {
 
             // Message Board
             Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.all(20),
-                itemCount: _messages.length + (_isLoading ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index == _messages.length && _isLoading) {
-                    return const _TypingIndicatorBubble();
+              child: StreamBuilder<QuerySnapshot>(
+                stream: _messagesStream(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text(
+                        StringsProvider.instance.t('chat_error_loading'),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontWeight: FontWeight.bold,
+                          color: PlayfulColors.mutedForeground,
+                        ),
+                      ),
+                    );
                   }
 
-                  final message = _messages[index];
-                  return _MessageBubble(message: message);
+                  final docs = snapshot.data?.docs ?? [];
+                  
+                  // Auto scroll when new messages arrive
+                  if (docs.isNotEmpty) {
+                    _scrollToBottom();
+                  }
+
+                  if (docs.isEmpty && !_isLoading) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 40),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.chat_bubble_outline,
+                              size: 48,
+                              color: PlayfulColors.mutedForeground,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              StringsProvider.instance.t('chat_intro'),
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.plusJakartaSans(
+                                color: PlayfulColors.mutedForeground,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(20),
+                    itemCount: docs.length + (_isLoading ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == docs.length && _isLoading) {
+                        return const _TypingIndicatorBubble();
+                      }
+
+                      final data = docs[index].data() as Map<String, dynamic>;
+                      final message = ChatMessage(
+                        text: data['content'] ?? '',
+                        isUser: data['role'] == 'user',
+                        isSystemError: data['is_system_error'] ?? false,
+                      );
+                      final messageId = docs[index].id;
+                      final isSpeaking = _speakingMessageId == messageId;
+
+                      return _MessageBubble(
+                        message: message,
+                        messageId: messageId,
+                        isSpeaking: isSpeaking,
+                        onSpeakTap: _isTtsAvailable && !message.isUser
+                            ? () => _speakMessage(messageId, message.text)
+                            : null,
+                      );
+                    },
+                  );
                 },
               ),
             ),
@@ -210,30 +620,43 @@ class _ChatScreenState extends State<ChatScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // Quick reply chips
-                  if (showQuickReplies) ...[
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
+                  StreamBuilder<QuerySnapshot>(
+                    stream: _messagesStream(),
+                    builder: (context, snapshot) {
+                      final docs = snapshot.data?.docs ?? [];
+                      final bool showQuickReplies = !_isLoading && docs.isEmpty;
+
+                      if (!showQuickReplies) return const SizedBox.shrink();
+
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          QuickReplyChip(
-                            text: "Is my pay fair?",
-                            onTap: () => _sendMessage("Is my pay fair?"),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                QuickReplyChip(
+                                  text: StringsProvider.instance.t('chip_pay_fair'),
+                                  onTap: () => _sendMessage(StringsProvider.instance.t('chip_pay_fair')),
+                                ),
+                                const SizedBox(width: 8),
+                                QuickReplyChip(
+                                  text: StringsProvider.instance.t('chip_rights'),
+                                  onTap: () => _sendMessage(StringsProvider.instance.t('chip_rights')),
+                                ),
+                                const SizedBox(width: 8),
+                                QuickReplyChip(
+                                  text: StringsProvider.instance.t('chip_complain'),
+                                  onTap: () => _sendMessage(StringsProvider.instance.t('chip_complain')),
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(width: 8),
-                          QuickReplyChip(
-                            text: "What are my rights?",
-                            onTap: () => _sendMessage("What are my rights?"),
-                          ),
-                          const SizedBox(width: 8),
-                          QuickReplyChip(
-                            text: "How do I complain?",
-                            onTap: () => _sendMessage("How do I complain?"),
-                          ),
+                          const SizedBox(height: 12),
                         ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
+                      );
+                    },
+                  ),
 
                   // Input Box
                   Row(
@@ -249,7 +672,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       Expanded(
                         child: PlayfulInput(
                           labelText: "",
-                          hintText: "Type your question...",
+                          hintText: StringsProvider.instance.t('chat_hint'),
                           controller: _inputController,
                         ),
                       ),
@@ -261,7 +684,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "General guidance, not legal advice.",
+                    StringsProvider.instance.t('chat_disclaimer'),
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 11,
                       color: PlayfulColors.mutedForeground,
@@ -278,10 +701,159 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
+class _SessionRow extends StatefulWidget {
+  final String sessionId;
+  final String title;
+  final DateTime? updatedAt;
+  final bool isSelected;
+  final VoidCallback onSelect;
+  final Function(String) onRename;
+
+  const _SessionRow({
+    required this.sessionId,
+    required this.title,
+    required this.updatedAt,
+    required this.isSelected,
+    required this.onSelect,
+    required this.onRename,
+  });
+
+  @override
+  State<_SessionRow> createState() => _SessionRowState();
+}
+
+class _SessionRowState extends State<_SessionRow> {
+  bool _isEditing = false;
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.title);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String _getRelativeTime(DateTime? dt) {
+    if (dt == null) return "";
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 1) return "Just now";
+    if (diff.inMinutes < 60) return "${diff.inMinutes}m ago";
+    if (diff.inHours < 24) return "${diff.inHours}h ago";
+    if (diff.inDays == 1) return "Yesterday";
+    return "${diff.inDays}d ago";
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: widget.isSelected ? PlayfulColors.muted : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        border: widget.isSelected
+            ? Border.all(color: PlayfulColors.border, width: 2)
+            : null,
+      ),
+      child: _isEditing
+          ? Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      autofocus: true,
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: PlayfulColors.foreground,
+                      ),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      onSubmitted: (val) {
+                        if (val.trim().isNotEmpty) {
+                          widget.onRename(val.trim());
+                        }
+                        setState(() {
+                          _isEditing = false;
+                        });
+                      },
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.check, size: 18, color: PlayfulColors.accent),
+                    onPressed: () {
+                      if (_controller.text.trim().isNotEmpty) {
+                        widget.onRename(_controller.text.trim());
+                      }
+                      setState(() {
+                        _isEditing = false;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            )
+          : Material(
+              color: Colors.transparent,
+              child: ListTile(
+                onTap: widget.onSelect,
+                title: Text(
+                  widget.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: widget.isSelected ? FontWeight.bold : FontWeight.w600,
+                    color: PlayfulColors.foreground,
+                    fontSize: 14,
+                  ),
+                ),
+                subtitle: widget.updatedAt != null
+                    ? Text(
+                        _getRelativeTime(widget.updatedAt),
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 11,
+                          color: PlayfulColors.mutedForeground,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      )
+                    : null,
+                trailing: IconButton(
+                  icon: const Icon(Icons.edit_note, size: 20, color: PlayfulColors.mutedForeground),
+                  onPressed: () {
+                    setState(() {
+                      _isEditing = true;
+                      _controller.text = widget.title;
+                    });
+                  },
+                ),
+              ),
+            ),
+    );
+  }
+}
+
 class _MessageBubble extends StatefulWidget {
   final ChatMessage message;
+  final String? messageId;
+  final bool isSpeaking;
+  final VoidCallback? onSpeakTap;
 
-  const _MessageBubble({required this.message});
+  const _MessageBubble({
+    required this.message,
+    this.messageId,
+    this.isSpeaking = false,
+    this.onSpeakTap,
+  });
 
   @override
   State<_MessageBubble> createState() => _MessageBubbleState();
@@ -310,7 +882,7 @@ class _MessageBubbleState extends State<_MessageBubble> with SingleTickerProvide
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _controller,
-      curve: Curves.easeOutBack, // Playful bounce!
+      curve: Curves.easeOutBack,
     ));
 
     _controller.forward();
@@ -363,7 +935,6 @@ class _MessageBubbleState extends State<_MessageBubble> with SingleTickerProvide
       );
     }
 
-    // GigChat Response
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
@@ -385,7 +956,7 @@ class _MessageBubbleState extends State<_MessageBubble> with SingleTickerProvide
             Expanded(
               child: Container(
                 margin: const EdgeInsets.only(right: 40),
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.only(left: 16, top: 16, right: 16, bottom: 8),
                 decoration: BoxDecoration(
                   color: message.isSystemError ? Colors.red.shade50 : PlayfulColors.background,
                   border: Border.all(
@@ -406,13 +977,41 @@ class _MessageBubbleState extends State<_MessageBubble> with SingleTickerProvide
                     ),
                   ],
                 ),
-                child: Text(
-                  message.text,
-                  style: GoogleFonts.plusJakartaSans(
-                    color: message.isSystemError ? Colors.red.shade900 : PlayfulColors.foreground,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
+                child: Stack(
+                  children: [
+                    Padding(
+                      padding: widget.onSpeakTap != null
+                          ? const EdgeInsets.only(bottom: 28)
+                          : EdgeInsets.zero,
+                      child: Text(
+                        message.text,
+                        style: GoogleFonts.plusJakartaSans(
+                          color: message.isSystemError ? Colors.red.shade900 : PlayfulColors.foreground,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    if (widget.onSpeakTap != null)
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: GestureDetector(
+                          onTap: widget.onSpeakTap,
+                          behavior: HitTestBehavior.opaque,
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            alignment: Alignment.bottomRight,
+                            child: Icon(
+                              widget.isSpeaking ? Icons.stop : Icons.volume_up,
+                              size: 18,
+                              color: PlayfulColors.mutedForeground,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -658,5 +1257,3 @@ class _PlayfulSendButtonState extends State<PlayfulSendButton> {
     );
   }
 }
-
-

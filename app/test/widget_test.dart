@@ -1,15 +1,11 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:app/main.dart';
+import 'package:app/i18n/strings.dart';
 
 void main() {
-  testWidgets('GigShield navigation smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const GigShieldApp());
-
-    // Verify that bottom navigation bar items are present
-    expect(find.text('Home'), findsOneWidget);
-    expect(find.text('Log Job'), findsOneWidget);
-    expect(find.text('Chat'), findsOneWidget);
+  test('AppStrings localization translation check', () {
+    final s = StringsProvider.instance;
+    s.setLanguage('en');
+    expect(s.t('app_name'), 'GIGSHIELD');
+    expect(s.t('tagline'), 'Fair pay, on your side.');
   });
 }

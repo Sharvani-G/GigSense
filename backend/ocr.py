@@ -14,13 +14,30 @@ def extract_job_data(image_bytes: bytes) -> dict:
         # Raise exception to be caught in main.py to return 422
         raise ValueError(f"Failed to process image: {e}")
 
-    # Heuristics for parsing
-    # 1. Platform
     platform = "other"
     lower_text = raw_text.lower()
-    for p in ["uber", "rapido", "zomato", "swiggy"]:
-        if p in lower_text:
-            platform = p
+    platform_map = {
+        "uber": "uber",
+        "rapido": "rapido",
+        "ola": "ola",
+        "indrive": "indrive",
+        "zomato": "zomato",
+        "swiggy": "swiggy",
+        "dunzo": "dunzo",
+        "blinkit": "blinkit",
+        "zepto": "zepto",
+        "bigbasket": "bigbasket",
+        "big basket": "bigbasket",
+        "amazon flex": "amazon_flex",
+        "amazonflex": "amazon_flex",
+        "urban company": "urban_company",
+        "urbancompany": "urban_company",
+        "porter": "porter",
+        "housejoy": "housejoy"
+    }
+    for keyword, p_id in platform_map.items():
+        if keyword in lower_text:
+            platform = p_id
             break
             
     # 2. Fare (₹ or Rs followed by digits)

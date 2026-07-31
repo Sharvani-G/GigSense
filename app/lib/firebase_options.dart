@@ -39,28 +39,28 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'REPLACE_ME_WITH_REAL_API_KEY',
-    appId: '1:1234567890:web:1234567890',
-    messagingSenderId: '1234567890',
+    apiKey: 'AIzaSyCoGEU3slZZIqmHeY_e830w9ue2roMeDvY',
+    appId: '1:382367359308:web:fcb34785fd4d12b2edafe9',
+    messagingSenderId: '382367359308',
     projectId: 'gigshield-e38ec',
     authDomain: 'gigshield-e38ec.firebaseapp.com',
-    storageBucket: 'gigshield-e38ec.appspot.com',
+    storageBucket: 'gigshield-e38ec.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'REPLACE_ME_WITH_REAL_API_KEY',
-    appId: '1:1234567890:android:1234567890',
-    messagingSenderId: '1234567890',
+    apiKey: 'AIzaSyCoGEU3slZZIqmHeY_e830w9ue2roMeDvY',
+    appId: '1:382367359308:android:fcb34785fd4d12b2edafe9',
+    messagingSenderId: '382367359308',
     projectId: 'gigshield-e38ec',
-    storageBucket: 'gigshield-e38ec.appspot.com',
+    storageBucket: 'gigshield-e38ec.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'REPLACE_ME_WITH_REAL_API_KEY',
-    appId: '1:1234567890:ios:1234567890',
-    messagingSenderId: '1234567890',
+    apiKey: 'AIzaSyCoGEU3slZZIqmHeY_e830w9ue2roMeDvY',
+    appId: '1:382367359308:ios:fcb34785fd4d12b2edafe9',
+    messagingSenderId: '382367359308',
     projectId: 'gigshield-e38ec',
-    storageBucket: 'gigshield-e38ec.appspot.com',
+    storageBucket: 'gigshield-e38ec.firebasestorage.app',
     iosBundleId: 'com.example.app',
   );
 

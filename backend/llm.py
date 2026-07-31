@@ -8,7 +8,7 @@ def ask_gemma(prompt: str, system_prompt: str = "") -> str:
         "stream": False
     }
     try:
-        response = requests.post(url, json=payload, timeout=20)
+        response = requests.post(url, json=payload, timeout=60)
         response.raise_for_status()
         return response.json().get("response", "")
     except Exception as e:

@@ -12,6 +12,15 @@ class JobScanResponse(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     user_id: str
+    session_id: str
 
 class ChatResponse(BaseModel):
     response: str
+
+class ComplaintRequest(BaseModel):
+    platform: str
+    fare: float
+    distance_km: float
+    duration_min: float
+    expected_fare: float
+    user_id: str
