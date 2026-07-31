@@ -424,7 +424,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
       return;
     }
 
-    final pickedFile = await picker.pickImage(source: source);
+    final pickedFile = await picker.pickImage(source: source, imageQuality: 50, maxWidth: 1024);
     
     if (pickedFile == null) {
       // User cancelled picker, return to manual
@@ -577,6 +577,29 @@ class _LogJobScreenState extends State<LogJobScreen> {
     double rawDuration = double.parse(_durationController.text);
     final double duration = _durationUnit == 'hr' ? rawDuration * 60 : rawDuration;
     final String platform = _selectedPlatform ?? 'other';
+    
+    // Sanity bounds check
+    if (distance > 500 || duration > 1440) {
+      bool? confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(StringsProvider.instance.t('logjob_long_trip_title') ?? "Long Trip?", style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+          content: Text(StringsProvider.instance.t('logjob_long_trip_desc') ?? "That's a very long trip — is this correct?", style: GoogleFonts.plusJakartaSans()),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: const BorderSide(color: PlayfulColors.border, width: 2)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(StringsProvider.instance.t('stt_cancel') ?? "Cancel", style: GoogleFonts.plusJakartaSans(color: PlayfulColors.mutedForeground)),
+            ),
+            PlayfulSecondaryButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text("Yes, it's correct"),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -1058,10 +1081,12 @@ class _LogJobScreenState extends State<LogJobScreen> {
                           ],
 
                           PlayfulButton(
-                            onPressed: _isFormValid ? _submitJob : null,
-                            child: Text(_jobSource == "ocr"
-                                ? StringsProvider.instance.t('logjob_btn_confirm')
-                                : StringsProvider.instance.t('logjob_btn')),
+                            onPressed: _isFormValid && !_isLoading ? _submitJob : null,
+                            child: _isLoading 
+                                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
+                                : Text(_jobSource == "ocr"
+                                    ? StringsProvider.instance.t('logjob_btn_confirm')
+                                    : StringsProvider.instance.t('logjob_btn')),
                           ),
                           const SizedBox(height: 24),
                         ],

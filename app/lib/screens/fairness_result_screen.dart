@@ -8,6 +8,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:convert';
 import '../main.dart';
 import 'playful_widgets.dart';
+import 'package:share_plus/share_plus.dart';
 
 class FairnessResultScreen extends StatelessWidget {
   final Map<String, dynamic> job;
@@ -631,24 +632,39 @@ class _ComplaintBottomSheetContentState extends State<_ComplaintBottomSheetConte
               ],
             ),
             const SizedBox(height: 16),
-            PlayfulButton(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: _controller.text));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    backgroundColor: PlayfulColors.accent,
-                    content: Text(
-                      "Complaint draft copied to clipboard!",
-                      style: GoogleFonts.plusJakartaSans(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
+            Row(
+              children: [
+                Expanded(
+                  child: PlayfulButton(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: _controller.text));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          backgroundColor: PlayfulColors.accent,
+                          content: Text(
+                            "Copied to clipboard!",
+                            style: GoogleFonts.plusJakartaSans(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      );
+                      Navigator.pop(context);
+                    },
+                    child: const FittedBox(fit: BoxFit.scaleDown, child: Text("COPY")),
                   ),
-                );
-                Navigator.pop(context);
-              },
-              child: const Text("COPY TO CLIPBOARD"),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: PlayfulSecondaryButton(
+                    onPressed: () {
+                      Share.share(_controller.text);
+                    },
+                    child: const FittedBox(fit: BoxFit.scaleDown, child: Text("SHARE")),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
             Center(

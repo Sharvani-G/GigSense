@@ -1270,6 +1270,10 @@ class _PlayfulSafetyContextWidgetState extends State<PlayfulSafetyContextWidget>
 
     final pillLabel = isEvening ? "🌆 Evening trip" : "🌙 Late-night trip";
 
+    final pillColor = isLateNight ? const Color(0xFFFDF2F8) : const Color(0xFFFFFBEB);
+    final borderColor = isLateNight ? PlayfulColors.secondary : PlayfulColors.tertiary;
+    final textColor = isLateNight ? const Color(0xFFDB2777) : const Color(0xFFD97706);
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1282,9 +1286,9 @@ class _PlayfulSafetyContextWidgetState extends State<PlayfulSafetyContextWidget>
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFFBEB), // Very soft amber
+              color: pillColor, 
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: PlayfulColors.tertiary, width: 2),
+              border: Border.all(color: borderColor, width: 2),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -1294,14 +1298,14 @@ class _PlayfulSafetyContextWidgetState extends State<PlayfulSafetyContextWidget>
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
-                    color: const Color(0xFFD97706), // Rich amber text
+                    color: textColor,
                   ),
                 ),
                 const SizedBox(width: 6),
                 Icon(
                   _expanded ? Icons.expand_less : Icons.expand_more,
                   size: 16,
-                  color: const Color(0xFFD97706),
+                  color: textColor,
                 ),
               ],
             ),
@@ -1315,10 +1319,10 @@ class _PlayfulSafetyContextWidgetState extends State<PlayfulSafetyContextWidget>
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: PlayfulColors.border, width: 2),
-              boxShadow: const [
+              boxShadow: [
                 BoxShadow(
-                  color: PlayfulColors.tertiary,
-                  offset: Offset(4, 4),
+                  color: borderColor,
+                  offset: const Offset(4, 4),
                   blurRadius: 0,
                 ),
               ],

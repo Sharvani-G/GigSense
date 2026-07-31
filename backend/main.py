@@ -111,7 +111,7 @@ def get_user_language(user_id: str) -> str:
 
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
-    recent_jobs = get_recent_jobs(request.user_id)
+    recent_jobs = get_recent_jobs(request.user_id)[:5]
     recent_jobs_json = json.dumps(recent_jobs)
 
     conversation_history_str = ""

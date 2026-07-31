@@ -996,6 +996,9 @@ class _MessageBubbleState extends State<_MessageBubble> with SingleTickerProvide
         ),
       );
     }
+    if (message.text.isEmpty) {
+      return const _TypingIndicatorBubble();
+    }
 
     return Align(
       alignment: Alignment.centerLeft,

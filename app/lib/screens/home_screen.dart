@@ -220,6 +220,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _flaggedCount = flaggedCount;
         _chartData = chartData;
         _platformsBreakdown = platformMap.values.toList();
+        _platformsBreakdown.sort((a, b) => b.total.compareTo(a.total));
         _isLoading = false;
       });
 
@@ -746,15 +747,38 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: widget.onNavigateToLogJob,
-        backgroundColor: PlayfulColors.accent,
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: PlayfulColors.border, width: 2),
-        ),
-        child: const Icon(Icons.add, size: 28),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'sosBtn',
+            onPressed: _triggerSOS,
+            backgroundColor: const Color(0xFFEF4444),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: PlayfulColors.border, width: 2),
+            ),
+            icon: const Icon(Icons.sos, size: 24),
+            label: Text(
+              "I feel unsafe",
+              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton(
+            heroTag: 'logJobBtn',
+            onPressed: widget.onNavigateToLogJob,
+            backgroundColor: PlayfulColors.accent,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: PlayfulColors.border, width: 2),
+            ),
+            child: const Icon(Icons.add, size: 28),
+          ),
+        ],
       ),
     );
   }
