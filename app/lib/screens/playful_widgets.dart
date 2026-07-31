@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import '../i18n/strings.dart';
 
 // Playful Geometric Design System Colors
 class PlayfulColors {

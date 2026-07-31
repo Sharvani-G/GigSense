@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'playful_widgets.dart';
 import 'fairness_result_screen.dart';
+import 'home_screen.dart'; // For EmptyStatePainter
 import '../i18n/strings.dart';
 
 class HistoryScreen extends StatefulWidget {
