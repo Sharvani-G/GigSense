@@ -2,6 +2,11 @@ import os
 import firebase_admin
 from firebase_admin import credentials, firestore
 
+from dotenv import load_dotenv
+
+# Load env variables in case this is imported before main.py calls load_dotenv()
+load_dotenv()
+
 cred_path = os.environ.get("FIREBASE_CREDENTIALS_PATH", "")
 
 # Initialize Firebase Admin if credentials path is provided

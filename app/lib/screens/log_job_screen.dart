@@ -95,11 +95,63 @@ class _LogJobScreenState extends State<LogJobScreen> {
     }
   }
 
-  void _parseAndSetNumber(String text, TextEditingController controller) {
+  double? parseSpokenPhrase(String text) {
+    // First, check for digit strings
     final match = RegExp(r'(\d+(?:\.\d+)?)').firstMatch(text);
     if (match != null) {
+      return double.tryParse(match.group(1)!);
+    }
+
+    const Map<String, double> spokenNumbers = {
+      // English
+      'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
+      'hundred': 100, 'thousand': 1000,
+      // Hindi
+      'ek': 1, 'do': 2, 'teen': 3, 'chaar': 4, 'paanch': 5, 'chhey': 6, 'saat': 7, 'aath': 8, 'nau': 9, 'das': 10,
+      'sau': 100, 'hazaar': 1000, 'hajar': 1000,
+      // Kannada
+      'ondu': 1, 'eradu': 2, 'mooru': 3, 'naalku': 4, 'aidu': 5, 'aaru': 6, 'elu': 7, 'entu': 8, 'ombattu': 9, 'hattu': 10,
+      'nooru': 100, 'saavira': 1000,
+      // Telugu
+      'okati': 1, 'rendu': 2, 'moodu': 3, 'naalugu': 4, 'edu': 7, 'enimidi': 8, 'tommidi': 9, 'padi': 10,
+      'vei': 1000,
+      // Tamil
+      'ondru': 1, 'irandu': 2, 'moondru': 3, 'naangu': 4, 'aindhu': 5, 'ezhu': 7, 'ettu': 8, 'onbadhu': 9, 'pathu': 10,
+      'aayiram': 1000,
+      // Malayalam
+      'onnu': 1, 'moonnu': 3, 'naalu': 4, 'anchu': 5, 'onpathu': 9,
+    };
+
+    final words = text.toLowerCase().split(RegExp(r'\s+'));
+    double total = 0.0;
+    double current = 0.0;
+
+    for (var word in words) {
+      final cleanWord = word.replaceAll(RegExp(r'[^\w]'), '');
+      if (spokenNumbers.containsKey(cleanWord)) {
+        final val = spokenNumbers[cleanWord]!;
+        if (val == 100 || val == 1000) {
+          if (current == 0.0) current = 1.0;
+          total += current * val;
+          current = 0.0;
+        } else {
+          current += val;
+        }
+      }
+    }
+    total += current;
+    return total > 0 ? total : null;
+  }
+
+  void _parseAndSetNumber(String text, TextEditingController controller) {
+    final parsed = parseSpokenPhrase(text);
+    if (parsed != null) {
       setState(() {
-        controller.text = match.group(1)!;
+        if (parsed == parsed.toInt()) {
+          controller.text = parsed.toInt().toString();
+        } else {
+          controller.text = parsed.toString();
+        }
       });
       _checkFormValid();
     }
@@ -646,6 +698,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 2),
                                 child: PlayfulMicButton(
+                                  textOnLeft: true,
                                   onSpeechResult: (text) => _parseAndSetNumber(text, _fareController),
                                 ),
                               ),
@@ -688,6 +741,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 2),
                                 child: PlayfulMicButton(
+                                  textOnLeft: true,
                                   onSpeechResult: (text) => _parseAndSetNumber(text, _distanceController),
                                 ),
                               ),
@@ -730,6 +784,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 2),
                                 child: PlayfulMicButton(
+                                  textOnLeft: true,
                                   onSpeechResult: (text) => _parseAndSetNumber(text, _durationController),
                                 ),
                               ),

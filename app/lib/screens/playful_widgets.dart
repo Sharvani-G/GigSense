@@ -536,10 +536,39 @@ class _PlayfulSecondaryButtonState extends State<PlayfulSecondaryButton> {
   }
 }
 
+String getBCP47Locale(String langCode) {
+  const mapping = {
+    'en': 'en-IN',
+    'hi': 'hi-IN',
+    'kn': 'kn-IN',
+    'te': 'te-IN',
+    'ta': 'ta-IN',
+    'ml': 'ml-IN',
+  };
+  return mapping[langCode.toLowerCase()] ?? 'en-IN';
+}
+
+String getLanguageName(String langCode) {
+  const names = {
+    'en': 'English',
+    'hi': 'Hindi',
+    'kn': 'Kannada',
+    'te': 'Telugu',
+    'ta': 'Tamil',
+    'ml': 'Malayalam',
+  };
+  return names[langCode.toLowerCase()] ?? 'English';
+}
+
 class PlayfulMicButton extends StatefulWidget {
   final ValueChanged<String> onSpeechResult;
+  final bool textOnLeft;
 
-  const PlayfulMicButton({super.key, required this.onSpeechResult});
+  const PlayfulMicButton({
+    super.key,
+    required this.onSpeechResult,
+    this.textOnLeft = false,
+  });
 
   @override
   State<PlayfulMicButton> createState() => _PlayfulMicButtonState();
@@ -589,6 +618,9 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
   }
 
   Future<void> _toggleListening() async {
+    final resolvedLanguage = StringsProvider.instance.lang;
+    final resolvedLocale = getBCP47Locale(resolvedLanguage);
+
     if (!_speechAvailable) {
       await _initSpeech();
       if (!_speechAvailable) {
@@ -596,9 +628,12 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
           SnackBar(
             content: Text(
               "Speech recognition is not available on this device.",
-              style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+              style: GoogleFonts.plusJakartaSans(
+                color: PlayfulColors.foreground,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            backgroundColor: PlayfulColors.secondary,
+            backgroundColor: const Color(0xFFFFFDF5),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -617,6 +652,44 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
         _isListening = false;
       });
     } else {
+      // Locale availability check
+      try {
+        final locales = await _speech.locales();
+        bool isLocaleAvailable = false;
+        for (var loc in locales) {
+          if (loc.localeId.toLowerCase().replaceAll('_', '-') == resolvedLocale.toLowerCase().replaceAll('_', '-')) {
+            isLocaleAvailable = true;
+            break;
+          }
+        }
+
+        if (!isLocaleAvailable) {
+          final langName = getLanguageName(resolvedLanguage);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  "$langName voice input isn't available on this device yet — you can still type, or install $langName under your phone's language settings.",
+                  style: GoogleFonts.plusJakartaSans(
+                    color: PlayfulColors.foreground,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                backgroundColor: const Color(0xFFFFFDF5),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: PlayfulColors.border, width: 2),
+                ),
+              ),
+            );
+          }
+          return;
+        }
+      } catch (e) {
+        debugPrint("Error checking voice locales: $e");
+      }
+
       setState(() {
         _isListening = true;
       });
@@ -624,6 +697,7 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
         _pulseController.repeat(reverse: true);
       }
       await _speech.listen(
+        localeId: resolvedLocale,
         onResult: (result) {
           widget.onSpeechResult(result.recognizedWords);
           if (result.finalResult) {
@@ -677,19 +751,150 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
       ),
     );
 
-    if (_isListening && !disableMotion) {
-      return AnimatedBuilder(
-        animation: _pulseController,
-        builder: (context, child) {
-          return Transform.scale(
-            scale: _scaleAnimation.value,
-            child: child,
-          );
-        },
-        child: buttonBody,
-      );
+    final resolvedLanguage = StringsProvider.instance.lang;
+    final activeLangName = getLanguageName(resolvedLanguage);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_isListening && widget.textOnLeft) ...[
+          Text(
+            "Listening in $activeLangName...",
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: PlayfulColors.accent,
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+        _isListening && !disableMotion
+            ? AnimatedBuilder(
+                animation: _pulseController,
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: _scaleAnimation.value,
+                    child: child,
+                  );
+                },
+                child: buttonBody,
+              )
+            : buttonBody,
+        if (_isListening && !widget.textOnLeft) ...[
+          const SizedBox(width: 8),
+          Text(
+            "Listening in $activeLangName...",
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: PlayfulColors.accent,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class PlayfulMarkdownText extends StatelessWidget {
+  final String text;
+  final TextStyle style;
+
+  const PlayfulMarkdownText({
+    super.key,
+    required this.text,
+    required this.style,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final lines = text.split('\n');
+    final List<Widget> children = [];
+
+    for (var line in lines) {
+      if (line.trim().isEmpty) {
+        children.add(const SizedBox(height: 8));
+        continue;
+      }
+
+      // Check if it is a list item (starts with digit. or * or -)
+      final listMatch = RegExp(r'^(\s*)(?:\d+\.|\*|-)\s+(.*)$').firstMatch(line);
+      if (listMatch != null) {
+        final isNumbered = RegExp(r'^\s*\d+\.').hasMatch(line.trim());
+        final indent = listMatch.group(1) ?? '';
+        final contentText = listMatch.group(2) ?? '';
+        
+        final prefix = isNumbered 
+            ? RegExp(r'^\s*(\d+\.)').firstMatch(line)!.group(1)! 
+            : '•';
+
+        children.add(
+          Padding(
+            padding: EdgeInsets.only(left: 16.0 + (indent.length * 4), top: 2, bottom: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$prefix ',
+                  style: style.copyWith(fontWeight: FontWeight.bold),
+                ),
+                Expanded(
+                  child: RichText(
+                    text: TextSpan(
+                      style: style,
+                      children: _parseInlineBold(contentText, style),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      } else {
+        // Normal paragraph line
+        children.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6.0),
+            child: RichText(
+              text: TextSpan(
+                style: style,
+                children: _parseInlineBold(line, style),
+              ),
+            ),
+          ),
+        );
+      }
     }
 
-    return buttonBody;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: children,
+    );
+  }
+
+  List<InlineSpan> _parseInlineBold(String text, TextStyle defaultStyle) {
+    final List<InlineSpan> spans = [];
+    final parts = text.split('**');
+    for (var i = 0; i < parts.length; i++) {
+      if (i % 2 == 1) {
+        spans.add(
+          TextSpan(
+            text: parts[i],
+            style: defaultStyle.copyWith(fontWeight: FontWeight.bold),
+          ),
+        );
+      } else {
+        if (parts[i].isNotEmpty) {
+          spans.add(
+            TextSpan(
+              text: parts[i],
+              style: defaultStyle,
+            ),
+          );
+        }
+      }
+    }
+    return spans;
   }
 }

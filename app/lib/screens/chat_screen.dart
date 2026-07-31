@@ -41,12 +41,56 @@ class _ChatScreenState extends State<ChatScreen> {
   final FlutterTts _flutterTts = FlutterTts();
   String? _speakingMessageId;
   bool _isTtsAvailable = true;
+  final Map<String, bool> _availableLanguages = {};
+
+  Future<void> _checkLanguagesAvailability() async {
+    const locales = ['en-IN', 'hi-IN', 'kn-IN', 'te-IN', 'ta-IN', 'ml-IN'];
+    for (var locale in locales) {
+      try {
+        final available = await _flutterTts.isLanguageAvailable(locale);
+        _availableLanguages[locale] = (available == true || available == 1);
+      } catch (e) {
+        _availableLanguages[locale] = false;
+      }
+    }
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  String detectLanguageLocale(String text, String preferredLang) {
+    if (RegExp(r'[\u0C80-\u0CFF]').hasMatch(text)) {
+      return 'kn-IN';
+    }
+    if (RegExp(r'[\u0900-\u097F]').hasMatch(text)) {
+      return 'hi-IN';
+    }
+    if (RegExp(r'[\u0C00-\u0C7F]').hasMatch(text)) {
+      return 'te-IN';
+    }
+    if (RegExp(r'[\u0B80-\u0BFF]').hasMatch(text)) {
+      return 'ta-IN';
+    }
+    if (RegExp(r'[\u0D00-\u0D7F]').hasMatch(text)) {
+      return 'ml-IN';
+    }
+    const mapping = {
+      'en': 'en-IN',
+      'hi': 'hi-IN',
+      'kn': 'kn-IN',
+      'te': 'te-IN',
+      'ta': 'ta-IN',
+      'ml': 'ml-IN',
+    };
+    return mapping[preferredLang.toLowerCase()] ?? 'en-IN';
+  }
 
   @override
   void initState() {
     super.initState();
     MainNavigationController.activeSessionId.addListener(_onDeepLinkSessionChanged);
     _initTts();
+    _checkLanguagesAvailability();
     _initializeChat();
   }
 
@@ -93,6 +137,9 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     try {
+      final preferredLang = StringsProvider.instance.lang;
+      final resolvedLocale = detectLanguageLocale(text, preferredLang);
+      await _flutterTts.setLanguage(resolvedLocale);
       await _flutterTts.speak(text);
     } catch (e) {
       debugPrint("Failed to play TTS: $e");
@@ -592,12 +639,14 @@ class _ChatScreenState extends State<ChatScreen> {
                       );
                       final messageId = docs[index].id;
                       final isSpeaking = _speakingMessageId == messageId;
+                      final String messageLocale = detectLanguageLocale(message.text, StringsProvider.instance.lang);
+                      final bool isLangAvailable = _availableLanguages[messageLocale] ?? true;
 
                       return _MessageBubble(
                         message: message,
                         messageId: messageId,
                         isSpeaking: isSpeaking,
-                        onSpeakTap: _isTtsAvailable && !message.isUser
+                        onSpeakTap: _isTtsAvailable && !message.isUser && isLangAvailable
                             ? () => _speakMessage(messageId, message.text)
                             : null,
                       );
@@ -983,8 +1032,8 @@ class _MessageBubbleState extends State<_MessageBubble> with SingleTickerProvide
                       padding: widget.onSpeakTap != null
                           ? const EdgeInsets.only(bottom: 28)
                           : EdgeInsets.zero,
-                      child: Text(
-                        message.text,
+                      child: PlayfulMarkdownText(
+                        text: message.text,
                         style: GoogleFonts.plusJakartaSans(
                           color: message.isSystemError ? Colors.red.shade900 : PlayfulColors.foreground,
                           fontSize: 15,

@@ -411,8 +411,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                         ),
                                       ),
                                     )
-                                  : Text(
-                                      _insightText,
+                                  : PlayfulMarkdownText(
+                                      text: _insightText,
                                       style: GoogleFonts.plusJakartaSans(
                                         color: PlayfulColors.foreground,
                                         fontWeight: FontWeight.w600,

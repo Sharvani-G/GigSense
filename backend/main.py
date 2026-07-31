@@ -1,6 +1,10 @@
 from fastapi import FastAPI, UploadFile, File, status
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
+
+# Load environment variables first
+load_dotenv()
+
 import os
 
 # Load environment variables FIRST before importing other modules
@@ -9,7 +13,7 @@ load_dotenv()
 import json
 import datetime
 from ocr import extract_job_data
-from llm import ask_gemma
+from llm import ask_gemma, get_chat_system_prompt, get_weekly_insight_prompt
 from schemas import JobScanResponse, ChatRequest, ComplaintRequest
 from firebase_client import db
 from firebase_admin import firestore
@@ -129,13 +133,14 @@ async def chat_endpoint(request: ChatRequest):
     lang_code = profile.get('preferredLanguage', 'en')
     worker_type = profile.get('workerType', 'other_gig_worker')
     worker_type_desc = WORKER_TYPE_DESCRIPTIONS.get(worker_type, 'gig worker')
+    language_name = LANGUAGE_NAMES.get(lang_code, 'English')
 
-    system_prompt = f"""You are a friendly, practical assistant helping gig workers in India understand their pay and rights. The worker is a {worker_type_desc}. Tailor your advice and tone specifically to their gig type (e.g. optimizing trips, incentives, platform differences). Explain things simply, avoid legal jargon, be warm but honest — you are on the worker's side. Here is the worker's recent job data for context: {recent_jobs_json}. If asked whether a fare is fair, refer to this specific data rather than speaking generically. If asked about rights or how to raise a complaint, give practical general guidance appropriate to gig work in India, and make clear this is general informational guidance, not legal advice.
-
-Here is the conversation history for context:
-{conversation_history_str}
-
-    Structure your responses cleanly for a mobile screen: use short paragraphs, bold text for key numbers/terms, and bullet points for lists to make details easy to scan. Respond in {LANGUAGE_NAMES.get(lang_code, 'English')}."""
+    system_prompt = get_chat_system_prompt(
+        worker_type_desc=worker_type_desc,
+        recent_jobs_json=recent_jobs_json,
+        conversation_history_str=conversation_history_str,
+        language_name=language_name
+    )
 
     response_text = ask_gemma(request.message, system_prompt)
 
@@ -259,18 +264,13 @@ async def weekly_insight(user_id: str):
     lang_code = profile.get('preferredLanguage', 'en')
     worker_type = profile.get('workerType', 'other_gig_worker')
     worker_type_desc = WORKER_TYPE_DESCRIPTIONS.get(worker_type, 'gig worker')
+    language_name = LANGUAGE_NAMES.get(lang_code, 'English')
 
-    prompt = f"""Here is a {worker_type_desc}'s earnings data for this week, in JSON:
-    {json.dumps(aggregates)}. Write a short, warm, honest 2-3 sentence summary as
-    if you are a supportive coach speaking directly to them. Tailor your coaching insights specifically to their type of gig work. If there isn't
-    enough history to meaningfully compare against a typical week, just speak
-    honestly about this week's numbers as they stand. Call out anything
-    genuinely worth flagging — for example if underpayment concentrated on a
-    particular platform, or if a noticeable share of the week's flagged jobs
-    share something in common based on the data given. End with one small,
-    practical, encouraging next step. Do not be falsely positive if the data
-    shows a real problem — be honest, but always supportive in tone, never
-    scolding. Respond in {LANGUAGE_NAMES.get(lang_code, 'English')}."""
+    prompt = get_weekly_insight_prompt(
+        worker_type_desc=worker_type_desc,
+        aggregates_json=json.dumps(aggregates),
+        language_name=language_name
+    )
 
     insight_text = ask_gemma(prompt)
     
