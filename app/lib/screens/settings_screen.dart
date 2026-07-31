@@ -24,6 +24,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _name = "THERE";
   String _workerType = "other_gig_worker";
   String _langCode = "en";
+  Map<String, dynamic>? _savingsGoal;
 
   @override
   void initState() {
