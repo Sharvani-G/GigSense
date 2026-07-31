@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'playful_widgets.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -17,7 +20,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _isLoading = true;
   bool _hasError = false;
   List<Map<String, dynamic>> _jobs = [];
@@ -29,10 +32,32 @@ class _HomeScreenState extends State<HomeScreen> {
   List<MapEntry<String, double>> _chartData = [];
   List<PlatformBreakdown> _platformsBreakdown = [];
 
+  // AI Weekly Insight
+  String _insightText = "Log a few jobs and I'll have your first weekly insight ready.";
+  bool _isInsightLoading = true;
+  late final AnimationController _insightAnimationController;
+  late final Animation<double> _insightScaleAnimation;
+
   @override
   void initState() {
     super.initState();
+    _insightAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 550),
+      vsync: this,
+    );
+    _insightScaleAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _insightAnimationController,
+        curve: Curves.easeOutBack,
+      ),
+    );
     _fetchAndProcessJobs();
+  }
+
+  @override
+  void dispose() {
+    _insightAnimationController.dispose();
+    super.dispose();
   }
 
   // Parses various timestamp/date types safely
@@ -56,6 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchAndProcessJobs() async {
     setState(() {
       _isLoading = true;
+      _isInsightLoading = true;
       _hasError = false;
     });
 
@@ -141,12 +167,40 @@ class _HomeScreenState extends State<HomeScreen> {
         _platformsBreakdown = platformMap.values.toList();
         _isLoading = false;
       });
+
+      _fetchWeeklyInsight(userId);
     } catch (e) {
       debugPrint("Error fetching jobs from Firestore: $e");
       setState(() {
         _hasError = true;
         _isLoading = false;
+        _isInsightLoading = false;
       });
+    }
+  }
+
+  Future<void> _fetchWeeklyInsight(String userId) async {
+    try {
+      final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+      final Uri url = Uri.parse('$baseUrl/weekly-insight?user_id=$userId');
+      final response = await http.get(url);
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          _insightText = data['insight_text'] ?? "Log a few jobs and I'll have your first weekly insight ready.";
+          _isInsightLoading = false;
+        });
+        _insightAnimationController.forward(from: 0.0);
+      } else {
+        throw Exception("Server returned status code ${response.statusCode}");
+      }
+    } catch (e) {
+      debugPrint("Error fetching weekly insight: $e");
+      setState(() {
+        _isInsightLoading = false;
+      });
+      _insightAnimationController.forward(from: 0.0);
     }
   }
 
@@ -233,48 +287,60 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 24),
 
-                      // AI Weekly Insight Placeholder
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: PlayfulColors.tertiary.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: PlayfulColors.border, width: 2.0),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: PlayfulColors.tertiary,
-                                    borderRadius: BorderRadius.circular(9999),
-                                    border: Border.all(color: PlayfulColors.border, width: 2),
-                                  ),
-                                  child: Text(
-                                    "AI INSIGHT",
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w900,
-                                      color: PlayfulColors.foreground,
+                      // AI Weekly Insight Pop-in Card
+                      ScaleTransition(
+                        scale: _insightScaleAnimation,
+                        child: Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: PlayfulColors.tertiary.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: PlayfulColors.border, width: 2.0),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: PlayfulColors.tertiary,
+                                      borderRadius: BorderRadius.circular(9999),
+                                      border: Border.all(color: PlayfulColors.border, width: 2),
+                                    ),
+                                    child: Text(
+                                      "AI INSIGHT",
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                        color: PlayfulColors.foreground,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              "Your weekly insight will appear here once you've logged a few jobs.",
-                              style: GoogleFonts.plusJakartaSans(
-                                color: PlayfulColors.foreground,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
+                                ],
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 12),
+                              _isInsightLoading
+                                  ? const SizedBox(
+                                      height: 48,
+                                      child: Center(
+                                        child: CircularProgressIndicator(
+                                          color: PlayfulColors.accent,
+                                        ),
+                                      ),
+                                    )
+                                  : Text(
+                                      _insightText,
+                                      style: GoogleFonts.plusJakartaSans(
+                                        color: PlayfulColors.foreground,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 32),

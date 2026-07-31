@@ -76,3 +76,35 @@ async def chat_endpoint(request: ChatRequest):
         )
 
     return {"response": response_text}
+
+@app.get("/weekly-insight")
+async def weekly_insight(user_id: str):
+    aggregates = get_weekly_aggregates(user_id)
+    
+    if aggregates["total_jobs"] == 0:
+        return {
+            "insight_text": "Log a few jobs and I'll have your first weekly insight ready.",
+            "stats_used": None
+        }
+        
+    prompt = f"""Here is a gig worker's earnings data for this week, in JSON:
+    {json.dumps(aggregates)}. Write a short, warm, honest 2-3 sentence summary as
+    if you are a supportive coach speaking directly to them. If there isn't
+    enough history to meaningfully compare against a typical week, just speak
+    honestly about this week's numbers as they stand. Call out anything
+    genuinely worth flagging — for example if underpayment concentrated on a
+    particular platform, or if a noticeable share of the week's flagged jobs
+    share something in common based on the data given. End with one small,
+    practical, encouraging next step. Do not be falsely positive if the data
+    shows a real problem — be honest, but always supportive in tone, never
+    scolding."""
+
+    insight_text = ask_gemma(prompt)
+    
+    if insight_text == "OLLAMA_UNREACHABLE_ERROR":
+        insight_text = "I'm having trouble generating your weekly summary right now. Your logged stats below are safe and up to date."
+        
+    return {
+        "insight_text": insight_text,
+        "stats_used": aggregates
+    }
