@@ -708,6 +708,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
       'source': _jobSource,
       'rate_source': 'fallback',
       'sample_size': jobSampleSize,
+      'area_hint': _areaHintController.text.trim(),
       'job_timestamp': FieldValue.serverTimestamp(),
       'created_at': FieldValue.serverTimestamp(),
     };
@@ -724,6 +725,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
       'source': _jobSource,
       'rate_source': 'fallback',
       'sample_size': jobSampleSize,
+      'area_hint': _areaHintController.text.trim(),
       'job_timestamp': DateTime.now().toIso8601String(),
       'created_at': DateTime.now().toIso8601String(),
     };

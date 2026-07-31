@@ -1369,27 +1369,26 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         url,
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'user_id': user.uid}),
-      );
+      ).timeout(const Duration(seconds: 4));
       
       if (!mounted) return;
       Navigator.pop(context); // close loader
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final message = data['message'] ?? "";
+        final message = data['draft_message'] ?? data['message'] ?? "I am feeling unsafe during my current gig work trip. Please check in on me or be ready to help.";
         _showSOBSheet(trustedContact, message);
       } else {
-        throw Exception("Server error");
+        final defaultMsg = "I am feeling unsafe during my current gig work trip. Please check in on me or be ready to help.";
+        _showSOBSheet(trustedContact, defaultMsg);
       }
     } catch (e) {
-      if (!mounted) return;
-      Navigator.pop(context); // close loader
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Failed to draft message. Please try again."),
-          backgroundColor: Color(0xFFEF4444),
-        ),
-      );
+      debugPrint("Error triggering SOS: $e");
+      if (mounted) {
+        Navigator.pop(context); // close loader
+        final defaultMsg = "I am feeling unsafe during my current gig work trip. Please check in on me or be ready to help.";
+        _showSOBSheet(trustedContact, defaultMsg);
+      }
     }
   }
 

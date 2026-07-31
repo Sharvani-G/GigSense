@@ -106,7 +106,7 @@ class FairnessResultScreen extends StatelessWidget {
                                   ? DateTime.tryParse(job['created_at'] as String)
                                   : null))
                           : null),
-                  
+                  areaHint: job['area_hint'] as String?,
                 ),
               ),
               const SizedBox(height: 24),

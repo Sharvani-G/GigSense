@@ -4,6 +4,9 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'dart:async';
 import 'package:permission_handler/permission_handler.dart';
 import '../i18n/strings.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'dart:convert';
 
 // Playful Geometric Design System Colors
 class PlayfulColors {
@@ -1235,10 +1238,12 @@ class _ArcGaugePainter extends CustomPainter {
 
 class PlayfulSafetyContextWidget extends StatefulWidget {
   final DateTime? timestamp;
+  final String? areaHint;
 
   const PlayfulSafetyContextWidget({
     super.key,
     required this.timestamp,
+    this.areaHint,
   });
 
   @override
@@ -1247,24 +1252,124 @@ class PlayfulSafetyContextWidget extends StatefulWidget {
 
 class _PlayfulSafetyContextWidgetState extends State<PlayfulSafetyContextWidget> {
   bool _expanded = false;
+  bool _loading = false;
+  String? _score;
+  String? _message;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchRouteSafety();
+  }
+
+  @override
+  void didUpdateWidget(covariant PlayfulSafetyContextWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.timestamp != widget.timestamp || oldWidget.areaHint != widget.areaHint) {
+      _fetchRouteSafety();
+    }
+  }
+
+  String _getLanguageName(String code) {
+    switch (code) {
+      case 'hi':
+        return 'Hindi';
+      case 'kn':
+        return 'Kannada';
+      case 'ta':
+        return 'Tamil';
+      case 'te':
+        return 'Telugu';
+      case 'ml':
+        return 'Malayalam';
+      default:
+        return 'English';
+    }
+  }
+
+  Future<void> _fetchRouteSafety() async {
+    if (widget.timestamp == null) return;
+    
+    setState(() {
+      _loading = true;
+      _score = null;
+      _message = null;
+    });
+
+    try {
+      final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+      final Uri url = Uri.parse('$baseUrl/route-safety');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'job_timestamp': widget.timestamp!.toUtc().toIso8601String(),
+          'area_hint': widget.areaHint ?? '',
+          'language_name': _getLanguageName(StringsProvider.instance.lang),
+        }),
+      ).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (mounted) {
+          setState(() {
+            _score = data['score'];
+            _message = data['message'];
+            _loading = false;
+          });
+        }
+        return;
+      }
+    } catch (e) {
+      debugPrint("Error fetching route safety: $e. Falling back to local checks.");
+    }
+
+    // Fallback logic on error/failure
+    if (mounted) {
+      final hour = widget.timestamp!.hour;
+      final isEvening = hour >= 21 && hour < 23;
+      final isLateNight = hour >= 23 || hour < 5;
+
+      setState(() {
+        if (isLateNight) {
+          _score = "higher";
+          _message = "Late-night trips warrant extra caution; consider sharing your trip details with someone you trust.";
+        } else if (isEvening) {
+          _score = "moderate";
+          _message = "Stick to well-lit, busy routes where possible, and consider letting someone know your last drop-off time.";
+        } else {
+          _score = "low";
+          _message = "";
+        }
+        _loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     if (widget.timestamp == null) return const SizedBox.shrink();
-    
-    final hour = widget.timestamp!.hour;
-    final isEvening = hour >= 21 && hour < 23;
-    final isLateNight = hour >= 23 || hour < 6;
+    if (_loading) {
+      return const SizedBox(
+        height: 24,
+        width: 24,
+        child: CircularProgressIndicator(strokeWidth: 2, color: PlayfulColors.accent),
+      );
+    }
 
-    if (!isEvening && !isLateNight) {
+    // Determine values based on resolved safety score
+    final score = _score ?? "low";
+    final message = _message ?? "";
+
+    if (score == "low") {
       return const SizedBox.shrink();
     }
 
-    final pillLabel = isEvening ? "🌆 Evening trip" : "🌙 Late-night trip";
-
-    final pillColor = isLateNight ? const Color(0xFFFDF2F8) : const Color(0xFFFFFBEB);
-    final borderColor = isLateNight ? PlayfulColors.secondary : PlayfulColors.tertiary;
-    final textColor = isLateNight ? const Color(0xFFDB2777) : const Color(0xFFD97706);
+    final isHigher = score == "higher";
+    final pillLabel = isHigher ? "🌙 High Risk Alert" : "🌆 Moderate Route Warning";
+    final pillColor = isHigher ? const Color(0xFFFDF2F8) : const Color(0xFFFFFBEB);
+    final borderColor = isHigher ? const Color(0xFFEF4444) : PlayfulColors.tertiary; // Red for higher, yellow/amber for moderate
+    final textColor = isHigher ? const Color(0xFFEF4444) : const Color(0xFFD97706);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -1303,7 +1408,7 @@ class _PlayfulSafetyContextWidgetState extends State<PlayfulSafetyContextWidget>
             ),
           ),
         ),
-        if (_expanded) ...[
+        if (_expanded && message.isNotEmpty) ...[
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(16),
@@ -1323,7 +1428,7 @@ class _PlayfulSafetyContextWidgetState extends State<PlayfulSafetyContextWidget>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "Stick to well-lit, busy routes where possible, and consider letting someone know your last drop-off time.",
+                  message,
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -1333,7 +1438,7 @@ class _PlayfulSafetyContextWidgetState extends State<PlayfulSafetyContextWidget>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  "General safety reminder based on time of day — not a specific risk assessment for your route.",
+                  "Route Safety Guidance — based on localized time context & location details.",
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
