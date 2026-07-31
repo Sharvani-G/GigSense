@@ -63,12 +63,23 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
+  late final List<Widget> _screens;
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const LogJobScreen(),
-    const ChatScreen(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      HomeScreen(
+        onNavigateToLogJob: () {
+          setState(() {
+            _currentIndex = 1;
+          });
+        },
+      ),
+      const LogJobScreen(),
+      const ChatScreen(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
