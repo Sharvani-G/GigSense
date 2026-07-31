@@ -899,3 +899,171 @@ class PlayfulMarkdownText extends StatelessWidget {
     return spans;
   }
 }
+
+class PlayfulArcGauge extends StatefulWidget {
+  final double percentage; // e.g. 0.0 to 1.5 (for 0% to 150%)
+
+  const PlayfulArcGauge({
+    super.key,
+    required this.percentage,
+  });
+
+  @override
+  State<PlayfulArcGauge> createState() => _PlayfulArcGaugeState();
+}
+
+class _PlayfulArcGaugeState extends State<PlayfulArcGauge> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _animation = Tween<double>(begin: 0.0, end: widget.percentage).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+    _controller.forward();
+  }
+
+  @override
+  void didUpdateWidget(PlayfulArcGauge oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.percentage != widget.percentage) {
+      _animation = Tween<double>(
+        begin: _animation.value,
+        end: widget.percentage,
+      ).animate(
+        CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+      );
+      _controller.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final int percentInt = (widget.percentage * 100).round();
+
+    // Resolve color based on percentage
+    Color activeColor;
+    if (percentInt >= 100) {
+      activeColor = PlayfulColors.quaternary; // Mint
+    } else if (percentInt >= 85) {
+      activeColor = PlayfulColors.tertiary; // Amber
+    } else {
+      activeColor = PlayfulColors.secondary; // Hot pink
+    }
+
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return CustomPaint(
+          size: const Size(140, 100),
+          painter: _ArcGaugePainter(
+            value: _animation.value,
+            activeColor: activeColor,
+            textColor: PlayfulColors.foreground,
+            percentText: "$percentInt%",
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ArcGaugePainter extends CustomPainter {
+  final double value; // 0.0 to 1.5
+  final Color activeColor;
+  final Color textColor;
+  final String percentText;
+
+  _ArcGaugePainter({
+    required this.value,
+    required this.activeColor,
+    required this.textColor,
+    required this.percentText,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2 + 10);
+    final radius = size.width / 2.2;
+
+    // Symmetrical gauge with bottom open portion
+    const double startAngle = 5.0 * 3.141592653589793 / 6.0; // 150 degrees
+    const double totalSweepAngle = 4.0 * 3.141592653589793 / 3.0; // 240 degrees
+
+    final paintTrack = Paint()
+      ..color = const Color(0xFFE2E8F0)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 14
+      ..strokeCap = StrokeCap.round;
+
+    final paintActive = Paint()
+      ..color = activeColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 14
+      ..strokeCap = StrokeCap.round;
+
+    // Draw track arc
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      startAngle,
+      totalSweepAngle,
+      false,
+      paintTrack,
+    );
+
+    // Limit value to display range 0.0 to 1.5
+    final double displayVal = value.clamp(0.0, 1.5);
+    // 150% fills the entire gauge (totalSweepAngle). 100% fills 2/3 of it.
+    final double sweepAngle = (displayVal / 1.5) * totalSweepAngle;
+
+    // Draw active arc
+    if (sweepAngle > 0) {
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startAngle,
+        sweepAngle,
+        false,
+        paintActive,
+      );
+    }
+
+    // Draw text in center
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: percentText,
+        style: GoogleFonts.outfit(
+          color: textColor,
+          fontSize: 26,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    final textOffset = Offset(
+      center.dx - textPainter.width / 2,
+      center.dy - textPainter.height / 2 - 5,
+    );
+    textPainter.paint(canvas, textOffset);
+  }
+
+  @override
+  bool shouldRepaint(covariant _ArcGaugePainter oldDelegate) {
+    return oldDelegate.value != value ||
+        oldDelegate.activeColor != activeColor ||
+        oldDelegate.textColor != textColor ||
+        oldDelegate.percentText != percentText;
+  }
+}

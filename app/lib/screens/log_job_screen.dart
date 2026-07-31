@@ -180,7 +180,14 @@ class _LogJobScreenState extends State<LogJobScreen> {
           'other': {'displayName': 'Other', 'rate_per_km': 10.00, 'rate_per_min': 1.30, 'category': 'other_gig'},
         };
         for (var entry in defaults.entries) {
-          await firestore.collection('benchmarks').doc(entry.key).set(entry.value);
+          final data = Map<String, dynamic>.from(entry.value);
+          data['seedRate'] = {
+            'rate_per_km': data['rate_per_km'],
+            'rate_per_min': data['rate_per_min'],
+          };
+          data['communityRate'] = null;
+          data['sampleSize'] = 0;
+          await firestore.collection('benchmarks').doc(entry.key).set(data);
         }
         debugPrint("Seeded default benchmarks into Firestore.");
       }
@@ -211,12 +218,33 @@ class _LogJobScreenState extends State<LogJobScreen> {
         final List<PlatformItem> loaded = [];
         for (var doc in snapshot.docs) {
           final data = doc.data();
+          final int sampleSize = (data['sampleSize'] as num?)?.toInt() ?? 0;
+          
+          double ratePerKm = 10.0;
+          double ratePerMin = 1.3;
+          
+          Map<String, dynamic>? selectedRate;
+          if (sampleSize >= 15 && data['communityRate'] != null) {
+            selectedRate = data['communityRate'] as Map<String, dynamic>?;
+          } else if (data['seedRate'] != null) {
+            selectedRate = data['seedRate'] as Map<String, dynamic>?;
+          }
+          
+          if (selectedRate != null) {
+            ratePerKm = (selectedRate['rate_per_km'] as num?)?.toDouble() ?? ratePerKm;
+            ratePerMin = (selectedRate['rate_per_min'] as num?)?.toDouble() ?? ratePerMin;
+          } else {
+            ratePerKm = (data['rate_per_km'] as num?)?.toDouble() ?? ratePerKm;
+            ratePerMin = (data['rate_per_min'] as num?)?.toDouble() ?? ratePerMin;
+          }
+
           loaded.add(PlatformItem(
             id: doc.id,
             displayName: data['displayName'] ?? doc.id.toUpperCase(),
             category: data['category'] ?? 'other_gig',
-            ratePerKm: (data['rate_per_km'] as num?)?.toDouble() ?? 10.0,
-            ratePerMin: (data['rate_per_min'] as num?)?.toDouble() ?? 1.3,
+            ratePerKm: ratePerKm,
+            ratePerMin: ratePerMin,
+            sampleSize: sampleSize,
           ));
         }
         setState(() {
@@ -230,21 +258,21 @@ class _LogJobScreenState extends State<LogJobScreen> {
 
     if (_allPlatforms.isEmpty) {
       final defaults = [
-        PlatformItem(id: 'uber', displayName: 'Uber', category: 'cab', ratePerKm: 12.0, ratePerMin: 1.50),
-        PlatformItem(id: 'rapido', displayName: 'Rapido', category: 'cab', ratePerKm: 9.0, ratePerMin: 1.20),
-        PlatformItem(id: 'ola', displayName: 'Ola', category: 'cab', ratePerKm: 11.50, ratePerMin: 1.40),
-        PlatformItem(id: 'indrive', displayName: 'InDrive', category: 'cab', ratePerKm: 10.0, ratePerMin: 1.10),
-        PlatformItem(id: 'zomato', displayName: 'Zomato', category: 'delivery', ratePerKm: 8.0, ratePerMin: 1.00),
-        PlatformItem(id: 'swiggy', displayName: 'Swiggy', category: 'delivery', ratePerKm: 8.0, ratePerMin: 1.00),
-        PlatformItem(id: 'dunzo', displayName: 'Dunzo', category: 'delivery', ratePerKm: 8.50, ratePerMin: 1.10),
-        PlatformItem(id: 'blinkit', displayName: 'Blinkit', category: 'delivery', ratePerKm: 9.0, ratePerMin: 1.05),
-        PlatformItem(id: 'zepto', displayName: 'Zepto', category: 'delivery', ratePerKm: 8.50, ratePerMin: 1.00),
-        PlatformItem(id: 'bigbasket', displayName: 'BigBasket', category: 'delivery', ratePerKm: 9.50, ratePerMin: 1.15),
-        PlatformItem(id: 'amazon_flex', displayName: 'Amazon Flex', category: 'delivery', ratePerKm: 10.50, ratePerMin: 1.20),
-        PlatformItem(id: 'urban_company', displayName: 'Urban Company', category: 'other_gig', ratePerKm: 14.00, ratePerMin: 1.70),
-        PlatformItem(id: 'porter', displayName: 'Porter', category: 'other_gig', ratePerKm: 13.00, ratePerMin: 1.50),
-        PlatformItem(id: 'housejoy', displayName: 'Housejoy', category: 'other_gig', ratePerKm: 12.50, ratePerMin: 1.40),
-        PlatformItem(id: 'other', displayName: 'Other', category: 'other_gig', ratePerKm: 10.0, ratePerMin: 1.30),
+        PlatformItem(id: 'uber', displayName: 'Uber', category: 'cab', ratePerKm: 12.0, ratePerMin: 1.50, sampleSize: 0),
+        PlatformItem(id: 'rapido', displayName: 'Rapido', category: 'cab', ratePerKm: 9.0, ratePerMin: 1.20, sampleSize: 0),
+        PlatformItem(id: 'ola', displayName: 'Ola', category: 'cab', ratePerKm: 11.50, ratePerMin: 1.40, sampleSize: 0),
+        PlatformItem(id: 'indrive', displayName: 'InDrive', category: 'cab', ratePerKm: 10.0, ratePerMin: 1.10, sampleSize: 0),
+        PlatformItem(id: 'zomato', displayName: 'Zomato', category: 'delivery', ratePerKm: 8.0, ratePerMin: 1.00, sampleSize: 0),
+        PlatformItem(id: 'swiggy', displayName: 'Swiggy', category: 'delivery', ratePerKm: 8.0, ratePerMin: 1.00, sampleSize: 0),
+        PlatformItem(id: 'dunzo', displayName: 'Dunzo', category: 'delivery', ratePerKm: 8.50, ratePerMin: 1.10, sampleSize: 0),
+        PlatformItem(id: 'blinkit', displayName: 'Blinkit', category: 'delivery', ratePerKm: 9.0, ratePerMin: 1.05, sampleSize: 0),
+        PlatformItem(id: 'zepto', displayName: 'Zepto', category: 'delivery', ratePerKm: 8.50, ratePerMin: 1.00, sampleSize: 0),
+        PlatformItem(id: 'bigbasket', displayName: 'BigBasket', category: 'delivery', ratePerKm: 9.50, ratePerMin: 1.15, sampleSize: 0),
+        PlatformItem(id: 'amazon_flex', displayName: 'Amazon Flex', category: 'delivery', ratePerKm: 10.50, ratePerMin: 1.20, sampleSize: 0),
+        PlatformItem(id: 'urban_company', displayName: 'Urban Company', category: 'other_gig', ratePerKm: 14.00, ratePerMin: 1.70, sampleSize: 0),
+        PlatformItem(id: 'porter', displayName: 'Porter', category: 'other_gig', ratePerKm: 13.00, ratePerMin: 1.50, sampleSize: 0),
+        PlatformItem(id: 'housejoy', displayName: 'Housejoy', category: 'other_gig', ratePerKm: 12.50, ratePerMin: 1.40, sampleSize: 0),
+        PlatformItem(id: 'other', displayName: 'Other', category: 'other_gig', ratePerKm: 10.0, ratePerMin: 1.30, sampleSize: 0),
       ];
       setState(() {
         _allPlatforms = defaults;
@@ -399,6 +427,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
 
     double ratePerKm = 10.00;
     double ratePerMin = 1.30;
+    int jobSampleSize = 0;
 
     // Fetch the benchmark values
     try {
@@ -408,8 +437,24 @@ class _LogJobScreenState extends State<LogJobScreen> {
           .get();
 
       if (doc.exists && doc.data() != null) {
-        ratePerKm = (doc.data()!['rate_per_km'] as num?)?.toDouble() ?? ratePerKm;
-        ratePerMin = (doc.data()!['rate_per_min'] as num?)?.toDouble() ?? ratePerMin;
+        final data = doc.data()!;
+        final int sampleSize = (data['sampleSize'] as num?)?.toInt() ?? 0;
+        jobSampleSize = sampleSize;
+        
+        Map<String, dynamic>? selectedRate;
+        if (sampleSize >= 15 && data['communityRate'] != null) {
+          selectedRate = data['communityRate'] as Map<String, dynamic>?;
+        } else if (data['seedRate'] != null) {
+          selectedRate = data['seedRate'] as Map<String, dynamic>?;
+        }
+        
+        if (selectedRate != null) {
+          ratePerKm = (selectedRate['rate_per_km'] as num?)?.toDouble() ?? ratePerKm;
+          ratePerMin = (selectedRate['rate_per_min'] as num?)?.toDouble() ?? ratePerMin;
+        } else {
+          ratePerKm = (data['rate_per_km'] as num?)?.toDouble() ?? ratePerKm;
+          ratePerMin = (data['rate_per_min'] as num?)?.toDouble() ?? ratePerMin;
+        }
       } else {
         final fallbackDefaults = {
           'uber': {'rate_per_km': 12.00, 'rate_per_min': 1.50},
@@ -479,6 +524,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
       'is_underpaid': isUnderpaid,
       'explanation': explanationText,
       'source': _jobSource,
+      'sample_size': jobSampleSize,
       'job_timestamp': FieldValue.serverTimestamp(),
       'created_at': FieldValue.serverTimestamp(),
     };
@@ -493,6 +539,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
       'is_underpaid': isUnderpaid,
       'explanation': explanationText,
       'source': _jobSource,
+      'sample_size': jobSampleSize,
       'job_timestamp': DateTime.now().toIso8601String(),
       'created_at': DateTime.now().toIso8601String(),
     };
@@ -958,6 +1005,16 @@ class _LogJobScreenState extends State<LogJobScreen> {
                                             color: PlayfulColors.foreground,
                                           ),
                                         ),
+                                        subtitle: Text(
+                                          p.sampleSize >= 15
+                                              ? "${p.displayName}'s fair rate is based on ${p.sampleSize} real trips logged by GigShield workers in the last 60 days."
+                                              : "${p.displayName}'s fair rate is currently an estimate — not enough real data yet.",
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: PlayfulColors.mutedForeground,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   );
@@ -996,6 +1053,7 @@ class PlatformItem {
   final String category;
   final double ratePerKm;
   final double ratePerMin;
+  final int sampleSize;
 
   PlatformItem({
     required this.id,
@@ -1003,5 +1061,6 @@ class PlatformItem {
     required this.category,
     required this.ratePerKm,
     required this.ratePerMin,
+    required this.sampleSize,
   });
 }

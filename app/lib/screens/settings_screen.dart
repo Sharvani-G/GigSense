@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
 import 'playful_widgets.dart';
 import '../i18n/strings.dart';
 import '../main.dart' show showLanguagePicker;
@@ -242,6 +244,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       MaterialPageRoute(builder: (_) => const AboutScreen()),
                                     );
                                   },
+                                  onLongPress: _triggerRecalculateBenchmarks,
                                 ),
                               ],
                             ),
@@ -273,16 +276,109 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Future<void> _triggerRecalculateBenchmarks() async {
+    bool dialogClosed = false;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: PlayfulColors.border, width: 2),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(color: PlayfulColors.accent),
+              const SizedBox(height: 16),
+              Text(
+                "Recalculating community rates...",
+                style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.bold,
+                  color: PlayfulColors.foreground,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+      final Uri url = Uri.parse('$baseUrl/admin/recalculate-benchmarks');
+      final response = await http.post(url).timeout(const Duration(seconds: 30));
+      
+      if (mounted && !dialogClosed) {
+        Navigator.pop(context);
+        dialogClosed = true;
+      }
+
+      if (response.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                "Successfully recalculated community rates!",
+                style: GoogleFonts.plusJakartaSans(
+                  color: PlayfulColors.foreground,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              backgroundColor: const Color(0xFFFFFDF5),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: PlayfulColors.border, width: 2),
+              ),
+            ),
+          );
+        }
+      } else {
+        throw Exception("Server returned ${response.statusCode}");
+      }
+    } catch (e) {
+      if (mounted && !dialogClosed) {
+        Navigator.pop(context);
+        dialogClosed = true;
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "Recalculation failed: $e",
+              style: GoogleFonts.plusJakartaSans(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: PlayfulColors.border, width: 2),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildSettingsRow({
     required IconData icon,
     required String label,
     String? trailingText,
     required VoidCallback onTap,
+    VoidCallback? onLongPress,
   }) {
     return Material(
       color: Colors.transparent,
       child: ListTile(
         onTap: onTap,
+        onLongPress: onLongPress,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Icon(icon, color: PlayfulColors.foreground, size: 22),
         title: Text(

@@ -433,7 +433,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     final platform = (job['platform'] as String?) ?? 'other';
                     final platformName = platform.isNotEmpty ? platform[0].toUpperCase() + platform.substring(1) : '';
                     final fare = (job['fare'] as num?)?.toDouble() ?? 0.0;
+                    final expectedFare = (job['expected_fare'] as num?)?.toDouble() ?? 0.0;
                     final isUnderpaid = job['is_underpaid'] == true;
+                    double? pct;
+                    if (expectedFare > 0.0) {
+                      pct = (fare / expectedFare) * 100;
+                    }
                     final rawTimestamp = job['job_timestamp'];
                     final dateStr = rawTimestamp != null
                         ? _formatDateTime(_parseTimestamp(rawTimestamp)!)
@@ -548,6 +553,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                       ],
                                     ),
                                   ),
+                                  if (pct != null) ...[
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      "${pct.round()}%",
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w900,
+                                        color: pct >= 100
+                                            ? PlayfulColors.quaternary
+                                            : pct >= 85
+                                                ? PlayfulColors.tertiary
+                                                : PlayfulColors.secondary,
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                               const SizedBox(height: 12),

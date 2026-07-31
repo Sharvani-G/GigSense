@@ -305,3 +305,140 @@ async def draft_complaint_endpoint(request: ComplaintRequest):
         draft_text = fallbacks.get(lang_code, fallbacks['en'])
         
     return {"complaint_draft": draft_text}
+
+@app.post("/admin/recalculate-benchmarks")
+async def recalculate_benchmarks():
+    if db is None:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"error": "Database is not initialized"}
+        )
+    
+    summary = []
+    try:
+        # 1. Fetch cutoff date: 60 days ago
+        cutoff_date = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=60)
+        
+        # 2. Fetch all platforms/benchmarks
+        benchmarks_ref = db.collection("benchmarks")
+        platforms = [doc.id for doc in benchmarks_ref.stream()]
+        
+        # 3. Fetch all jobs in one go to optimize DB reads
+        all_jobs_ref = db.collection("jobs")
+        all_jobs_docs = all_jobs_ref.stream()
+        
+        # Group jobs by platform in-memory
+        jobs_by_platform = {p: [] for p in platforms}
+        for doc in all_jobs_docs:
+            job = doc.to_dict()
+            platform = job.get("platform")
+            if platform in jobs_by_platform:
+                jobs_by_platform[platform].append(job)
+        
+        # Helper function for median
+        def calculate_median(values):
+            if not values:
+                return 0.0
+            sorted_vals = sorted(values)
+            n = len(sorted_vals)
+            if n % 2 == 1:
+                return sorted_vals[n // 2]
+            else:
+                return (sorted_vals[n // 2 - 1] + sorted_vals[n // 2]) / 2.0
+
+        for p_id in platforms:
+            p_ref = benchmarks_ref.document(p_id)
+            p_snap = p_ref.get()
+            
+            if not p_snap.exists:
+                continue
+                
+            p_data = p_snap.to_dict()
+            
+            # Fetch existing seedRate or create it using legacy properties
+            seed_rate = p_data.get("seedRate")
+            if not seed_rate:
+                seed_rate = {
+                    "rate_per_km": p_data.get("rate_per_km", 10.0),
+                    "rate_per_min": p_data.get("rate_per_min", 1.3)
+                }
+            
+            # Filter jobs matching conditions
+            platform_jobs = jobs_by_platform.get(p_id, [])
+            filtered_jobs = []
+            for j in platform_jobs:
+                # 1. Reject if underpaid
+                if j.get("is_underpaid") is True:
+                    continue
+                # 2. Require positive values
+                dist = j.get("distance_km") or 0.0
+                dur = j.get("duration_min") or 0.0
+                fare = j.get("fare") or 0.0
+                if dist <= 0.0 or dur <= 0.0 or fare <= 0.0:
+                    continue
+                # 3. Within last 60 days
+                job_time = j.get("created_at") or j.get("job_timestamp")
+                if job_time is None:
+                    continue
+                
+                is_recent = False
+                if isinstance(job_time, str):
+                    try:
+                        if job_time.endswith('Z'):
+                            job_time = job_time[:-1] + '+00:00'
+                        dt = datetime.datetime.fromisoformat(job_time)
+                        if dt >= cutoff_date:
+                            is_recent = True
+                    except Exception:
+                        pass
+                elif hasattr(job_time, "timestamp"):
+                    if job_time.tzinfo is None:
+                        job_time = job_time.replace(tzinfo=datetime.timezone.utc)
+                    if job_time >= cutoff_date:
+                        is_recent = True
+                
+                if is_recent:
+                    filtered_jobs.append(j)
+            
+            sample_size = len(filtered_jobs)
+            
+            if sample_size > 0:
+                fares_per_km = [j["fare"] / j["distance_km"] for j in filtered_jobs]
+                fares_per_min = [j["fare"] / j["duration_min"] for j in filtered_jobs]
+                
+                community_rate_per_km = round(calculate_median(fares_per_km), 2)
+                community_rate_per_min = round(calculate_median(fares_per_min), 2)
+                
+                community_rate = {
+                    "rate_per_km": community_rate_per_km,
+                    "rate_per_min": community_rate_per_min
+                }
+            else:
+                community_rate = None
+                
+            # Perform update
+            update_data = {
+                "seedRate": seed_rate,
+                "communityRate": community_rate,
+                "sampleSize": sample_size
+            }
+            
+            p_ref.update(update_data)
+            
+            # Record for JSON summary response
+            old_community = p_data.get("communityRate") or seed_rate
+            summary.append({
+                "platform": p_id,
+                "old_rate": old_community,
+                "new_rate": community_rate or seed_rate,
+                "sample_size": sample_size
+            })
+            
+        return {"status": "success", "summary": summary}
+        
+    except Exception as e:
+        print(f"Error recalculating benchmarks: {e}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": f"Failed to recalculate: {str(e)}"}
+        )

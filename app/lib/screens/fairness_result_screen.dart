@@ -19,6 +19,24 @@ class FairnessResultScreen extends StatelessWidget {
     this.isReadOnly = false,
   });
 
+  Future<int> _getSampleSize(String platform, dynamic jobSampleSize) async {
+    if (jobSampleSize != null) {
+      return (jobSampleSize as num).toInt();
+    }
+    if (platform.isEmpty || platform == 'other') {
+      return 0;
+    }
+    try {
+      final doc = await FirebaseFirestore.instance.collection('benchmarks').doc(platform).get();
+      if (doc.exists && doc.data() != null) {
+        return (doc.data()!['sampleSize'] as num?)?.toInt() ?? 0;
+      }
+    } catch (e) {
+      debugPrint("Error fetching platform sample size: $e");
+    }
+    return 0;
+  }
+
   @override
   Widget build(BuildContext context) {
     final String platform = job['platform'] ?? 'other';
@@ -163,7 +181,44 @@ class FairnessResultScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 24),
+              if (expectedFare > 0.0) ...[
+                Center(
+                  child: PlayfulArcGauge(
+                    percentage: fare / expectedFare,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Center(
+                  child: FutureBuilder<int>(
+                    future: _getSampleSize(platform, job['sample_size']),
+                    builder: (context, snapshot) {
+                      final size = snapshot.data ?? 0;
+                      String text;
+                      if (size < 15) {
+                        text = "Estimated rate — still gathering real data for this platform";
+                      } else if (size < 50) {
+                        text = "Based on a growing set of real trips from other GigShield workers";
+                      } else {
+                        text = "Based on a well-established set of real trips from other GigShield workers";
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                        child: Text(
+                          text,
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: PlayfulColors.mutedForeground,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+              const SizedBox(height: 32),
 
               // Description sentence
               Container(
