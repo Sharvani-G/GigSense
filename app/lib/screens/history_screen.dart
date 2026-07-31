@@ -439,9 +439,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     if (expectedFare > 0.0) {
                       pct = (fare / expectedFare) * 100;
                     }
-                    final rawTimestamp = job['job_timestamp'];
-                    final dateStr = rawTimestamp != null
-                        ? _formatDateTime(_parseTimestamp(rawTimestamp)!)
+                    final rawTimestamp = job['job_timestamp'] ?? job['created_at'];
+                    final parsedTime = _parseTimestamp(rawTimestamp);
+                    final int? hour = parsedTime?.hour;
+                    final bool showEveningPill = hour != null && hour >= 21 && hour < 23;
+                    final bool showLateNightPill = hour != null && (hour >= 23 || hour < 6);
+                    final dateStr = parsedTime != null
+                        ? _formatDateTime(parsedTime)
                         : '';
                     final explanation = job['explanation'] ?? (isUnderpaid
                         ? "This came in noticeably below what's typical for this distance and platform."
@@ -565,6 +569,43 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                             : pct >= 85
                                                 ? PlayfulColors.tertiary
                                                 : PlayfulColors.secondary,
+                                      ),
+                                    ),
+                                  ],
+                                  if (showEveningPill) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFFBEB),
+                                        borderRadius: BorderRadius.circular(9999),
+                                        border: Border.all(color: PlayfulColors.tertiary, width: 1.5),
+                                      ),
+                                      child: Text(
+                                        "🌆 Evening",
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w800,
+                                          color: const Color(0xFFD97706),
+                                        ),
+                                      ),
+                                    ),
+                                  ] else if (showLateNightPill) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFFBEB),
+                                        borderRadius: BorderRadius.circular(9999),
+                                        border: Border.all(color: PlayfulColors.tertiary, width: 1.5),
+                                      ),
+                                      child: Text(
+                                        "🌙 Late-night",
+                                        style: GoogleFonts.plusJakartaSans(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w800,
+                                          color: const Color(0xFFD97706),
+                                        ),
                                       ),
                                     ),
                                   ],

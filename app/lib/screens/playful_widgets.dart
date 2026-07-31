@@ -1067,3 +1067,115 @@ class _ArcGaugePainter extends CustomPainter {
         oldDelegate.percentText != percentText;
   }
 }
+
+class PlayfulSafetyContextWidget extends StatefulWidget {
+  final DateTime? timestamp;
+
+  const PlayfulSafetyContextWidget({
+    super.key,
+    required this.timestamp,
+  });
+
+  @override
+  State<PlayfulSafetyContextWidget> createState() => _PlayfulSafetyContextWidgetState();
+}
+
+class _PlayfulSafetyContextWidgetState extends State<PlayfulSafetyContextWidget> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.timestamp == null) return const SizedBox.shrink();
+    
+    final hour = widget.timestamp!.hour;
+    final isEvening = hour >= 21 && hour < 23;
+    final isLateNight = hour >= 23 || hour < 6;
+
+    if (!isEvening && !isLateNight) {
+      return const SizedBox.shrink();
+    }
+
+    final pillLabel = isEvening ? "🌆 Evening trip" : "🌙 Late-night trip";
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _expanded = !_expanded;
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBEB), // Very soft amber
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: PlayfulColors.tertiary, width: 2),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  pillLabel,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFFD97706), // Rich amber text
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Icon(
+                  _expanded ? Icons.expand_less : Icons.expand_more,
+                  size: 16,
+                  color: const Color(0xFFD97706),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_expanded) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: PlayfulColors.border, width: 2),
+              boxShadow: const [
+                BoxShadow(
+                  color: PlayfulColors.tertiary,
+                  offset: Offset(4, 4),
+                  blurRadius: 0,
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Stick to well-lit, busy routes where possible, and consider letting someone know your last drop-off time.",
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: PlayfulColors.foreground,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "General safety reminder based on time of day — not a specific risk assessment for your route.",
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: PlayfulColors.mutedForeground,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}

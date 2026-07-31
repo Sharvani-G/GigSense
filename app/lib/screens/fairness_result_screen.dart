@@ -87,7 +87,25 @@ class FairnessResultScreen extends StatelessWidget {
                   isUnderpaid: isUnderpaid,
                 ),
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 16),
+              Center(
+                child: PlayfulSafetyContextWidget(
+                  timestamp: job['job_timestamp'] != null
+                      ? (job['job_timestamp'] is Timestamp
+                          ? (job['job_timestamp'] as Timestamp).toDate()
+                          : (job['job_timestamp'] is String
+                              ? DateTime.tryParse(job['job_timestamp'] as String)
+                              : null))
+                      : (job['created_at'] != null
+                          ? (job['created_at'] is Timestamp
+                              ? (job['created_at'] as Timestamp).toDate()
+                              : (job['created_at'] is String
+                                  ? DateTime.tryParse(job['created_at'] as String)
+                                  : null))
+                          : null),
+                ),
+              ),
+              const SizedBox(height: 24),
 
               // Side-by-side Expected vs Actual boxes
               Row(
