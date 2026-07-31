@@ -36,6 +36,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   List<MapEntry<String, double>> _chartData = [];
   List<PlatformBreakdown> _platformsBreakdown = [];
 
+  // Fatigue nudge variables
+  bool _showFatigueNudge = false;
+  double _fatigueHours = 0.0;
+  String? _anonymousLastNudgeDate;
+
   // User profile personalization
   String _userName = "THERE";
   bool _userFetched = false;
@@ -206,6 +211,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
       _fetchUserProfile();
       _fetchWeeklyInsight(userId);
+      _checkFatigueNudge();
     } catch (e) {
       debugPrint("Error fetching jobs from Firestore: $e");
       setState(() {
@@ -238,6 +244,95 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
     } catch (e) {
       debugPrint("Error fetching user profile: $e");
+    }
+  }
+
+  Future<void> _checkFatigueNudge() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final now = DateTime.now();
+    final twentyFourHoursAgo = now.subtract(const Duration(hours: 24));
+
+    double fatigueMinutes = 0.0;
+    for (var job in _jobs) {
+      final jobDate = _parseTimestamp(job['job_timestamp'] ?? job['created_at']);
+      if (jobDate != null && jobDate.isAfter(twentyFourHoursAgo)) {
+        fatigueMinutes += (job['duration_min'] as num?)?.toDouble() ?? 0.0;
+      }
+    }
+
+    if (fatigueMinutes >= 600.0) {
+      final todayStr = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+      
+      if (user.isAnonymous) {
+        if (_anonymousLastNudgeDate != todayStr) {
+          setState(() {
+            _showFatigueNudge = true;
+            _fatigueHours = fatigueMinutes / 60.0;
+          });
+        } else {
+          setState(() {
+            _showFatigueNudge = false;
+          });
+        }
+      } else {
+        try {
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+          final lastNudgeDate = userDoc.data()?['lastFatigueNudgeDate'] as String?;
+          if (lastNudgeDate != todayStr && _anonymousLastNudgeDate != todayStr) {
+            setState(() {
+              _showFatigueNudge = true;
+              _fatigueHours = fatigueMinutes / 60.0;
+            });
+          } else {
+            setState(() {
+              _showFatigueNudge = false;
+            });
+          }
+        } catch (e) {
+          debugPrint("Error fetching user profile for fatigue nudge: $e");
+          if (_anonymousLastNudgeDate != todayStr) {
+            setState(() {
+              _showFatigueNudge = true;
+              _fatigueHours = fatigueMinutes / 60.0;
+            });
+          } else {
+            setState(() {
+              _showFatigueNudge = false;
+            });
+          }
+        }
+      }
+    } else {
+      setState(() {
+        _showFatigueNudge = false;
+      });
+    }
+  }
+
+  Future<void> _dismissFatigueNudge() async {
+    setState(() {
+      _showFatigueNudge = false;
+    });
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final now = DateTime.now();
+    final todayStr = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+
+    if (user.isAnonymous) {
+      _anonymousLastNudgeDate = todayStr;
+    } else {
+      try {
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'lastFatigueNudgeDate': todayStr,
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint("Error saving fatigue nudge timestamp to Firestore: $e");
+        _anonymousLastNudgeDate = todayStr;
+      }
     }
   }
 
@@ -366,6 +461,73 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         ),
                       ),
                       const SizedBox(height: 24),
+
+                      // Fatigue Nudge Banner
+                      if (_showFatigueNudge) ...[
+                        AnimatedOpacity(
+                          opacity: _showFatigueNudge ? 1.0 : 0.0,
+                          duration: const Duration(milliseconds: 500),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 24),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFFBEB), // Soft warm amber background
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: PlayfulColors.tertiary, width: 2.0),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: PlayfulColors.tertiary,
+                                  offset: Offset(4, 4),
+                                  blurRadius: 0,
+                                ),
+                              ],
+                            ),
+                            child: Stack(
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.warning_amber_rounded,
+                                      color: Color(0xFFD97706),
+                                      size: 24,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            "You've logged ${_fatigueHours.toStringAsFixed(1)} hours in the last 24 hours — even a short break helps.",
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                              color: PlayfulColors.foreground,
+                                              height: 1.3,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 24), // Leave room for close button
+                                  ],
+                                ),
+                                Positioned(
+                                  top: -4,
+                                  right: -4,
+                                  child: GestureDetector(
+                                    onTap: _dismissFatigueNudge,
+                                    child: const Icon(
+                                      Icons.close,
+                                      size: 18,
+                                      color: Color(0xFFD97706),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
 
                       // AI Weekly Insight Pop-in Card
                       ScaleTransition(
