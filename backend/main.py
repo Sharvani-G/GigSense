@@ -13,8 +13,8 @@ load_dotenv()
 import json
 import datetime
 from ocr import extract_job_data
-from llm import ask_gemma, get_chat_system_prompt, get_weekly_insight_prompt
-from schemas import JobScanResponse, ChatRequest, ComplaintRequest
+from llm import ask_gemma, get_chat_system_prompt, get_weekly_insight_prompt, get_complaint_draft_prompt
+from schemas import JobScanResponse, ChatRequest, ComplaintRequest, DraftRequest
 from firebase_client import db
 from firebase_admin import firestore
 
@@ -441,4 +441,90 @@ async def recalculate_benchmarks():
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"error": f"Failed to recalculate: {str(e)}"}
+        )
+
+@app.post("/complaint-draft")
+async def complaint_draft_endpoint(request: DraftRequest):
+    if db is None:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"error": "Database is not initialized"}
+        )
+    
+    try:
+        # Fetch target job details from Firestore
+        job_doc = db.collection("jobs").document(request.job_id).get()
+        if not job_doc.exists:
+            return JSONResponse(
+                status_code=status.HTTP_44_NOT_FOUND,
+                content={"error": f"Job {request.job_id} not found"}
+            )
+            
+        job = job_doc.to_dict()
+        
+        # User profile to determine preferred language
+        profile = get_user_profile(request.user_id)
+        lang_code = profile.get('preferredLanguage', 'en') or 'en'
+        language_name = LANGUAGE_NAMES.get(lang_code, 'English')
+        
+        platform = job.get("platform") or "Platform"
+        fare = (job.get("fare") or 0.0)
+        expected_fare = (job.get("expected_fare") or 0.0)
+        distance_km = (job.get("distance_km") or 0.0)
+        duration_min = (job.get("duration_min") or 0.0)
+        
+        # Format the trip timestamp
+        formatted_date = "recently"
+        raw_time = job.get("job_timestamp") or job.get("created_at")
+        if raw_time:
+            if isinstance(raw_time, str):
+                try:
+                    if raw_time.endswith('Z'):
+                        raw_time = raw_time[:-1] + '+00:00'
+                    dt = datetime.datetime.fromisoformat(raw_time)
+                    formatted_date = dt.strftime("%B %d, %Y")
+                except Exception:
+                    pass
+            elif hasattr(raw_time, "strftime"):
+                formatted_date = raw_time.strftime("%B %d, %Y")
+                
+        # Ask Gemma for the draft
+        prompt = get_complaint_draft_prompt(
+            platform=platform.capitalize(),
+            fare=fare,
+            expected_fare=expected_fare,
+            distance_km=distance_km,
+            duration_min=duration_min,
+            formatted_date=formatted_date,
+            language_name=language_name
+        )
+        
+        draft_text = ask_gemma(prompt)
+        
+        if draft_text == "OLLAMA_UNREACHABLE_ERROR":
+            # Return specific formatted fallback template
+            fallbacks = {
+                'en': "Hello support. I am writing regarding my ride on {platform} on {date}. I was paid ₹{fare:.2f} for a trip of {distance_km:.1f} km and {duration_min:.0f} mins. Based on benchmark rates, the expected fare is ₹{expected_fare:.2f}. Please review this calculation and adjust my payout. Thank you.",
+                'hi': "नमस्ते सहायता टीम। मैं {platform} पर {date} को अपनी सवारी के संबंध में लिख रहा हूँ। मुझे {distance_km:.1f} किमी और {duration_min:.0f} मिनट की यात्रा के लिए ₹{fare:.2f} का भुगतान किया गया था। बेंचमार्क दरों के आधार पर, अपेक्षित किराया ₹{expected_fare:.2f} होना चाहिए। कृपया इस भुगतान की समीक्षा करें। धन्यवाद।",
+                'kn': "{platform} ನಲ್ಲಿ {date} ರಂದು ನನ್ನ ಪಯಣದ ಕುರಿತು ನಾನು ಬರೆಯುತ್ತಿದ್ದೇನೆ. {distance_km:.1f} ಕಿಮೀ ಮತ್ತು {duration_min:.0f} ನಿಮಿಷಗಳ ಪ್ರಯಾಣಕ್ಕೆ ನನಗೆ ₹{fare:.2f} ಪಾವತಿಸಲಾಗಿದೆ. ದರಗಳ ಪ್ರಕಾರ, ನಿರೀಕ್ಷಿತ ದರ ₹{expected_fare:.2f} ಇರಬೇಕು. ದಯವಿಟ್ಟು ಇದನ್ನು ಪರಿಶೀಲಿಸಿ ನನ್ನ ಪಾವತಿಯನ್ನು ಸರಿಪಡಿಸಿ. ಧನ್ಯವಾದಗಳು.",
+                'ta': "{platform} இல் {date} அன்று எனது பயணம் குறித்து நான் எழுதுகிறேன். {distance_km:.1f} கிமீ மற்றும் {duration_min:.0f} நிமிட பயணத்திற்கு எனக்கு ₹{fare:.2f} வழங்கப்பட்டது. தரநிலைகளின்படி, எதிர்பார்க்கப்படும் கட்டணம் ₹{expected_fare:.2f} ஆகும். தயவுசெய்து ಇದನ್ನು மறுபரிசீலனை செய்து சரிசெய்யவும். நன்றி.",
+                'te': "{platform} లో {date} న నా ప్రయాణానికి సంబంధించి నేను వ్రాస్తున్నాను. {distance_km:.1f} కిమీ మరియు {duration_min:.0f} నిమిషాల ప్రయాణానికి నాకు ₹{fare:.2f} చెల్లించబడింది. ప్రామాణిక రేట్ల ప్రకారం, ఆశించిన ఛార్జీ ₹{expected_fare:.2f} ఉండాలి. దయస చేసి దీనిని సమీక్షించండి. ಧನ್ಯವಾದಗಳು."
+            }
+            tmpl = fallbacks.get(lang_code, fallbacks['en'])
+            draft_text = tmpl.format(
+                platform=platform.capitalize(),
+                date=formatted_date,
+                fare=fare,
+                distance_km=distance_km,
+                duration_min=duration_min,
+                expected_fare=expected_fare
+            )
+            
+        return {"draft_text": draft_text.strip()}
+        
+    except Exception as e:
+        print(f"Error drafting complaint: {e}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": f"Failed to draft complaint: {str(e)}"}
         )

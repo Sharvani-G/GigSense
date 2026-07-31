@@ -24,3 +24,7 @@ class ComplaintRequest(BaseModel):
     duration_min: float
     expected_fare: float
     user_id: str
+
+class DraftRequest(BaseModel):
+    job_id: str
+    user_id: str
