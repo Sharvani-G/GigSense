@@ -339,7 +339,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
           if (platform != null) {
             final matched = _allPlatforms.firstWhere(
               (p) => p.id == platform.toLowerCase(),
-              orElse: () => PlatformItem(id: 'other', displayName: 'Other', category: 'other_gig', ratePerKm: 10.0, ratePerMin: 1.30),
+              orElse: () => PlatformItem(id: 'other', displayName: 'Other', category: 'other_gig', ratePerKm: 10.0, ratePerMin: 1.30, sampleSize: 0),
             );
             if (matched.id != 'other') {
               _selectedPlatform = matched.id;
