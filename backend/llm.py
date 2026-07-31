@@ -38,35 +38,50 @@ def ask_gemma_stream(prompt: str, system_prompt: str = ""):
         print(f"Ollama connection or processing error: {e}")
         yield "OLLAMA_UNREACHABLE_ERROR"
 
-KNOWLEDGE_BASE = """KNOWLEDGE BASE:
-Use the reference information below for any question about laws, worker rights, or complaint processes. If a worker asks about something not covered in this reference, say plainly that you don't have verified information on that specific point rather than guessing.
-
----
-NATIONAL LEVEL — Code on Social Security, 2020
-- This is India's consolidated labour law covering social security, and it came into force on 21 November 2025.
-- For the first time, it formally defines "gig worker" and "platform worker" as legal categories, separate from a traditional employee, under Sections 113 and 114.
-- It does NOT make gig workers employees, and does NOT create a minimum wage or fixed working-hours guarantee for gig work — this is an important, honest limitation to state clearly if a worker asks whether they're now "protected like an employee."
-- It sets up a National Social Security Board and a Social Security Fund, meant to provide welfare benefits: life and disability insurance, accident insurance, health and maternity benefits, and old-age/pension support for gig and platform workers.
-- Aggregators (the platforms themselves — Uber, Zomato, Swiggy, Ola, etc.) are required to contribute 1-2% of their turnover (capped) into this Social Security Fund to finance these welfare schemes.
-- Registration for these benefits generally happens through the e-Shram portal (India's national database for unorganised/gig/platform workers) — a worker who wants to access these benefits should register there.
-
-KARNATAKA STATE LEVEL — Platform-Based Gig Workers (Social Security and Welfare) Act, 2025 (directly relevant since GigShield is a Bengaluru-built app)
-- Karnataka's own law for platform workers has been in effect since 30 May 2025 (originally an ordinance, formally passed as an Act by the state legislature in August 2025), with detailed Rules notified on 19 November 2025.
-- It requires every gig worker to be registered with a unique ID through a state Welfare Board, and requires the aggregator/platform to register the worker within 30 days of onboarding them.
-- It sets up a Karnataka Platform-Based Gig Workers Welfare Fund, financed by a Welfare Fee charged to the platform of 1-5% of each payout made to the worker.
-- Uniquely among Indian state gig-worker laws so far, it gives workers an explicit right to REFUSE a task offered by the platform without being penalized for it — Rajasthan's and Telangana's equivalent laws don't explicitly include this.
-- Honest caveat worth stating if asked: as of late 2025, the actual Welfare Board, digital registration portal, and payment-verification system were still being set up — the law exists, but the practical machinery to claim benefits through it was still rolling out, so a worker asking "can I claim this today" deserves an honest "the legal right exists, but check whether the registration portal is live yet" answer, not false certainty that benefits are immediately claimable.
-
-HOW TO ACTUALLY RAISE A COMPLAINT (platform-level, before any legal escalation)
-- Every major platform (Zomato, Swiggy, Uber, Ola, etc.) is legally required under India's IT Rules, 2021 (Rule 3(2)) to have a published Grievance Officer, who must acknowledge a complaint within 24 hours and resolve it within 15 days.
-- The practical first step is always: raise the issue inside the app's own in-app support/help chat first, and get a ticket/reference number — never rely on phone numbers found outside the official app, since fake support numbers are a known scam pattern in this space.
-- If the in-app resolution doesn't work, escalate specifically to the platform's published Grievance Officer contact (usually listed in the app's "Contact Us" or "Grievance Redressal" section) rather than repeating the same in-app chat.
-- If that still doesn't resolve it, a worker can escalate to India's National Consumer Helpline, reachable at the number 1915, or file a complaint through the National Consumer Helpline's online portal — this is a real, government-run escalation path, not a platform-specific one, and applies broadly to consumer/service disputes.
-- For Karnataka-specific gig-work grievances (as opposed to general consumer complaints), the Karnataka Welfare Board set up under the state Act above is the intended long-term grievance channel, though — per the caveat above — be honest that its full operational rollout was still in progress as of late 2025.
----"""
-
 def get_chat_system_prompt(worker_type_desc: str, recent_jobs_json: str, conversation_history_str: str, language_name: str) -> str:
     return f"""You are GigChat, an assistant for Indian gig workers. Do NOT introduce yourself or restate what you are at the start of every response. Answer the question directly. Only mention your scope if the user's question is genuinely unrelated to gig work pay, safety, or rights, or if they explicitly ask what you are.
+
+---
+# TODO: Keep this block updated when Karnataka's Welfare Board becomes fully operational 
+# with a public grievance portal/hotline number. Swap in the real number if one becomes 
+# publicly available before the demo.
+Reference facts you may cite when relevant to a worker's question. Do not
+invent additional legal specifics beyond what is given here — if asked about
+a detail not covered below, say plainly that you don't have verified
+information on that specific point rather than guessing:
+
+- Code on Social Security, 2020 (central law): in force since 21 November
+  2025. First time gig workers and platform workers are legally defined and
+  recognized in Indian law. Aggregators (e.g. Uber, Swiggy, Zomato) must
+  contribute 1-2% of annual turnover (capped at 5% of amounts paid to gig
+  workers) into a Social Security Fund. Covers life/disability cover,
+  accident insurance, health and maternity benefits, old-age protection.
+  Full scheme rollout is still being implemented as of this year — say
+  "schemes are being rolled out," not that all benefits are already fully
+  active and claimable today.
+
+- Karnataka Platform Based Gig Workers (Social Security and Welfare) Act,
+  2025: in force since 30 May 2025, rules notified 19 November 2025. Workers
+  get a unique registration ID, portable across platforms. Workers have the
+  right to refuse a task without penalty. Aggregators must give 14 days'
+  notice before changing contract terms. Payment deduction reasons must be
+  disclosed to the worker. Contracts and grievance processes must use simple,
+  local language. At least one human grievance contact point is required
+  (not fully automated). IMPORTANT: this Act does NOT mandate a minimum
+  guaranteed wage or a minimum per-km/per-trip rate, and does NOT guarantee
+  compensation for waiting time — never claim it does.
+
+- National Consumer Helpline: 1915 or 1800-11-4000, also via WhatsApp
+  (8800001915), the NCH web portal, or the NCH app. Operates in 17 languages.
+  Staffed 8 AM-8 PM daily including holidays (web/WhatsApp accept complaints
+  24/7, processed during those hours). This is a CONSUMER helpline for
+  disputes with a platform's service/goods — appropriate for consumer-side
+  complaints. For a wage or labor-specific grievance specifically (e.g.
+  underpayment, unfair deactivation), direct the worker toward their state's
+  Labour Department or, in Karnataka specifically, the Karnataka Platform
+  Based Gig Workers Welfare Board (headquartered in Bengaluru) instead of
+  1915 — do not conflate consumer complaints with labor/wage grievances.
+---
 
 CONTEXT:
 - Worker Type: {worker_type_desc}
@@ -87,7 +102,7 @@ LANGUAGE AND SCRIPT RULES:
 - Respond ONLY in fluent, natural {language_name} using its native script. Do not mix in English words except for proper nouns (e.g., Uber, Zomato, ₹).
 - The user may type in romanized script (Latin letters) instead of native script for their language — understand their intent regardless, but ALWAYS reply in proper native script, never romanized.
 
-{KNOWLEDGE_BASE}"""
+"""
 
 def get_weekly_insight_prompt(worker_type_desc: str, aggregates_json: str, language_name: str) -> str:
     return f"""You are a supportive coach helping an Indian gig worker improve their earnings and monitor pay fairness. The worker is a {worker_type_desc}.
@@ -125,7 +140,7 @@ INSTRUCTIONS:
 - Do NOT claim any specific legal entitlement, refund guarantee, or assert a legal right to compensation (we are not providing legal counsel).
 - Keep it concise: 3-5 sentences total.
 
-{KNOWLEDGE_BASE}"""
+"""
 
 def get_route_safety_prompt(time_band: str, area_hint: str, language_name: str) -> str:
     return f"""You are a safety assistant for a gig worker.
