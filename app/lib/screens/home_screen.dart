@@ -578,7 +578,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           color: PlayfulColors.foreground,
                         ),
                       ),
-                      )
+                      ),
                       const SizedBox(height: 4),
                       Text(
                         dateRange,
@@ -1302,6 +1302,210 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
     return Colors.white;
   }
+
+  Future<void> _triggerSOS() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    
+    // Check if trusted contact exists
+    Map<String, dynamic>? trustedContact;
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists) {
+        final contacts = doc.data()?['emergencyContacts'] as List<dynamic>?;
+        if (contacts != null && contacts.isNotEmpty) {
+          trustedContact = contacts.first as Map<String, dynamic>?;
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching trusted contact: $e");
+    }
+
+    if (!mounted) return;
+
+    if (trustedContact == null || trustedContact['phone'] == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Please set an Emergency Contact in Settings first."),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: PlayfulColors.border, width: 2),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(color: Color(0xFFEF4444)),
+              const SizedBox(height: 16),
+              Text(
+                "Drafting alert...",
+                style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.bold,
+                  color: PlayfulColors.foreground,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+      final Uri url = Uri.parse('$baseUrl/sos-message');
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'user_id': user.uid}),
+      );
+      
+      if (!mounted) return;
+      Navigator.pop(context); // close loader
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final message = data['message'] ?? "";
+        _showSOBSheet(trustedContact, message);
+      } else {
+        throw Exception("Server error");
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // close loader
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Failed to draft message. Please try again."),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+    }
+  }
+
+  void _showSOBSheet(Map<String, dynamic> contact, String message) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444)),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Safety Alert",
+                        style: GoogleFonts.outfit(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: PlayfulColors.foreground,
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "Send this message to ${contact['name'] ?? 'your contact'} (${contact['phone']}):",
+                style: GoogleFonts.plusJakartaSans(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: PlayfulColors.mutedForeground,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: PlayfulColors.muted,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: PlayfulColors.border),
+                ),
+                child: Text(
+                  message,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                    color: PlayfulColors.foreground,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: PlayfulButton(
+                      backgroundColor: Colors.white,
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: message));
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Copied to clipboard')),
+                          );
+                        }
+                      },
+                      child: Text(
+                        "COPY",
+                        style: GoogleFonts.outfit(
+                          color: PlayfulColors.foreground,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: PlayfulButton(
+                      backgroundColor: const Color(0xFFEF4444),
+                      onPressed: () async {
+                        await Share.share(message);
+                      },
+                      child: Text(
+                        "SHARE",
+                        style: GoogleFonts.outfit(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 class PlatformBreakdown {
@@ -1600,7 +1804,7 @@ class _PlayfulSkeletonState extends State<PlayfulSkeleton> with SingleTickerProv
                     ),
                     const SizedBox(height: 24),
                     PlayfulButton(
-                      backgroundColor: PlayfulColors.primary,
+                      backgroundColor: PlayfulColors.accent,
                       onPressed: () async {
                         await Clipboard.setData(ClipboardData(text: draftMessage!));
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -1639,4 +1843,7 @@ class _PlayfulSkeletonState extends State<PlayfulSkeleton> with SingleTickerProv
         );
       },
     );
-  }
+  
+
+  
+}

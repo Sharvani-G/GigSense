@@ -636,7 +636,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
           ratePerMin = (data['rate_per_min'] as num?)?.toDouble() ?? ratePerMin;
         }
       } else {
-        rateSource = 'fallback';
+        String rateSource = 'fallback';
       final fallbackDefaults = {
           'uber': {'rate_per_km': 12.00, 'rate_per_min': 1.50},
           'rapido': {'rate_per_km': 9.00, 'rate_per_min': 1.20},
@@ -660,7 +660,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
       }
     } catch (e) {
       debugPrint("Error fetching benchmarks: $e. Using local fallbacks.");
-      rateSource = 'fallback';
+      String rateSource = 'fallback';
       final fallbackDefaults = {
         'uber': {'rate_per_km': 12.00, 'rate_per_min': 1.50},
         'rapido': {'rate_per_km': 9.00, 'rate_per_min': 1.20},
@@ -706,7 +706,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
       'is_underpaid': isUnderpaid,
       'explanation': explanationText,
       'source': _jobSource,
-      'rate_source': rateSource,
+      'rate_source': 'fallback',
       'sample_size': jobSampleSize,
       'job_timestamp': FieldValue.serverTimestamp(),
       'created_at': FieldValue.serverTimestamp(),
@@ -722,7 +722,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
       'is_underpaid': isUnderpaid,
       'explanation': explanationText,
       'source': _jobSource,
-      'rate_source': rateSource,
+      'rate_source': 'fallback',
       'sample_size': jobSampleSize,
       'job_timestamp': DateTime.now().toIso8601String(),
       'created_at': DateTime.now().toIso8601String(),

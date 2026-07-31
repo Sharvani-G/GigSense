@@ -1,3 +1,4 @@
+import '../i18n/strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -105,7 +106,7 @@ class FairnessResultScreen extends StatelessWidget {
                                   ? DateTime.tryParse(job['created_at'] as String)
                                   : null))
                           : null),
-                  areaHint: job['area_hint'] as String?,
+                  
                 ),
               ),
               const SizedBox(height: 24),
@@ -385,6 +386,7 @@ class FairnessResultScreen extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }

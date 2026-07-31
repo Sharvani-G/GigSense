@@ -154,15 +154,7 @@ class _PlayfulInputState extends State<PlayfulInput> with SingleTickerProviderSt
   late final AnimationController _pulseController;
   late final Animation<Color?> _pulseAnimation;
 
-  @override
-  void didUpdateWidget(PlayfulMicButton oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // Sync if global language changed and we haven't manually cycled
-    final globalLang = StringsProvider.instance.lang;
-    if (_supportedLanguages.contains(globalLang) && _currentOverrideLang != globalLang) {
-      _currentOverrideLang = globalLang;
-    }
-  }
+
 
   @override
   void initState() {
@@ -715,7 +707,7 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
               Navigator.of(ctx).pop();
               openAppSettings();
             },
-            child: const Text(StringsProvider.instance.t('stt_open_settings')),
+            child: Text(StringsProvider.instance.t('stt_open_settings')),
           ),
         ],
       ),
