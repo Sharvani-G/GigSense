@@ -160,6 +160,32 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
     );
   }
 
+  Widget _buildLegendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: Border.all(color: PlayfulColors.border, width: 1.5),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.bold,
+            fontSize: 10,
+            color: PlayfulColors.foreground,
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -315,18 +341,74 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(22),
-                      child: FlutterMap(
-                        options: const MapOptions(
-                          initialCenter: LatLng(12.9716, 77.5946),
-                          initialZoom: 12.0,
-                        ),
+                      child: Stack(
                         children: [
-                          TileLayer(
-                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            userAgentPackageName: 'com.gigshield.app',
+                          FlutterMap(
+                            options: const MapOptions(
+                              initialCenter: LatLng(12.9716, 77.5946),
+                              initialZoom: 12.0,
+                            ),
+                            children: [
+                              TileLayer(
+                                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                userAgentPackageName: 'com.gigshield.app',
+                              ),
+                              CircleLayer(circles: circles),
+                              MarkerLayer(markers: markers),
+                            ],
                           ),
-                          CircleLayer(circles: circles),
-                          MarkerLayer(markers: markers),
+                          Positioned(
+                            bottom: 16,
+                            left: 16,
+                            right: 16,
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: PlayfulColors.border, width: 2.0),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: PlayfulColors.border,
+                                    offset: Offset(3, 3),
+                                    blurRadius: 0,
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "PAY FAIRNESS HEALTH BY LOCALITY",
+                                    style: GoogleFonts.outfit(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 11,
+                                      color: PlayfulColors.foreground,
+                                      letterSpacing: 1.0,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    "Tapping a zone shows actual earnings compared to legal benchmarks.",
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                      color: PlayfulColors.mutedForeground,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Row(
+                                    children: [
+                                      _buildLegendDot(PlayfulColors.quaternary.withOpacity(0.6), "Fair Pay (>= 85%)"),
+                                      const SizedBox(width: 16),
+                                      _buildLegendDot(PlayfulColors.secondary.withOpacity(0.6), "Underpaid (< 85%)"),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
