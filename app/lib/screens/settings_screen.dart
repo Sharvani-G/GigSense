@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'playful_widgets.dart';
 import '../i18n/strings.dart';
 import '../main.dart' show showLanguagePicker;
+import 'sos_active_screen.dart';
 
 // ---------------------------------------------------------------------------
 // SettingsScreen — The 4th tab of GigShield
@@ -26,6 +27,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _langCode = "en";
   Map<String, dynamic>? _savingsGoal;
   List<Map<String, dynamic>> _emergencyContacts = [];
+  Map<String, dynamic>? _sosSettings;
 
   @override
   void initState() {
@@ -60,7 +62,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _workerType = data['workerType'] ?? "other_gig_worker";
           _langCode = data['preferredLanguage'] ?? StringsProvider.instance.lang;
           _savingsGoal = data['savingsGoal'] as Map<String, dynamic>?;
-              _emergencyContacts = List<Map<String, dynamic>>.from((data['emergencyContacts'] as List?)?.map((e) => Map<String,dynamic>.from(e)) ?? []);
+          _emergencyContacts = List<Map<String, dynamic>>.from((data['emergencyContacts'] as List?)?.map((e) => Map<String,dynamic>.from(e)) ?? []);
+          _sosSettings = data['sosSettings'] as Map<String, dynamic>?;
           _isLoading = false;
         });
       }
@@ -270,6 +273,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   },
                                 ),
                                 _buildDivider(),
+
+                                // SOS Settings row
+                                _buildSettingsRow(
+                                  icon: Icons.sos_outlined,
+                                  label: s.t('sos_settings'),
+                                  trailingText: "Configure",
+                                  onTap: () => _showSOSSettingsBottomSheet(context),
+                                ),
+                                _buildDivider(),
                                 // About row
                                 _buildSettingsRow(
                                   icon: Icons.info_outline_rounded,
@@ -469,6 +481,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
             setState(() {
               _savingsGoal = goal;
             });
+          },
+        );
+      },
+    );
+  }
+
+  void _showSOSSettingsBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return _SOSSettingsBottomSheetContent(
+          initialSettings: _sosSettings,
+          emergencyContacts: _emergencyContacts,
+          onSave: (settings) async {
+            final user = FirebaseAuth.instance.currentUser;
+            if (user != null) {
+              try {
+                if (!user.isAnonymous) {
+                  await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+                    'sosSettings': settings,
+                  });
+                }
+                setState(() {
+                  _sosSettings = settings;
+                });
+              } catch (e) {
+                debugPrint("Error saving SOS settings: $e");
+              }
+            }
           },
         );
       },
@@ -1471,6 +1514,401 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _SOSSettingsBottomSheetContent — Custom layout sheet for SOS Settings
+// ---------------------------------------------------------------------------
+class _SOSSettingsBottomSheetContent extends StatefulWidget {
+  final Map<String, dynamic>? initialSettings;
+  final List<Map<String, dynamic>> emergencyContacts;
+  final Future<void> Function(Map<String, dynamic>) onSave;
+
+  const _SOSSettingsBottomSheetContent({
+    required this.initialSettings,
+    required this.emergencyContacts,
+    required this.onSave,
+  });
+
+  @override
+  State<_SOSSettingsBottomSheetContent> createState() => _SOSSettingsBottomSheetContentState();
+}
+
+class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetContent> {
+  late TextEditingController _templateController;
+  
+  bool _smsEnabled = true;
+  bool _whatsappEnabled = false;
+  bool _callEnabled = false;
+  
+  String _primaryChannel = 'sms';
+  bool _liveLocationEnabled = true;
+  int _liveDuration = 30; // 15, 30, 60
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final settings = widget.initialSettings ?? {};
+    final channels = settings['channels'] as Map<String, dynamic>? ?? {};
+    _smsEnabled = channels['sms'] ?? true;
+    _whatsappEnabled = channels['whatsapp'] ?? false;
+    _callEnabled = channels['call'] ?? false;
+    
+    _primaryChannel = settings['primaryChannel'] ?? 'sms';
+    
+    final locationMode = settings['locationMode'] ?? 'live';
+    _liveLocationEnabled = locationMode == 'live';
+    _liveDuration = settings['liveLocationDurationMinutes'] ?? 30;
+    
+    final s = StringsProvider.instance;
+    final defaultTemplate = s.t('sos_message_template');
+    _templateController = TextEditingController(text: settings['messageTemplate'] ?? defaultTemplate);
+  }
+
+  @override
+  void dispose() {
+    _templateController.dispose();
+    super.dispose();
+  }
+
+  void _resetTemplate() {
+    final s = StringsProvider.instance;
+    setState(() {
+      _templateController.text = s.t('sos_message_template');
+    });
+  }
+
+  Future<void> _saveSettings() async {
+    if (!_smsEnabled && !_whatsappEnabled && !_callEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enable at least one channel.")),
+      );
+      return;
+    }
+    
+    if (_primaryChannel == 'sms' && !_smsEnabled) _primaryChannel = _whatsappEnabled ? 'whatsapp' : 'call';
+    if (_primaryChannel == 'whatsapp' && !_whatsappEnabled) _primaryChannel = _smsEnabled ? 'sms' : 'call';
+    if (_primaryChannel == 'call' && !_callEnabled) _primaryChannel = _smsEnabled ? 'sms' : 'whatsapp';
+
+    final settings = {
+      'channels': {
+        'sms': _smsEnabled,
+        'whatsapp': _whatsappEnabled,
+        'call': _callEnabled,
+      },
+      'primaryChannel': _primaryChannel,
+      'locationMode': _liveLocationEnabled ? 'live' : 'none',
+      'liveLocationDurationMinutes': _liveDuration,
+      'messageTemplate': _templateController.text.trim(),
+    };
+
+    setState(() => _isSaving = true);
+    await widget.onSave(settings);
+    if (mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("SOS settings updated successfully!")),
+      );
+    }
+  }
+
+  Future<void> _sendTestAlert() async {
+    if (widget.emergencyContacts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please configure at least 1 emergency contact in settings first.")),
+      );
+      return;
+    }
+
+    final currentSettings = {
+      'channels': {
+        'sms': _smsEnabled,
+        'whatsapp': _whatsappEnabled,
+        'call': _callEnabled,
+      },
+      'primaryChannel': _primaryChannel,
+      'locationMode': _liveLocationEnabled ? 'live' : 'none',
+      'liveLocationDurationMinutes': _liveDuration,
+      'messageTemplate': _templateController.text.trim(),
+    };
+
+    await widget.onSave(currentSettings);
+
+    final user = FirebaseAuth.instance.currentUser;
+    String workerName = "Worker";
+    if (user != null) {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists && doc.data() != null) {
+        workerName = doc.data()!['name'] ?? "Worker";
+      }
+    }
+
+    if (mounted) {
+      Navigator.pop(context); // close bottom sheet
+      await SOSManager.instance.startSOS(widget.emergencyContacts.first, currentSettings, workerName, context, isTest: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    return Container(
+      padding: EdgeInsets.only(
+        top: 24,
+        left: 24,
+        right: 24,
+        bottom: mq.viewInsets.bottom + 24,
+      ),
+      decoration: const BoxDecoration(
+        color: Color(0xFFFFFDF5),
+        border: Border(
+          top: BorderSide(color: PlayfulColors.border, width: 4),
+        ),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(32),
+          topRight: Radius.circular(32),
+        ),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "SOS SETTINGS",
+                  style: GoogleFonts.outfit(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: PlayfulColors.foreground,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: PlayfulColors.border, size: 24),
+                  onPressed: () => Navigator.pop(context),
+                )
+              ],
+            ),
+            const Divider(color: PlayfulColors.border, thickness: 2),
+            const SizedBox(height: 16),
+            
+            Text(
+              "CHANNELS",
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: PlayfulColors.mutedForeground,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            
+            CheckboxListTile(
+              title: Text("SMS Text Alert", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13)),
+              value: _smsEnabled,
+              activeColor: PlayfulColors.accent,
+              onChanged: (val) {
+                setState(() {
+                  _smsEnabled = val ?? true;
+                  if (!_smsEnabled && _primaryChannel == 'sms') {
+                    _primaryChannel = 'whatsapp';
+                  }
+                });
+              },
+            ),
+            CheckboxListTile(
+              title: Text("WhatsApp Alert", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13)),
+              value: _whatsappEnabled,
+              activeColor: PlayfulColors.accent,
+              onChanged: (val) {
+                setState(() {
+                  _whatsappEnabled = val ?? false;
+                  if (!_whatsappEnabled && _primaryChannel == 'whatsapp') {
+                    _primaryChannel = 'sms';
+                  }
+                });
+              },
+            ),
+            CheckboxListTile(
+              title: Text("Phone Call Shortcut", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13)),
+              value: _callEnabled,
+              activeColor: PlayfulColors.accent,
+              onChanged: (val) {
+                setState(() {
+                  _callEnabled = val ?? false;
+                  if (!_callEnabled && _primaryChannel == 'call') {
+                    _primaryChannel = 'sms';
+                  }
+                });
+              },
+            ),
+            
+            const SizedBox(height: 16),
+            
+            Text(
+              "PRIMARY SOS METHOD",
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: PlayfulColors.mutedForeground,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (_smsEnabled)
+                  Expanded(
+                    child: RadioListTile<String>(
+                      title: Text("SMS", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 12)),
+                      value: 'sms',
+                      groupValue: _primaryChannel,
+                      activeColor: PlayfulColors.accent,
+                      onChanged: (val) => setState(() => _primaryChannel = val!),
+                    ),
+                  ),
+                if (_whatsappEnabled)
+                  Expanded(
+                    child: RadioListTile<String>(
+                      title: Text("WhatsApp", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 12)),
+                      value: 'whatsapp',
+                      groupValue: _primaryChannel,
+                      activeColor: PlayfulColors.accent,
+                      onChanged: (val) => setState(() => _primaryChannel = val!),
+                    ),
+                  ),
+                if (_callEnabled)
+                  Expanded(
+                    child: RadioListTile<String>(
+                      title: Text("Call", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 12)),
+                      value: 'call',
+                      groupValue: _primaryChannel,
+                      activeColor: PlayfulColors.accent,
+                      onChanged: (val) => setState(() => _primaryChannel = val!),
+                    ),
+                  ),
+              ],
+            ),
+            
+            const SizedBox(height: 16),
+            
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "LIVE LOCATION TRACKING",
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: PlayfulColors.mutedForeground,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                Switch(
+                  value: _liveLocationEnabled,
+                  activeColor: PlayfulColors.accent,
+                  onChanged: (val) => setState(() => _liveLocationEnabled = val),
+                ),
+              ],
+            ),
+            
+            if (_liveLocationEnabled) ...[
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text("Sharing Duration:", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13)),
+                  DropdownButton<int>(
+                    value: _liveDuration,
+                    items: const [
+                      DropdownMenuItem(value: 15, child: Text("15 Minutes")),
+                      DropdownMenuItem(value: 30, child: Text("30 Minutes")),
+                      DropdownMenuItem(value: 60, child: Text("60 Minutes")),
+                    ],
+                    onChanged: (val) => setState(() => _liveDuration = val!),
+                  ),
+                ],
+              ),
+            ],
+            
+            const SizedBox(height: 20),
+            
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "CUSTOM ALERT MESSAGE",
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: PlayfulColors.mutedForeground,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                TextButton(
+                  onPressed: _resetTemplate,
+                  child: Text(
+                    "Reset to Default",
+                    style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 11, color: PlayfulColors.accent),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _templateController,
+              maxLines: 3,
+              style: GoogleFonts.plusJakartaSans(fontSize: 13, color: PlayfulColors.foreground),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.white,
+                helperText: "Use placeholders {name}, {link}, and {time} to keep info dynamic.",
+                helperStyle: GoogleFonts.plusJakartaSans(fontSize: 10, fontWeight: FontWeight.bold),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: PlayfulColors.border, width: 2),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: PlayfulColors.accent, width: 2),
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 24),
+            
+            Row(
+              children: [
+                Expanded(
+                  child: PlayfulButton(
+                    onPressed: _isSaving ? null : _saveSettings,
+                    child: _isSaving
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : Text(
+                            "SAVE SETTINGS",
+                            style: GoogleFonts.outfit(fontWeight: FontWeight.w900, color: Colors.white),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            PlayfulButton(
+              onPressed: _sendTestAlert,
+              backgroundColor: PlayfulColors.secondary,
+              child: Text(
+                "SEND TEST ALERT",
+                style: GoogleFonts.outfit(fontWeight: FontWeight.w900, color: Colors.white),
+              ),
+            ),
+          ],
         ),
       ),
     );

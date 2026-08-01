@@ -22,3 +22,6 @@ build/
 
 # Mac
 .DS_Store
+
+# Android binaries
+*.apk

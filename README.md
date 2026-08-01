@@ -37,12 +37,15 @@ GigSense is a mobile-first safety and earnings companion app designed specifical
 
 ### Core Requirements:
 * **Manual & OCR Job Logging:** Form-based trip creation with distance/time unit conversions, plus a screenshot scanner that auto-extracts data and rejects invalid receipts.
+  * *Robust Regex Engine*: Upgraded OCR matching rules to bypass misread currency characters (e.g. `Ps`, `Bs`, `Fs`) and ignore line-crossing matches.
   * *How to use:* Tap the green **`+` (Add)** FAB at the bottom-right of the Home Screen. Fill out manually or tap **Scan Screenshot** at the top.
 * **Underpayment & Fairness Check:** Evaluates logged jobs against live Firestore benchmarks and flags deviations as possible underpayment.
   * *How to use:* If a logged trip has a low payout, you will see a red **⚠️ Possible Underpayment** warning card on the Home Screen. Tapping it opens the detailed fairness calculation view.
 * **AI Chatbot (GigChat):** Interactive chat grounded in user logs, featuring native script output and fact-restricted Indian legal references.
+  * *Chat Attachment Scanner*: Embedded a camera/gallery attachment button next to the voice input. Scans photos and automatically structures them as formatted receipt prompts or raw context.
   * *How to use:* Tap the **Chat** option on the bottom navigation bar and ask questions. It automatically loads your trip history in the background.
 * **Weekly Dashboard:** Highlights total earnings, underpaid trips, total hours worked, and platform distribution via colorful charts.
+  * *Weekly Insight Caching*: Loads pre-generated summaries instantly from the Firestore cache on app start without making repeated network requests on tab navigations.
   * *How to use:* Visible on the main **Home Screen** showing real-time summary cards at the top.
 * **Multi-Platform Aggregation:** Displays unified analytics from ridesharing (Uber, Ola) and delivery (Swiggy, Zomato) platforms side-by-side.
   * *How to use:* Scroll to the "Platform Distribution" section on the **Home Screen** dashboard to see the color-coded chart.
@@ -60,8 +63,17 @@ GigSense is a mobile-first safety and earnings companion app designed specifical
   * *How to use:* Open the **Fairness Result Screen** for an underpaid trip, scroll to the bottom, and tap **Draft Dispute Message**.
 * **Fatigue & Burnout Detector:** Monitors active hours and triggers friend-like reminders to rest if daily (10+ hrs) or weekly (50+ hrs) limits are exceeded.
   * *How to use:* A **"Fatigue Warning"** banner appears automatically on the **Home Screen** dashboard when limits are breached.
-* **"I Feel Unsafe" (SOS Alert):** Instant emergency button that drafts coordinates and opens a native share-sheet for trusted contacts.
+* **Stateful SOS emergency tracking (Emergency SOS):**
+  * *Native SMS Dispatch*: Integrates Kotlin channel calling standard `SmsManager` to send silent live background coordinates.
+  * *Persistent lockouts*: Applies navigation block locks keeping the worker on the active SOS status view until duration completes or they tap "STOP SHARING".
   * *How to use:* Tap the red **SOS** floating button on the bottom-right of the **Home Screen** (above the Add button).
+* **Advanced Fairness Map & Locality Utilities:**
+  * *Time & Platform Filtering*: Dynamic overlays showing morning/evening/late-night trends.
+  * *Online nominatim search*: Debounced autocomplete queries bounded strictly inside Bengaluru.
+  * *Memory suggestion caching*: Saves search results locally in a memory cache map (`_searchCache`) to prevent Nominatim rate-limits or IP bans.
+  * *Nearest Zone Guidance*: Dynamic distance calculations leading users to pan to their nearest high-paying zone.
+* **Offline Mode Cache Settings:**
+  * *Native Firebase sync queue*: Configured Firestore with offline persistence enabled and unlimited cache sizes. Trips logged offline are queued locally and synchronized automatically when network resumes.
 * **Savings Goal Tracker:** Lets workers configure weekly targets and tracks target progress via animated progress indicators.
   * *How to use:* Configure your target amount in **Settings**, and see the progress bar update on the **Home Screen** dashboard.
 * **Community Fairness Benchmark:** Simulates crowdsourced rates from other local drivers to update and improve baseline rate accuracy.

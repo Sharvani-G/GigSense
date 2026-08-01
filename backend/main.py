@@ -45,15 +45,30 @@ def health_check():
 
 @app.post("/jobs/scan")
 async def scan_job_screenshot(file: UploadFile = File(...)):
+    # STAGE 1 LOGGING: Log file details unconditionally
+    content_type = file.content_type
+    filename = file.filename
+    print(f"[OCR] Received file: name='{filename}', content_type='{content_type}'")
     try:
         image_bytes = await file.read()
+        byte_size = len(image_bytes)
+        print(f"[OCR] File byte size: {byte_size} bytes")
+        
+        # Extract data
         extracted_data = extract_job_data(image_bytes)
+        
+        # STAGE 2 LOGGING: Log raw OCR text unconditionally
+        raw_text = extracted_data.get("raw_text", "")
+        print(f"[OCR] Raw OCR output text:\n--------------------------\n{raw_text}\n--------------------------")
+        
         return JSONResponse(status_code=status.HTTP_200_OK, content=extracted_data)
     except Exception as e:
-        print(f"Error processing image: {e}")
+        print(f"[OCR] Error processing image: {e}")
+        import traceback
+        traceback.print_exc()
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            content={"error": "Could not process image"}
+            content={"error": f"Could not process image: {str(e)}"}
         )
 
 @app.post("/stt")
