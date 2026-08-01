@@ -109,6 +109,7 @@ class FairnessResultScreen extends StatelessWidget {
                   areaHint: job['area_hint'] as String?,
                 ),
               ),
+              _buildLegalDisclosureFlag(job),
               const SizedBox(height: 24),
 
               // Side-by-side Expected vs Actual boxes
@@ -145,7 +146,7 @@ class FairnessResultScreen extends StatelessWidget {
                           FittedBox(
                             fit: BoxFit.scaleDown,
                             child: Text(
-                              "₹${fare.toStringAsFixed(2)}",
+                              "₹${formatIndianCurrency(fare, decimals: 2)}",
                               style: GoogleFonts.outfit(
                                 fontSize: 28,
                                 fontWeight: FontWeight.w900,
@@ -189,7 +190,7 @@ class FairnessResultScreen extends StatelessWidget {
                           FittedBox(
                             fit: BoxFit.scaleDown,
                             child: Text(
-                              "₹${expectedFare.toStringAsFixed(2)}",
+                              "₹${formatIndianCurrency(expectedFare, decimals: 2)}",
                               style: GoogleFonts.outfit(
                                 fontSize: 28,
                                 fontWeight: FontWeight.w900,
@@ -203,6 +204,7 @@ class FairnessResultScreen extends StatelessWidget {
                   ),
                 ],
               ),
+              _buildBreakdownView(job),
               const SizedBox(height: 24),
               if (expectedFare > 0.0) ...[
                 Center(
@@ -334,7 +336,7 @@ class FairnessResultScreen extends StatelessWidget {
                               : '';
                           
                           // Auto-title from job context
-                          final title = "$capitalizedPlatform trip — ₹${fare.toStringAsFixed(0)}";
+                          final title = "$capitalizedPlatform trip — ₹${formatIndianCurrency(fare)}";
                           
                           try {
                             // 1. Create chatSession document
@@ -349,7 +351,7 @@ class FairnessResultScreen extends StatelessWidget {
 
                           // 2. Set initial message to send on chat screen init and navigate to Chat tab
                           MainNavigationController.initialMessageToSend = 
-                              "I want to ask about this ride:\nPlatform: $capitalizedPlatform\nFare: ₹${fare.toStringAsFixed(2)}\nDistance: ${distanceKm.toStringAsFixed(1)} km\nDuration: ${durationMin.toStringAsFixed(0)} mins. Is this pay fair?";
+                              "I want to ask about this ride:\nPlatform: $capitalizedPlatform\nFare: ₹${formatIndianCurrency(fare, decimals: 2)}\nDistance: ${distanceKm.toStringAsFixed(1)} km\nDuration: ${durationMin.toStringAsFixed(0)} mins. Is this pay fair?";
                           MainNavigationController.activeSessionId.value = newSessionId;
                           MainNavigationController.selectTab(2);
 
@@ -387,6 +389,137 @@ class FairnessResultScreen extends StatelessWidget {
           ),
         ),
       ),
+      ),
+    );
+  }
+
+  Widget _buildLegalDisclosureFlag(Map<String, dynamic> job) {
+    final double? deduction = job['deduction_amount'] != null ? (job['deduction_amount'] as num).toDouble() : null;
+    final bool reasonStated = job['deduction_reason_stated'] ?? false;
+
+    if (deduction == null || deduction <= 0 || reasonStated) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF1F2), // Light red/pink background
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: PlayfulColors.secondary, width: 1.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.gavel,
+            size: 16,
+            color: PlayfulColors.secondary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              "This screenshot shows a ₹${deduction.toStringAsFixed(2)} deduction with no reason given. Karnataka's Platform-Based Gig Workers Act requires aggregators to disclose deduction reasons.",
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: PlayfulColors.foreground,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBreakdownView(Map<String, dynamic> job) {
+    final double? baseFare = job['base_fare'] != null ? (job['base_fare'] as num).toDouble() : null;
+    final double? incentive = job['incentive_amount'] != null ? (job['incentive_amount'] as num).toDouble() : null;
+    final double? surge = job['surge_amount'] != null ? (job['surge_amount'] as num).toDouble() : null;
+    final double? deduction = job['deduction_amount'] != null ? (job['deduction_amount'] as num).toDouble() : null;
+    final double fare = (job['fare'] as num?)?.toDouble() ?? 0.0;
+
+    if (baseFare == null && incentive == null && surge == null && deduction == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: PlayfulColors.border, width: 2.0),
+        boxShadow: const [
+          BoxShadow(
+            color: PlayfulColors.border,
+            offset: Offset(4, 4),
+            blurRadius: 0,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "TRIP BREAKDOWN",
+            style: GoogleFonts.plusJakartaSans(
+              fontWeight: FontWeight.w900,
+              fontSize: 12,
+              color: PlayfulColors.mutedForeground,
+              letterSpacing: 1.0,
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (baseFare != null)
+            _buildBreakdownRow("Base Fare", "₹${baseFare.toStringAsFixed(2)}"),
+          if (incentive != null && incentive > 0)
+            _buildBreakdownRow("Incentive / Bonus", "+ ₹${incentive.toStringAsFixed(2)}", isPositive: true),
+          if (surge != null && surge > 0)
+            _buildBreakdownRow("Surge / Peak Pay", "+ ₹${surge.toStringAsFixed(2)}", isPositive: true),
+          if (deduction != null && deduction > 0)
+            _buildBreakdownRow("Platform Commission / Deduction", "- ₹${deduction.toStringAsFixed(2)}", isNegative: true),
+          const Divider(color: PlayfulColors.border, thickness: 1.5, height: 24),
+          _buildBreakdownRow(
+            "Actual Earnings",
+            "₹${fare.toStringAsFixed(2)}",
+            isBold: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBreakdownRow(String label, String value, {bool isPositive = false, bool isNegative = false, bool isBold = false}) {
+    Color valColor = PlayfulColors.foreground;
+    if (isPositive) valColor = PlayfulColors.quaternary;
+    if (isNegative) valColor = PlayfulColors.secondary;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts.plusJakartaSans(
+                fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+                fontSize: 13,
+                color: PlayfulColors.foreground,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.shareTechMono(
+              fontWeight: FontWeight.bold,
+              fontSize: isBold ? 15 : 13,
+              color: valColor,
+            ),
+          ),
+        ],
       ),
     );
   }

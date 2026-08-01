@@ -243,7 +243,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   icon: Icons.savings_outlined,
                                   label: "Savings Goal",
                                   trailingText: _savingsGoal != null
-                                      ? "₹${(_savingsGoal!['targetAmount'] as num).toInt()} / ${_savingsGoal!['period']}"
+                                      ? "₹${formatIndianCurrency((_savingsGoal!['targetAmount'] as num).toDouble())} / ${_savingsGoal!['period']}"
                                       : "Not set",
                                   onTap: () => _showSavingsGoalBottomSheet(context),
                                 ),
@@ -494,21 +494,118 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
   String _period = "weekly";
   bool _isSaving = false;
 
+  double _bestHistoricalWeek = 0.0;
+  double _bestHistoricalMonth = 0.0;
+
   @override
   void initState() {
     super.initState();
     final amountVal = widget.initialGoal != null ? widget.initialGoal!['targetAmount'].toString() : "";
     _amountController = TextEditingController(text: amountVal);
+    _amountController.addListener(_onAmountChanged);
     _period = widget.initialGoal != null ? widget.initialGoal!['period'] ?? "weekly" : "weekly";
+    _loadHistoricalBest();
+  }
+
+  void _onAmountChanged() {
+    setState(() {});
   }
 
   @override
   void dispose() {
+    _amountController.removeListener(_onAmountChanged);
     _amountController.dispose();
     super.dispose();
   }
 
+  DateTime? _parseTimestamp(dynamic val) {
+    if (val == null) return null;
+    if (val is Timestamp) return val.toDate();
+    if (val is String) {
+      try {
+        return DateTime.parse(val);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _loadHistoricalBest() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('jobs')
+          .where('user_id', isEqualTo: user.uid)
+          .get();
+
+      final Map<int, double> weeklyFares = {};
+      final Map<String, double> monthlyFares = {};
+
+      for (var doc in querySnapshot.docs) {
+        final data = doc.data();
+        final timestampVal = data['job_timestamp'];
+        final jobDate = _parseTimestamp(timestampVal);
+        if (jobDate == null) continue;
+
+        final fare = (data['fare'] as num?)?.toDouble() ?? 0.0;
+
+        // Calendar week grouping
+        final weekId = jobDate.millisecondsSinceEpoch ~/ (7 * 24 * 3600 * 1000);
+        weeklyFares[weekId] = (weeklyFares[weekId] ?? 0.0) + fare;
+
+        // Calendar month grouping
+        final monthId = "${jobDate.year}-${jobDate.month}";
+        monthlyFares[monthId] = (monthlyFares[monthId] ?? 0.0) + fare;
+      }
+
+      double maxWeek = 0.0;
+      for (var val in weeklyFares.values) {
+        if (val > maxWeek) maxWeek = val;
+      }
+
+      double maxMonth = 0.0;
+      for (var val in monthlyFares.values) {
+        if (val > maxMonth) maxMonth = val;
+      }
+
+      if (mounted) {
+        setState(() {
+          _bestHistoricalWeek = maxWeek;
+          _bestHistoricalMonth = maxMonth;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error loading historical best: $e");
+    }
+  }
+
+  String? _getValidationError() {
+    final text = _amountController.text.trim();
+    if (text.isEmpty) return null;
+    final val = double.tryParse(text);
+    if (val == null || val <= 0) {
+      return "Please enter a valid amount greater than 0.";
+    }
+    return null;
+  }
+
+  bool _shouldShowWarning() {
+    final text = _amountController.text.trim();
+    if (text.isEmpty) return false;
+    final val = double.tryParse(text);
+    if (val == null || val <= 0) return false;
+
+    final bestHistory = _period == "weekly" ? _bestHistoricalWeek : _bestHistoricalMonth;
+    if (bestHistory <= 0) return false;
+
+    return val > (20 * bestHistory);
+  }
+
   Future<void> _setGoal() async {
+    if (_getValidationError() != null) return;
     final amountText = _amountController.text.trim();
     if (amountText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -679,6 +776,80 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
                 isDense: true,
               ),
             ),
+          ),
+          Builder(
+            builder: (context) {
+              final errorText = _getValidationError();
+              if (errorText != null) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text(
+                    errorText,
+                    style: GoogleFonts.plusJakartaSans(
+                      color: PlayfulColors.mutedForeground,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                );
+              }
+              
+              if (_shouldShowWarning()) {
+                final bestHistory = _period == "weekly" ? _bestHistoricalWeek : _bestHistoricalMonth;
+                final suggestedAmount = (bestHistory * 1.5).round();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 12.0),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: PlayfulColors.border, width: 2),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          "This target is a lot higher than anything you've earned before — want to set something more achievable instead?",
+                          style: GoogleFonts.plusJakartaSans(
+                            color: PlayfulColors.foreground,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _amountController.text = suggestedAmount.toString();
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: PlayfulColors.accent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: PlayfulColors.border, width: 1.5),
+                            ),
+                            child: Text(
+                              "Set to ₹${formatIndianCurrency(suggestedAmount.toDouble())}",
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.outfit(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 12,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              
+              return const SizedBox.shrink();
+            },
           ),
           const SizedBox(height: 24),
           Text(

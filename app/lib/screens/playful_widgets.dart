@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'dart:async';
 import 'package:permission_handler/permission_handler.dart';
 import '../i18n/strings.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:convert';
+import 'package:record/record.dart' as rec;
+import 'package:path_provider/path_provider.dart';
+import 'dart:io' as io;
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 // Playful Geometric Design System Colors
 class PlayfulColors {
@@ -18,6 +21,9 @@ class PlayfulColors {
   static const Color secondary = Color(0xFFF472B6); // Hot Pink (Playful pop)
   static const Color tertiary = Color(0xFFFBBF24); // Amber/Yellow
   static const Color quaternary = Color(0xFF34D399); // Emerald/Mint
+  static const Color blue = Color(0xFF60A5FA); // Sky Blue
+  static const Color orange = Color(0xFFFB923C); // Warm Orange
+  static const Color teal = Color(0xFF2DD4BF); // Vibrant Teal
   static const Color border = Color(0xFF1E293B); // Dark border
   static const Color cardBg = Colors.white;
 }
@@ -589,15 +595,15 @@ class PlayfulMicButton extends StatefulWidget {
 }
 
 class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerProviderStateMixin {
-  late final stt.SpeechToText _speech;
+  late final rec.AudioRecorder _audioRecorder;
   bool _isListening = false;
   bool _isProcessing = false;
-  bool _speechAvailable = false;
-  
+  String? _recordedFilePath;
+
   late final AnimationController _pulseController;
   late final Animation<double> _scaleAnimation;
   Timer? _timeoutTimer;
-  
+
   final List<String> _supportedLanguages = ['en', 'hi', 'kn', 'te', 'ta', 'ml'];
   late String _currentOverrideLang;
 
@@ -608,9 +614,8 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
     if (!_supportedLanguages.contains(_currentOverrideLang)) {
       _currentOverrideLang = 'en';
     }
-    
-    _speech = stt.SpeechToText();
-    _initSpeech();
+
+    _audioRecorder = rec.AudioRecorder();
 
     _pulseController = AnimationController(
       duration: const Duration(milliseconds: 1000),
@@ -625,56 +630,25 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
     );
   }
 
-  Future<void> _initSpeech() async {
-    try {
-      final available = await _speech.initialize(
-        onError: (val) {
-          debugPrint('Speech initialize error: $val');
-          if (mounted) {
-             _handleSttError();
-          }
-        },
-        onStatus: (val) {
-          debugPrint('Speech status: $val');
-          if (val == 'done' && _isListening) {
-             if (mounted) {
-               setState(() {
-                 _isListening = false;
-                 _isProcessing = true;
-               });
-             }
-          }
-        },
-      );
-      if (mounted) {
-        setState(() {
-          _speechAvailable = available;
-        });
-      }
-    } catch (e) {
-      debugPrint('Speech initialization failed: $e');
-    }
-  }
-
   void _handleSttError() {
-      _timeoutTimer?.cancel();
-      _pulseController.stop();
-      if (mounted) {
-          setState(() {
-             _isListening = false;
-             _isProcessing = false;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                StringsProvider.instance.t('stt_didnt_catch'),
-                style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
-              ),
-              backgroundColor: PlayfulColors.secondary,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-      }
+    _timeoutTimer?.cancel();
+    _pulseController.stop();
+    if (mounted) {
+      setState(() {
+        _isListening = false;
+        _isProcessing = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            StringsProvider.instance.t('stt_didnt_catch'),
+            style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: PlayfulColors.secondary,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<bool> _requestMicrophonePermission() async {
@@ -718,125 +692,122 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
   }
 
   Future<void> _toggleListening() async {
-    if (_isProcessing) return; // Prevent tapping while processing
+    if (_isProcessing) return;
 
     final hasPerm = await _requestMicrophonePermission();
     if (!hasPerm) return;
 
-    final resolvedLocale = getBCP47Locale(_currentOverrideLang);
-
-    if (!_speechAvailable) {
-      await _initSpeech();
-      if (!_speechAvailable) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              StringsProvider.instance.t('stt_not_available'),
-              style: GoogleFonts.plusJakartaSans(
-                color: PlayfulColors.foreground,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            backgroundColor: const Color(0xFFFFFDF5),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: PlayfulColors.border, width: 2),
-            ),
-          ),
-        );
-        return;
-      }
-    }
-
     if (_isListening) {
-      await _speech.stop();
-      _pulseController.stop();
       _timeoutTimer?.cancel();
+      _pulseController.stop();
       setState(() {
         _isListening = false;
-        _isProcessing = false;
+        _isProcessing = true;
       });
-    } else {
-      // Locale availability check
-      try {
-        final locales = await _speech.locales();
-        bool isLocaleAvailable = false;
-        for (var loc in locales) {
-          if (loc.localeId.toLowerCase().replaceAll('_', '-') == resolvedLocale.toLowerCase().replaceAll('_', '-')) {
-            isLocaleAvailable = true;
-            break;
-          }
-        }
 
-        if (!isLocaleAvailable) {
-          final langName = getLanguageName(_currentOverrideLang);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  StringsProvider.instance.t('stt_voice_input_unavailable').replaceAll('{}', langName),
-                  style: GoogleFonts.plusJakartaSans(
-                    color: PlayfulColors.foreground,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                backgroundColor: const Color(0xFFFFFDF5),
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: const BorderSide(color: PlayfulColors.border, width: 2),
-                ),
-              ),
-            );
-          }
-          return;
+      try {
+        final path = await _audioRecorder.stop();
+        if (path != null) {
+          _recordedFilePath = path;
+          await _uploadAndTranscribe();
+        } else {
+          _handleSttError();
         }
       } catch (e) {
-        debugPrint("Error checking voice locales: $e");
+        debugPrint("Error stopping recording: $e");
+        _handleSttError();
       }
-
-      setState(() {
-        _isListening = true;
-        _isProcessing = false;
-      });
-      if (!MediaQuery.of(context).disableAnimations) {
-        _pulseController.repeat(reverse: true);
-      }
-      
-      // Start timeout
-      _timeoutTimer = Timer(const Duration(seconds: 6), () {
-         if (_isListening && mounted) {
-            _speech.stop();
-            _handleSttError();
-         }
-      });
-
-      await _speech.listen(
-        localeId: resolvedLocale,
-        onResult: (result) {
-          _timeoutTimer?.cancel();
-          if (result.finalResult) {
-            _pulseController.stop();
-            if (mounted) {
-              setState(() {
-                _isListening = false;
-                _isProcessing = false;
-              });
-            }
-            widget.onSpeechResult(result.recognizedWords);
-          } else {
-             // Partial results reset timeout
-             _timeoutTimer?.cancel();
-             _timeoutTimer = Timer(const Duration(seconds: 4), () {
-                 if (_isListening && mounted) {
-                    _speech.stop();
-                    _handleSttError();
-                 }
-             });
+    } else {
+      try {
+        if (await _audioRecorder.hasPermission()) {
+          setState(() {
+            _isListening = true;
+            _isProcessing = false;
+          });
+          if (!MediaQuery.of(context).disableAnimations) {
+            _pulseController.repeat(reverse: true);
           }
-        },
-      );
+
+          _timeoutTimer = Timer(const Duration(seconds: 15), () {
+            if (_isListening && mounted) {
+              _toggleListening();
+            }
+          });
+
+          String recordPath = 'audio.m4a';
+          if (!kIsWeb) {
+            final tempDir = await getTemporaryDirectory();
+            recordPath = '${tempDir.path}/audio_${io.Platform.isAndroid ? DateTime.now().millisecondsSinceEpoch : DateTime.now().microsecondsSinceEpoch}.m4a';
+          }
+
+          await _audioRecorder.start(
+            const rec.RecordConfig(
+              encoder: rec.AudioEncoder.aacLc,
+              bitRate: 64000,
+              sampleRate: 16000,
+            ),
+            path: recordPath,
+          );
+        } else {
+          _showPermissionDialog();
+        }
+      } catch (e) {
+        debugPrint("Error starting recording: $e");
+        _handleSttError();
+      }
+    }
+  }
+
+  Future<void> _uploadAndTranscribe() async {
+    if (_recordedFilePath == null) {
+      _handleSttError();
+      return;
+    }
+
+    try {
+      final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+      final Uri url = Uri.parse('$baseUrl/stt');
+
+      final request = http.MultipartRequest('POST', url);
+
+      if (kIsWeb) {
+        final response = await http.get(Uri.parse(_recordedFilePath!));
+        final bytes = response.bodyBytes;
+        request.files.add(http.MultipartFile.fromBytes(
+          'audio',
+          bytes,
+          filename: 'audio.m4a',
+        ));
+      } else {
+        request.files.add(await http.MultipartFile.fromPath(
+          'audio',
+          _recordedFilePath!,
+        ));
+      }
+
+      request.fields['language'] = _currentOverrideLang;
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final transcript = data['transcript'] ?? '';
+
+        if (mounted) {
+          setState(() {
+            _isProcessing = false;
+          });
+        }
+
+        widget.onSpeechResult(transcript);
+      } else {
+        debugPrint("STT server error: ${response.statusCode} - ${response.body}");
+        _handleSttError();
+      }
+    } catch (e) {
+      debugPrint("STT request failed: $e");
+      _handleSttError();
     }
   }
 
@@ -852,9 +823,7 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
   void dispose() {
     _timeoutTimer?.cancel();
     _pulseController.dispose();
-    if (_isListening) {
-      _speech.cancel();
-    }
+    _audioRecorder.dispose();
     super.dispose();
   }
 
@@ -882,7 +851,7 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
             ),
           ],
         ),
-        child: _isProcessing 
+        child: _isProcessing
             ? const Padding(
                 padding: EdgeInsets.all(12.0),
                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
@@ -911,29 +880,39 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
           ),
           const SizedBox(width: 8),
         ],
-        
-        // Language Chip
+        if (_isProcessing && widget.textOnLeft) ...[
+          Text(
+            "Transcribing...",
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: PlayfulColors.accent,
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
+
         if (!_isListening && !_isProcessing) ...[
-           GestureDetector(
-             onTap: _cycleLanguage,
-             child: Container(
-               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-               decoration: BoxDecoration(
-                 color: PlayfulColors.secondary,
-                 borderRadius: BorderRadius.circular(4),
-                 border: Border.all(color: PlayfulColors.border, width: 1.5),
-               ),
-               child: Text(
-                 _currentOverrideLang.toUpperCase(),
-                 style: GoogleFonts.outfit(
-                   fontSize: 10,
-                   fontWeight: FontWeight.w900,
-                   color: Colors.white,
-                 ),
-               ),
-             ),
-           ),
-           const SizedBox(width: 6),
+          GestureDetector(
+            onTap: _cycleLanguage,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: PlayfulColors.secondary,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: PlayfulColors.border, width: 1.5),
+              ),
+              child: Text(
+                _currentOverrideLang.toUpperCase(),
+                style: GoogleFonts.outfit(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
         ],
 
         _isListening && !disableMotion
@@ -948,11 +927,22 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
                 child: buttonBody,
               )
             : buttonBody,
-            
+
         if (_isListening && !widget.textOnLeft) ...[
           const SizedBox(width: 8),
           Text(
             StringsProvider.instance.t('stt_listening').replaceAll('{}', activeLangName),
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: PlayfulColors.accent,
+            ),
+          ),
+        ],
+        if (_isProcessing && !widget.textOnLeft) ...[
+          const SizedBox(width: 8),
+          Text(
+            "Transcribing...",
             style: GoogleFonts.plusJakartaSans(
               fontSize: 12,
               fontWeight: FontWeight.bold,
@@ -1534,4 +1524,55 @@ class PlayfulUnitInput extends StatelessWidget {
       ),
     );
   }
+}
+
+String formatIndianCurrency(double val, {int decimals = 0}) {
+  final isNegative = val < 0;
+  final numVal = val.abs();
+  
+  final parts = numVal.toStringAsFixed(decimals).split('.');
+  final integerPart = parts[0];
+  final decimalPart = parts.length > 1 ? ".${parts[1]}" : "";
+  
+  if (integerPart.length <= 3) {
+    return "${isNegative ? "-" : ""}$integerPart$decimalPart";
+  }
+  
+  final lastThree = integerPart.substring(integerPart.length - 3);
+  final remaining = integerPart.substring(0, integerPart.length - 3);
+  
+  final buffer = StringBuffer();
+  int count = 0;
+  for (int i = remaining.length - 1; i >= 0; i--) {
+    buffer.write(remaining[i]);
+    count++;
+    if (count == 2 && i > 0) {
+      buffer.write(',');
+      count = 0;
+    }
+  }
+  
+  final groupedRemaining = buffer.toString().split('').reversed.join('');
+  return "${isNegative ? "-" : ""}$groupedRemaining,$lastThree$decimalPart";
+}
+
+Color getPlatformColor(String platform) {
+  final clean = platform.trim().toLowerCase();
+  if (clean.isEmpty) return PlayfulColors.mutedForeground;
+  
+  final List<Color> colors = [
+    PlayfulColors.accent,      // Violet
+    PlayfulColors.tertiary,    // Amber
+    PlayfulColors.blue,        // Blue
+    PlayfulColors.orange,      // Orange
+    PlayfulColors.teal,        // Teal
+  ];
+  
+  int hash = 0;
+  for (int i = 0; i < clean.length; i++) {
+    hash = clean.codeUnitAt(i) + ((hash << 5) - hash);
+  }
+  
+  final index = hash.abs() % colors.length;
+  return colors[index];
 }

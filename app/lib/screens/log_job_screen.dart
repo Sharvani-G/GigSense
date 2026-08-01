@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'playful_widgets.dart';
 import 'fairness_result_screen.dart';
+import 'batch_confirm_screen.dart';
 import '../i18n/strings.dart';
 
 class LogJobScreen extends StatefulWidget {
@@ -42,6 +43,15 @@ class _LogJobScreenState extends State<LogJobScreen> {
   String? _fareOcrNote;
   String? _distanceOcrNote;
   String? _durationOcrNote;
+  String? _rawOcrText;
+  bool _showRawOcr = false;
+
+  // Breakdown specific states
+  double? _baseFare;
+  double? _incentiveAmount;
+  double? _surgeAmount;
+  double? _deductionAmount;
+  bool? _deductionReasonStated;
 
   // Highlight pulse flags
   bool _fareHighlighted = false;
@@ -393,7 +403,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Text(
-                  StringsProvider.instance.t('logjob_upload_title') ?? "Upload Screenshot",
+                  StringsProvider.instance.t('logjob_upload_title'),
                   style: GoogleFonts.outfit(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -454,80 +464,123 @@ class _LogJobScreenState extends State<LogJobScreen> {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        final bool isBatch = data['is_batch'] ?? false;
         
-        if (data['relevant'] == false) {
-           ScaffoldMessenger.of(context).showSnackBar(
-             SnackBar(
-               content: Text(
-                 data['reason'] ?? "Screenshot is not a valid gig job.",
-                 style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
-               ),
-               backgroundColor: PlayfulColors.secondary,
-               behavior: SnackBarBehavior.floating,
-             ),
-           );
-           setState(() {
-             _activeToggle = "manual";
-             _isOcrLoading = false;
-           });
-           return;
+        if (isBatch) {
+          final List<dynamic> candidates = data['candidates'] ?? [];
+          if (candidates.isNotEmpty) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => BatchConfirmScreen(candidates: candidates),
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("No trips could be read from this batch screenshot.")),
+            );
+          }
+          return;
         }
 
-        final String? platform = data['platform'];
-        final double? fare = data['fare'] != null ? (data['fare'] as num).toDouble() : null;
-        final double? distance = data['distance'] != null ? (data['distance'] as num).toDouble() : null;
-        final String? distanceUnit = data['distance_unit'];
-        final double? duration = data['duration'] != null ? (data['duration'] as num).toDouble() : null;
-        final String? durationUnit = data['duration_unit'];
+        final String ocrStatus = data['status'] ?? 'partial';
+        final String rawText = data['raw_text'] ?? '';
 
         setState(() {
-          _jobSource = "ocr";
-          _activeToggle = "manual"; // Back to manual form prefilled
-          
-          if (platform != null) {
-            final matched = _allPlatforms.firstWhere(
-              (p) => p.id == platform.toLowerCase(),
-              orElse: () => PlatformItem(id: 'other', displayName: 'Other', category: 'other_gig', ratePerKm: 10.0, ratePerMin: 1.30, sampleSize: 0),
-            );
-            if (matched.id != 'other') {
-              _selectedPlatform = matched.id;
-              _platformFieldController.text = matched.displayName;
-              _platformHighlighted = true;
+          _rawOcrText = rawText;
+          _showRawOcr = false;
+
+          if (ocrStatus == 'irrelevant') {
+            _jobSource = "manual";
+            _activeToggle = "manual";
+            _ocrGeneralNote = "This doesn't look like a trip screenshot — try picking a different image, or switch to Manual Entry";
+            
+            _fareController.clear();
+            _distanceController.clear();
+            _durationController.clear();
+            _selectedPlatform = "other";
+            _platformFieldController.text = "Other";
+            
+            _fareOcrNote = null;
+            _distanceOcrNote = null;
+            _durationOcrNote = null;
+
+            _baseFare = null;
+            _incentiveAmount = null;
+            _surgeAmount = null;
+            _deductionAmount = null;
+            _deductionReasonStated = null;
+          } else {
+            _jobSource = "ocr";
+            _activeToggle = "manual";
+
+            if (ocrStatus == 'partial') {
+              _ocrGeneralNote = "Couldn't read the screenshot clearly — go ahead and fill this in.";
+            } else {
+              _ocrGeneralNote = null;
+            }
+
+            _baseFare = data['base_fare'] != null ? (data['base_fare'] as num).toDouble() : null;
+            _incentiveAmount = data['incentive_amount'] != null ? (data['incentive_amount'] as num).toDouble() : null;
+            _surgeAmount = data['surge_amount'] != null ? (data['surge_amount'] as num).toDouble() : null;
+            _deductionAmount = data['deduction_amount'] != null ? (data['deduction_amount'] as num).toDouble() : null;
+            _deductionReasonStated = data['deduction_reason_stated'] as bool?;
+
+            final String? platform = data['platform'];
+            final double? fare = data['fare'] != null ? (data['fare'] as num).toDouble() : null;
+            final double? distance = data['distance'] != null ? (data['distance'] as num).toDouble() : null;
+            final String? distanceUnit = data['distance_unit'];
+            final double? duration = data['duration'] != null ? (data['duration'] as num).toDouble() : null;
+            final String? durationUnit = data['duration_unit'];
+
+            if (platform != null) {
+              final matched = _allPlatforms.firstWhere(
+                (p) => p.id == platform.toLowerCase(),
+                orElse: () => PlatformItem(id: 'other', displayName: 'Other', category: 'other_gig', ratePerKm: 10.0, ratePerMin: 1.30, sampleSize: 0),
+              );
+              if (matched.id != 'other') {
+                _selectedPlatform = matched.id;
+                _platformFieldController.text = matched.displayName;
+                _platformHighlighted = true;
+              } else {
+                _selectedPlatform = "other";
+                _platformFieldController.text = "Other";
+              }
             } else {
               _selectedPlatform = "other";
               _platformFieldController.text = "Other";
             }
-          } else {
-            _selectedPlatform = "other";
-            _platformFieldController.text = "Other";
-          }
 
-          if (fare != null) {
-            _fareController.text = fare.toString();
-            _fareHighlighted = true;
-          } else {
-            _fareController.clear();
-            _fareOcrNote = StringsProvider.instance.t('ocr_no_fare');
-          }
+            if (fare != null) {
+              _fareController.text = fare.toString();
+              _fareHighlighted = true;
+              _fareOcrNote = null;
+            } else {
+              _fareController.clear();
+              _fareOcrNote = StringsProvider.instance.t('ocr_no_fare');
+            }
 
-          if (distance != null) {
-            _distanceController.text = distance.toString();
-            if (distanceUnit == 'm') _distanceUnit = 'm';
-            else _distanceUnit = 'km';
-            _distanceHighlighted = true;
-          } else {
-            _distanceController.clear();
-            _distanceOcrNote = StringsProvider.instance.t('ocr_no_distance');
-          }
+            if (distance != null) {
+              _distanceController.text = distance.toString();
+              if (distanceUnit == 'm') _distanceUnit = 'm';
+              else _distanceUnit = 'km';
+              _distanceHighlighted = true;
+              _distanceOcrNote = null;
+            } else {
+              _distanceController.clear();
+              _distanceOcrNote = StringsProvider.instance.t('ocr_no_distance');
+            }
 
-          if (duration != null) {
-            _durationController.text = duration.toString();
-            if (durationUnit == 'hr') _durationUnit = 'hr';
-            else _durationUnit = 'min';
-            _durationHighlighted = true;
-          } else {
-            _durationController.clear();
-            _durationOcrNote = StringsProvider.instance.t('ocr_no_duration');
+            if (duration != null) {
+              _durationController.text = duration.toString();
+              if (durationUnit == 'hr') _durationUnit = 'hr';
+              else _durationUnit = 'min';
+              _durationHighlighted = true;
+              _durationOcrNote = null;
+            } else {
+              _durationController.clear();
+              _durationOcrNote = StringsProvider.instance.t('ocr_no_duration');
+            }
           }
         });
 
@@ -543,7 +596,6 @@ class _LogJobScreenState extends State<LogJobScreen> {
           }
         });
       } else {
-        // 422 or other status codes -> Fail gracefully
         throw Exception("Backend failed with status code ${response.statusCode}");
       }
     } catch (e) {
@@ -552,6 +604,8 @@ class _LogJobScreenState extends State<LogJobScreen> {
         _activeToggle = "manual";
         _jobSource = "manual";
         _ocrGeneralNote = "Couldn't read the screenshot clearly — go ahead and fill this in.";
+        _rawOcrText = "Failed to communicate with OCR service.";
+        _showRawOcr = false;
         _fareController.clear();
         _distanceController.clear();
         _durationController.clear();
@@ -583,13 +637,13 @@ class _LogJobScreenState extends State<LogJobScreen> {
       bool? confirm = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text(StringsProvider.instance.t('logjob_long_trip_title') ?? "Long Trip?", style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-          content: Text(StringsProvider.instance.t('logjob_long_trip_desc') ?? "That's a very long trip — is this correct?", style: GoogleFonts.plusJakartaSans()),
+          title: Text(StringsProvider.instance.t('logjob_long_trip_title'), style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+          content: Text(StringsProvider.instance.t('logjob_long_trip_desc'), style: GoogleFonts.plusJakartaSans()),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: const BorderSide(color: PlayfulColors.border, width: 2)),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: Text(StringsProvider.instance.t('stt_cancel') ?? "Cancel", style: GoogleFonts.plusJakartaSans(color: PlayfulColors.mutedForeground)),
+              child: Text(StringsProvider.instance.t('stt_cancel'), style: GoogleFonts.plusJakartaSans(color: PlayfulColors.mutedForeground)),
             ),
             PlayfulSecondaryButton(
               onPressed: () => Navigator.pop(ctx, true),
@@ -711,6 +765,11 @@ class _LogJobScreenState extends State<LogJobScreen> {
       'area_hint': _areaHintController.text.trim(),
       'job_timestamp': FieldValue.serverTimestamp(),
       'created_at': FieldValue.serverTimestamp(),
+      'base_fare': _baseFare,
+      'incentive_amount': _incentiveAmount,
+      'surge_amount': _surgeAmount,
+      'deduction_amount': _deductionAmount,
+      'deduction_reason_stated': _deductionReasonStated,
     };
 
     final localJobData = {
@@ -728,12 +787,27 @@ class _LogJobScreenState extends State<LogJobScreen> {
       'area_hint': _areaHintController.text.trim(),
       'job_timestamp': DateTime.now().toIso8601String(),
       'created_at': DateTime.now().toIso8601String(),
+      'base_fare': _baseFare,
+      'incentive_amount': _incentiveAmount,
+      'surge_amount': _surgeAmount,
+      'deduction_amount': _deductionAmount,
+      'deduction_reason_stated': _deductionReasonStated,
     };
 
     try {
       final docRef = await FirebaseFirestore.instance.collection('jobs').add(jobData);
       localJobData['id'] = docRef.id;
       debugPrint("Successfully saved job to Firestore with ID: ${docRef.id}");
+
+      if (userId != 'anonymous_user') {
+        final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+        final Uri url = Uri.parse('$baseUrl/weekly-insight?user_id=$userId');
+        http.get(url).then((response) {
+          debugPrint("Background weekly-insight regeneration triggered: ${response.statusCode}");
+        }).catchError((err) {
+          debugPrint("Failed to trigger background weekly-insight: $err");
+        });
+      }
     } catch (e) {
       debugPrint("Firebase write failed: $e. Running in offline/mock fallback mode.");
       ScaffoldMessenger.of(context).showSnackBar(
@@ -878,20 +952,76 @@ class _LogJobScreenState extends State<LogJobScreen> {
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(color: PlayfulColors.border, width: 2),
                               ),
-                              child: Row(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.info_outline, color: PlayfulColors.foreground),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      _ocrGeneralNote!,
-                                      style: GoogleFonts.plusJakartaSans(
-                                        fontWeight: FontWeight.bold,
-                                        color: PlayfulColors.foreground,
-                                        fontSize: 13,
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.info_outline, color: PlayfulColors.foreground),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          _ocrGeneralNote!,
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontWeight: FontWeight.bold,
+                                            color: PlayfulColors.foreground,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (_rawOcrText != null && _rawOcrText!.trim().isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    const Divider(color: PlayfulColors.border, thickness: 1),
+                                    const SizedBox(height: 4),
+                                    InkWell(
+                                      onTap: () {
+                                        setState(() {
+                                          _showRawOcr = !_showRawOcr;
+                                        });
+                                      },
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            _showRawOcr ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                            size: 16,
+                                            color: PlayfulColors.accent,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            _showRawOcr ? "Hide what I read" : "Show what I read",
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: PlayfulColors.accent,
+                                              decoration: TextDecoration.underline,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  ),
+                                    if (_showRawOcr) ...[
+                                      const SizedBox(height: 8),
+                                      Container(
+                                        width: double.infinity,
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: PlayfulColors.border, width: 1),
+                                        ),
+                                        child: Text(
+                                          _rawOcrText!.trim(),
+                                          style: GoogleFonts.shareTechMono(
+                                            fontSize: 12,
+                                            color: PlayfulColors.foreground,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ],
                               ),
                             ),

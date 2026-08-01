@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
@@ -11,11 +12,13 @@ import '../i18n/strings.dart';
 import 'playful_widgets.dart';
 
 class ChatMessage {
+  final String id;
   final String text;
   final bool isUser;
   final bool isSystemError;
 
   ChatMessage({
+    required this.id,
     required this.text,
     required this.isUser,
     this.isSystemError = false,
@@ -38,6 +41,7 @@ class _ChatScreenState extends State<ChatScreen> {
   List<ChatMessage> _localMessages = [];
   bool _isLoading = false;
   bool _initializing = true;
+  StreamSubscription<String>? _streamSubscription;
 
   Future<void> _fetchMessagesForSession(String sessionId) async {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous_user';
@@ -54,6 +58,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final messages = snapshot.docs.map((doc) {
         final data = doc.data();
         return ChatMessage(
+          id: doc.id,
           text: data['content'] ?? '',
           isUser: data['role'] == 'user',
           isSystemError: data['is_system_error'] ?? false,
@@ -188,6 +193,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     MainNavigationController.activeSessionId.removeListener(() => _onDeepLinkSessionChanged());
+    _streamSubscription?.cancel();
     _flutterTts.stop();
     _inputController.dispose();
     _scrollController.dispose();
@@ -294,9 +300,13 @@ class _ChatScreenState extends State<ChatScreen> {
       debugPrint("Failed to save new session to Firestore: $e");
     }
 
+    _streamSubscription?.cancel();
+    _streamSubscription = null;
     if (mounted) {
       setState(() {
         _activeSessionId = sessionId;
+        _localMessages = [];
+        _isLoading = false;
       });
     }
     return sessionId;
@@ -341,6 +351,10 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _sendMessage(String text) async {
     if (text.trim().isEmpty) return;
 
+    // Cancel any previous active stream subscription before sending a new one
+    await _streamSubscription?.cancel();
+    _streamSubscription = null;
+
     if (_activeSessionId == null) {
       await _createNewSession(title: "New Chat");
     }
@@ -348,10 +362,13 @@ class _ChatScreenState extends State<ChatScreen> {
     final sessionId = _activeSessionId!;
     final String userId = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous_user';
 
+    final String userMsgId = 'user_${DateTime.now().millisecondsSinceEpoch}';
+    final String assistantMsgId = 'assistant_${DateTime.now().millisecondsSinceEpoch}';
+
     setState(() {
       _isLoading = true;
-      _localMessages.add(ChatMessage(text: text, isUser: true));
-      _localMessages.add(ChatMessage(text: "", isUser: false)); // Empty assistant message for streaming
+      _localMessages.add(ChatMessage(id: userMsgId, text: text, isUser: true));
+      _localMessages.add(ChatMessage(id: assistantMsgId, text: "", isUser: false)); // Empty assistant message for streaming
     });
     _inputController.clear();
     _scrollToBottom();
@@ -378,7 +395,7 @@ class _ChatScreenState extends State<ChatScreen> {
         throw Exception("Server returned status code ${response.statusCode}");
       }
       
-      response.stream.transform(utf8.decoder).transform(const LineSplitter()).listen(
+      _streamSubscription = response.stream.transform(utf8.decoder).transform(const LineSplitter()).listen(
         (line) {
           if (line.trim().isEmpty) return;
           try {
@@ -386,13 +403,28 @@ class _ChatScreenState extends State<ChatScreen> {
             if (data['error'] != null) {
               if (mounted) {
                 setState(() {
-                  _localMessages.last = ChatMessage(text: data['error'], isUser: false, isSystemError: true);
+                  final idx = _localMessages.indexWhere((m) => m.id == assistantMsgId);
+                  if (idx != -1) {
+                    _localMessages[idx] = ChatMessage(
+                      id: assistantMsgId,
+                      text: data['error'],
+                      isUser: false,
+                      isSystemError: true,
+                    );
+                  }
                 });
               }
             } else if (data['chunk'] != null) {
               if (mounted) {
                 setState(() {
-                  _localMessages.last = ChatMessage(text: _localMessages.last.text + data['chunk'], isUser: false);
+                  final idx = _localMessages.indexWhere((m) => m.id == assistantMsgId);
+                  if (idx != -1) {
+                    _localMessages[idx] = ChatMessage(
+                      id: assistantMsgId,
+                      text: _localMessages[idx].text + data['chunk'],
+                      isUser: false,
+                    );
+                  }
                 });
                 _scrollToBottom();
               }
@@ -400,24 +432,46 @@ class _ChatScreenState extends State<ChatScreen> {
           } catch (_) {}
         },
         onDone: () {
-          if (mounted) setState(() { _isLoading = false; });
-          client.close();
-        },
-        onError: (e) {
           if (mounted) {
             setState(() {
-              _localMessages.last = ChatMessage(text: "I'm having trouble responding right now — try again in a moment.", isUser: false, isSystemError: true);
               _isLoading = false;
             });
           }
           client.close();
+          _streamSubscription = null;
+        },
+        onError: (e) {
+          if (mounted) {
+            setState(() {
+              final idx = _localMessages.indexWhere((m) => m.id == assistantMsgId);
+              if (idx != -1) {
+                _localMessages[idx] = ChatMessage(
+                  id: assistantMsgId,
+                  text: "I'm having trouble responding right now — try again in a moment.",
+                  isUser: false,
+                  isSystemError: true,
+                );
+              }
+              _isLoading = false;
+            });
+          }
+          client.close();
+          _streamSubscription = null;
         }
       );
     } catch (e) {
       debugPrint("Chat query failed: $e");
       if (mounted) {
         setState(() {
-          _localMessages.last = ChatMessage(text: "I'm having trouble responding right now — try again in a moment.", isUser: false, isSystemError: true);
+          final idx = _localMessages.indexWhere((m) => m.id == assistantMsgId);
+          if (idx != -1) {
+            _localMessages[idx] = ChatMessage(
+              id: assistantMsgId,
+              text: "I'm having trouble responding right now — try again in a moment.",
+              isUser: false,
+              isSystemError: true,
+            );
+          }
           _isLoading = false;
         });
       }
@@ -509,14 +563,20 @@ class _ChatScreenState extends State<ChatScreen> {
                         final isSelected = sessionId == _activeSessionId;
 
                         return _SessionRow(
+                          key: ValueKey(sessionId),
                           sessionId: sessionId,
                           title: title,
                           updatedAt: updatedAt,
                           isSelected: isSelected,
                           onSelect: () {
+                            _streamSubscription?.cancel();
+                            _streamSubscription = null;
                             setState(() {
                               _activeSessionId = sessionId;
+                              _localMessages = [];
+                              _isLoading = false;
                             });
+                            _fetchMessagesForSession(sessionId);
                             Navigator.pop(context); // Close drawer
                           },
                           onRename: (newTitle) async {
@@ -652,17 +712,17 @@ class _ChatScreenState extends State<ChatScreen> {
                         return const _TypingIndicatorBubble();
                       }
 
-                      final messageId = "local_$index";
-                      final isSpeaking = _speakingMessageId == messageId;
+                      final isSpeaking = _speakingMessageId == message.id;
                       final String messageLocale = detectLanguageLocale(message.text, StringsProvider.instance.lang);
                       final bool isLangAvailable = _availableLanguages[messageLocale] ?? true;
 
                       return _MessageBubble(
+                        key: ValueKey(message.id),
                         message: message,
-                        messageId: messageId,
+                        messageId: message.id,
                         isSpeaking: isSpeaking,
                         onSpeakTap: _isTtsAvailable && !message.isUser && isLangAvailable
-                            ? () => _speakMessage(messageId, message.text)
+                            ? () => _speakMessage(message.id, message.text)
                             : null,
                       );
                     },
@@ -772,6 +832,7 @@ class _SessionRow extends StatefulWidget {
   final Function(String) onRename;
 
   const _SessionRow({
+    super.key,
     required this.sessionId,
     required this.title,
     required this.updatedAt,
@@ -911,6 +972,7 @@ class _MessageBubble extends StatefulWidget {
   final VoidCallback? onSpeakTap;
 
   const _MessageBubble({
+    super.key,
     required this.message,
     this.messageId,
     this.isSpeaking = false,

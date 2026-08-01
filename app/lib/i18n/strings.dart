@@ -75,6 +75,7 @@ class AppStrings {
       'view_all': 'View All',
 
       // Log Job
+      'logjob_upload_title': 'Upload screenshot',
       'logjob_subtitle': 'Log your trip to verify your pay instantly.',
       'logjob_platform': 'PLATFORM',
       'logjob_platform_hint': 'Select Platform',
@@ -189,8 +190,11 @@ class AppStrings {
       'stat_flagged': 'फ्लैग',
       'daily_earnings': 'दैनिक कमाई',
       'platform_breakdown': 'प्लेटफ़ॉर्म विवरण',
+      'home_summary': 'सारांश',
+      'view_all': 'सभी देखें',
 
       // Log Job
+      'logjob_upload_title': 'स्क्रीनशॉट अपलोड करें',
       'logjob_subtitle': 'अपनी सवारी दर्ज करें और तुरंत भुगतान जांचें।',
       'logjob_platform': 'प्लेटफ़ॉर्म',
       'logjob_platform_hint': 'प्लेटफ़ॉर्म चुनें',
@@ -304,8 +308,11 @@ class AppStrings {
       'stat_flagged': 'ಫ್ಲಾಗ್',
       'daily_earnings': 'ದೈನಂದಿನ ಆದಾಯ',
       'platform_breakdown': 'ಪ್ಲಾಟ್‌ಫಾರ್ಮ್ ವಿವರ',
+      'home_summary': 'ಸಾರಾಂಶ',
+      'view_all': 'ಎಲ್ಲವನ್ನೂ ವೀಕ್ಷಿಸಿ',
 
       // Log Job
+      'logjob_upload_title': 'ಸ್ಕ್ರೀನ್‌ಶಾಟ್ ಅಪ್‌ಲೋಡ್ ಮಾಡಿ',
       'logjob_subtitle': 'ನಿಮ್ಮ ಪ್ರಯಾಣ ದಾಖಲಿಸಿ ಮತ್ತು ತಕ್ಷಣ ಪಾವತಿ ಪರಿಶೀಲಿಸಿ.',
       'logjob_platform': 'ಪ್ಲಾಟ್‌ಫಾರ್ಮ್',
       'logjob_platform_hint': 'ಪ್ಲಾಟ್‌ಫಾರ್ಮ್ ಆಯ್ಕೆ ಮಾಡಿ',
@@ -418,8 +425,11 @@ class AppStrings {
       'stat_flagged': 'கொடியிடப்பட்டது',
       'daily_earnings': 'தினசரி வருவாய்',
       'platform_breakdown': 'தளத்தின் முறிவு',
+      'home_summary': 'சுருக்கம்',
+      'view_all': 'அனைத்தையும் பார்',
 
       // Log Job
+      'logjob_upload_title': 'ஸ்கிரீன்ஷாட்டை பதிவேற்றவும்',
       'logjob_subtitle': 'உங்கள் கட்டணத்தை உடனடியாகச் சரிபார்க்க உங்கள் பயணத்தைப் பதிவுசெய்யவும்.',
       'logjob_platform': 'தளம்',
       'logjob_platform_hint': 'தளத்தைத் தேர்ந்தெடுக்கவும்',
@@ -532,8 +542,11 @@ class AppStrings {
       'stat_flagged': 'ఫ్లాగ్ చేయబడింది',
       'daily_earnings': 'దినసరి ఆదాయం',
       'platform_breakdown': 'ప్లాట్‌ఫారమ్ వివరాలు',
+      'home_summary': 'సారాంశం',
+      'view_all': 'అన్నీ చూడండి',
 
       // Log Job
+      'logjob_upload_title': 'స్క్రీన్‌షాట్ అప్‌లోడ్ చేయండి',
       'logjob_subtitle': 'మీ పಾವతిని తక్షణమే ధృవీకరించడానికి మీ ప్రయాణాన్ని నమోదు చేయండి.',
       'logjob_platform': 'ప్లాట్‌ఫారమ్',
       'logjob_platform_hint': 'ప్లాట్‌ఫారమ్‌ను ఎంచుకోండి',
@@ -620,6 +633,7 @@ class AppStrings {
       'platform_breakdown': 'പ്ലാറ്റ്ഫോം വിശദാംശങ്ങൾ',
       'home_summary': 'ചുരുക്കം',
       'view_all': 'എല്ലാം കാണുക',
+      'logjob_upload_title': 'സ്ക്രീൻഷോട്ട് അപ്‌ലോഡ് ചെയ്യുക',
       'logjob_subtitle': 'നിങ്ങളുടെ പേയ്‌മെന്റ് തൽക്ഷണം പരിശോധിക്കാൻ നിങ്ങളുടെ യാത്ര ലോഗ് ചെയ്യുക.',
       'logjob_platform': 'പ്ലാറ്റ്ഫോം',
       'logjob_platform_hint': 'പ്ലാറ്റ്ഫോം തിരഞ്ഞെടുക്കുക',
@@ -707,8 +721,14 @@ class StringsProvider extends ChangeNotifier {
   /// Resolve a string key against the current locale.
   /// Falls back to English, then raw key — never crashes, never shows null.
   String t(String key) {
-    return AppStrings.all[_lang]?[key] ??
-        AppStrings.all['en']?[key] ??
-        key;
+    final val = AppStrings.all[_lang]?[key];
+    if (val != null && val.isNotEmpty) {
+      return val;
+    }
+    final enVal = AppStrings.all['en']?[key];
+    if (enVal != null && enVal.isNotEmpty) {
+      return enVal;
+    }
+    return "...";
   }
 }

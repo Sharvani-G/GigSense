@@ -121,3 +121,17 @@ Add your Gemini API Key in the backend `.env` file to enable the cloud LLM servi
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
 *(Firebase configuration files and keys are loaded via the assets and ignored from git to enforce security).*
+
+### Pre-Demo Checklist
+Before presenting a demo or performing a release run:
+1. **Verify Local LLM (Ollama)**:
+   Ensure Ollama is running and has downloaded the model:
+   ```bash
+   ollama run gemma3:4b
+   ```
+2. **Run Localization Key Audit**:
+   Verify key consistency and translations across all 6 supported languages:
+   ```bash
+   python scripts/audit_locales.py
+   ```
+   Ensure it prints: `Success: All languages have 100% key parity with English!`.

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, status
+from fastapi import FastAPI, UploadFile, File, Form, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from dotenv import load_dotenv
 
@@ -13,12 +13,23 @@ load_dotenv()
 import json
 import datetime
 from ocr import extract_job_data
+from stt import transcribe_audio
 from llm import ask_gemma, ask_gemma_stream, get_chat_system_prompt, get_weekly_insight_prompt, get_complaint_draft_prompt
 from schemas import JobScanResponse, ChatRequest, ChatResponse, ComplaintRequest, DraftRequest, FatigueRequest, SOSRequest, RouteSafetyRequest, RouteSafetyResponse
 from firebase_client import db
 from firebase_admin import firestore
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="GigShield API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 import asyncio
 
@@ -43,6 +54,53 @@ async def scan_job_screenshot(file: UploadFile = File(...)):
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={"error": "Could not process image"}
+        )
+
+@app.post("/stt")
+async def speech_to_text_endpoint(
+    audio: UploadFile = File(...),
+    language: str = Form(...)
+):
+    # 1. Input Validation
+    supported_langs = {'en', 'hi', 'kn', 'te', 'ta', 'ml'}
+    if not language or language.lower() not in supported_langs:
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content={"error": f"Unsupported or missing language: '{language}'"}
+        )
+        
+    if not audio or not audio.filename:
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            content={"error": "Audio file is missing or invalid"}
+        )
+
+    try:
+        import tempfile
+        suffix = os.path.splitext(audio.filename)[1] if audio.filename else ".m4a"
+        
+        content = await audio.read()
+        if not content:
+            return JSONResponse(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                content={"error": "Uploaded audio file is empty"}
+            )
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_audio:
+            temp_audio.write(content)
+            temp_audio_path = temp_audio.name
+
+        try:
+            transcript = transcribe_audio(temp_audio_path, language_code=language.lower())
+            return {"transcript": transcript}
+        finally:
+            if os.path.exists(temp_audio_path):
+                os.remove(temp_audio_path)
+    except Exception as e:
+        print(f"Error in speech_to_text: {e}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": f"Could not transcribe audio: {str(e)}"}
         )
 
 def get_recent_jobs(user_id: str) -> list:
@@ -145,6 +203,7 @@ async def chat_endpoint(request: ChatRequest):
     language_name = LANGUAGE_NAMES.get(lang_code, 'English')
 
     system_prompt = get_chat_system_prompt(
+        query=request.message,
         worker_type_desc=worker_type_desc,
         recent_jobs_json=recent_jobs_json,
         conversation_history_str=conversation_history_str,
@@ -209,6 +268,8 @@ def get_weekly_aggregates(user_id: str) -> dict:
         flagged_count = 0
         total_jobs = 0
         platforms = {}
+        undisclosed_deductions_count = 0
+        undisclosed_deductions_by_platform = {}
         
         for doc in docs:
             job = doc.to_dict()
@@ -236,10 +297,19 @@ def get_weekly_aggregates(user_id: str) -> dict:
             is_underpaid = job.get("is_underpaid") == True
             platform = job.get("platform") or "other"
             
+            # check for undisclosed deduction
+            deduction = job.get("deduction_amount")
+            deduction_amount = float(deduction) if deduction is not None else 0.0
+            reason_stated = job.get("deduction_reason_stated") == True
+            is_undisclosed = deduction_amount > 0.0 and not reason_stated
+            
             total_earnings += fare
             total_minutes += duration
             if is_underpaid:
                 flagged_count += 1
+            if is_undisclosed:
+                undisclosed_deductions_count += 1
+                undisclosed_deductions_by_platform[platform] = undisclosed_deductions_by_platform.get(platform, 0) + 1
                 
             platforms[platform] = platforms.get(platform, 0.0) + fare
             
@@ -248,7 +318,9 @@ def get_weekly_aggregates(user_id: str) -> dict:
             "total_hours": round(total_minutes / 60.0, 1),
             "flagged_count": flagged_count,
             "total_jobs": total_jobs,
-            "platforms": platforms
+            "platforms": platforms,
+            "undisclosed_deductions_count": undisclosed_deductions_count,
+            "undisclosed_deductions_by_platform": undisclosed_deductions_by_platform
         }
     except Exception as e:
         print(f"Error calculating weekly aggregates: {e}")
@@ -265,31 +337,44 @@ async def weekly_insight(user_id: str):
     aggregates = get_weekly_aggregates(user_id)
     
     if aggregates["total_jobs"] == 0:
-        return {
-            "insight_text": "Log a few jobs and I'll have your first weekly insight ready.",
-            "stats_used": None
-        }
-        
-    profile = get_user_profile(user_id)
-    lang_code = profile.get('preferredLanguage', 'en')
-    worker_type = profile.get('workerType', 'other_gig_worker')
-    worker_type_desc = WORKER_TYPE_DESCRIPTIONS.get(worker_type, 'gig worker')
-    language_name = LANGUAGE_NAMES.get(lang_code, 'English')
+        insight_text = "Log a few jobs and I'll have your first weekly insight ready."
+    else:
+        profile = get_user_profile(user_id)
+        lang_code = profile.get('preferredLanguage', 'en')
+        worker_type = profile.get('workerType', 'other_gig_worker')
+        worker_type_desc = WORKER_TYPE_DESCRIPTIONS.get(worker_type, 'gig worker')
+        language_name = LANGUAGE_NAMES.get(lang_code, 'English')
 
-    prompt = get_weekly_insight_prompt(
-        worker_type_desc=worker_type_desc,
-        aggregates_json=json.dumps(aggregates),
-        language_name=language_name
-    )
+        prompt = get_weekly_insight_prompt(
+            worker_type_desc=worker_type_desc,
+            aggregates_json=json.dumps(aggregates),
+            language_name=language_name
+        )
 
-    insight_text = ask_gemma(prompt)
-    
-    if insight_text == "OLLAMA_UNREACHABLE_ERROR":
-        insight_text = "I'm having trouble generating your weekly summary right now. Your logged stats below are safe and up to date."
+        insight_text = ask_gemma(prompt)
         
+        if insight_text == "OLLAMA_UNREACHABLE_ERROR":
+            insight_text = "I'm having trouble generating your weekly summary right now. Your logged stats below are safe and up to date."
+            
+    # Write to Firestore user cache document
+    if db is not None and user_id and user_id != 'anonymous_user':
+        try:
+            now = datetime.datetime.now(datetime.timezone.utc)
+            monday = now - datetime.timedelta(days=now.weekday())
+            monday_start = datetime.datetime(monday.year, monday.month, monday.day, 0, 0, 0, tzinfo=datetime.timezone.utc)
+            
+            db.collection("users").document(user_id).set({
+                "cachedInsightText": insight_text,
+                "cachedInsightWeekStart": monday_start,
+                "cachedInsightGeneratedAt": now
+            }, merge=True)
+            print(f"Successfully cached weekly insight for user {user_id}")
+        except Exception as e:
+            print(f"Error caching weekly insight to Firestore for user {user_id}: {e}")
+
     return {
         "insight_text": insight_text,
-        "stats_used": aggregates
+        "stats_used": aggregates if aggregates["total_jobs"] > 0 else None
     }
 
 @app.post("/jobs/draft-complaint")

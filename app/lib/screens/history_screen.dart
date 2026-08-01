@@ -123,39 +123,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Color _getPlatformColor(String platform) {
-    final clean = platform.trim().toLowerCase();
-    switch (clean) {
-      case 'uber':
-        return PlayfulColors.accent;
-      case 'rapido':
-        return PlayfulColors.secondary;
-      case 'ola':
-        return PlayfulColors.tertiary;
-      case 'indrive':
-        return PlayfulColors.quaternary;
-      case 'zomato':
-        return PlayfulColors.accent;
-      case 'swiggy':
-        return PlayfulColors.secondary;
-      case 'dunzo':
-        return PlayfulColors.tertiary;
-      case 'blinkit':
-        return PlayfulColors.quaternary;
-      case 'zepto':
-        return PlayfulColors.accent;
-      case 'bigbasket':
-        return PlayfulColors.secondary;
-      case 'amazon_flex':
-        return PlayfulColors.tertiary;
-      case 'urban_company':
-        return PlayfulColors.quaternary;
-      case 'porter':
-        return PlayfulColors.accent;
-      case 'housejoy':
-        return PlayfulColors.secondary;
-      default:
-        return PlayfulColors.mutedForeground;
-    }
+    return getPlatformColor(platform);
   }
 
   String _formatDateTime(DateTime dt) {
@@ -447,6 +415,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     final dateStr = parsedTime != null
                         ? _formatDateTime(parsedTime)
                         : '';
+                    final double? deduction = job['deduction_amount'] != null ? (job['deduction_amount'] as num).toDouble() : null;
+                    final bool reasonStated = job['deduction_reason_stated'] ?? false;
+                    final bool hasUndisclosedDeduction = deduction != null && deduction > 0 && !reasonStated;
                     final explanation = job['explanation'] ?? (isUnderpaid
                         ? "This came in noticeably below what's typical for this distance and platform."
                         : "This is about what's typical for a ${(job['distance_km'] as num?)?.toDouble()?.toStringAsFixed(1) ?? '0'}km $platformName trip.");
@@ -508,7 +479,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     ],
                                   ),
                                   Text(
-                                    "₹${fare.toStringAsFixed(2)}",
+                                    "₹${formatIndianCurrency(fare, decimals: 2)}",
                                     style: GoogleFonts.outfit(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w900,
@@ -557,6 +528,32 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                       ],
                                     ),
                                   ),
+                                  if (hasUndisclosedDeduction) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFF1F2),
+                                        borderRadius: BorderRadius.circular(9999),
+                                        border: Border.all(color: PlayfulColors.secondary, width: 1.5),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.gavel, size: 10, color: PlayfulColors.secondary),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            "Undisclosed Deduction",
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w800,
+                                              color: PlayfulColors.foreground,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                   if (pct != null) ...[
                                     const SizedBox(width: 8),
                                     Text(

@@ -8,11 +8,13 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/services.dart';
-import 'package:share_plus/share_plus.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'playful_widgets.dart';
 import 'history_screen.dart';
+import 'fairness_map_screen.dart';
 import '../i18n/strings.dart';
-import '../main.dart' show showLanguagePicker;
+import '../main.dart' show showLanguagePicker, MainNavigationController;
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback onNavigateToLogJob;
@@ -27,6 +29,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+  static const Map<String, String> _sosTemplates = {
+    'en': 'I feel unsafe right now and need help. This is an automatic alert from GigShield.',
+    'hi': 'मुझे अभी असुरक्षित महसूस हो रहा है और मदद की ज़रूरत है। यह गीगशील्ड (GigShield) से एक स्वचालित अलर्ट है।',
+    'kn': 'ನನಗೆ ಈಗ ಅಸುರಕ್ಷಿತ ಅನಿಸುತ್ತಿದೆ ಮತ್ತು ಸಹಾಯದ ಅಗತ್ಯವಿದೆ. ಇದು ಗೀಗ್‌ಶೀಲ್ಡ್ (GigShield) ನಿಂದ ಸ್ವಯಂಚಾಲಿತ ಎಚ್ಚರಿಕೆಯಾಗಿದೆ.',
+    'te': 'నేను ఇప్పుడు అసురక్షితంగా భావిస్తున్నాను మరియు సహాయం కావాలి. ఇది గీగ్‌షీల్డ్ (GigShield) నుండి ఒక ఆటోమేటిక్ అలర్ట్.',
+    'ta': 'நான் இப்போது பாதுகாப்பற்றதாக உணர்கிறேன், உதவி தேவை. இது கிக்ஷீல்ட் (GigShield) இன் தானியங்கி எச்சரிக்கை ஆகும்.',
+    'ml': 'എനിക്ക് ഇപ്പോൾ സുരക്ഷിതത്വമില്ലായ്മ തോന്നുന്നു, സഹായം ആവശ്യമുണ്ട്. ഇത് ഗിഗ്ഷീൽഡിൽ (GigShield) നിന്നുള്ള ഒരു ഓട്ടോമാറ്റിക് അലേർട്ട് ആണ്.',
+  };
+
   bool _isLoading = true;
   bool _hasError = false;
   List<Map<String, dynamic>> _jobs = [];
@@ -76,12 +87,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         curve: Curves.easeOutBack,
       ),
     );
+    MainNavigationController.currentTab.addListener(_onTabChanged);
     _fetchAndProcessJobs();
     
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       if (user.isAnonymous) {
         _userName = "THERE";
+        _insightText = "Log a few jobs and I'll have your first weekly insight ready.";
+        _isInsightLoading = false;
         _userFetched = true;
       } else {
         _userSubscription = FirebaseFirestore.instance
@@ -91,9 +105,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             .listen((doc) {
           if (doc.exists && mounted) {
             final data = doc.data()!;
+            final cachedText = data['cachedInsightText'] as String?;
             setState(() {
               _userName = (data['name'] as String?)?.toUpperCase() ?? "THERE";
               _savingsGoal = data['savingsGoal'] as Map<String, dynamic>?;
+              if (cachedText != null && cachedText != _insightText) {
+                _insightText = cachedText;
+                _isInsightLoading = false;
+                _insightAnimationController.forward(from: 0.0);
+              }
               _userFetched = true;
             });
             _calculateSavingsProgress();
@@ -103,8 +123,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
+  void _onTabChanged() {
+    if (MainNavigationController.currentTab.value == 0) {
+      _fetchAndProcessJobs();
+    }
+  }
+
   @override
   void dispose() {
+    MainNavigationController.currentTab.removeListener(_onTabChanged);
     _userSubscription?.cancel();
     _insightAnimationController.dispose();
     super.dispose();
@@ -225,7 +252,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       });
 
       _fetchUserProfile();
-      _fetchWeeklyInsight(userId);
       _checkFatigueNudge();
       _calculateSavingsProgress();
     } catch (e) {
@@ -246,19 +272,57 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         if (user.isAnonymous) {
           setState(() {
             _userName = "THERE";
+            _insightText = "Log a few jobs and I'll have your first weekly insight ready.";
+            _isInsightLoading = false;
             _userFetched = true;
           });
+          _insightAnimationController.forward(from: 0.0);
           return;
         }
         final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
         if (doc.exists && mounted) {
           final data = doc.data()!;
+          
+          final cachedText = data['cachedInsightText'] as String?;
+          final cachedWeekStart = data['cachedInsightWeekStart'] as Timestamp?;
+          
           setState(() {
             _userName = (data['name'] as String?)?.toUpperCase() ?? "THERE";
             _savingsGoal = data['savingsGoal'] as Map<String, dynamic>?;
+            
+            if (cachedText != null) {
+              _insightText = cachedText;
+              _isInsightLoading = false;
+              _insightAnimationController.forward(from: 0.0);
+            } else {
+              if (_jobs.isNotEmpty) {
+                _isInsightLoading = true;
+                _fetchWeeklyInsight(user.uid);
+              } else {
+                _insightText = "Log a few jobs and I'll have your first weekly insight ready.";
+                _isInsightLoading = false;
+                _insightAnimationController.forward(from: 0.0);
+              }
+            }
+            
             _userFetched = true;
           });
           _calculateSavingsProgress();
+          
+          if (cachedWeekStart != null) {
+            final weekStartDateTime = cachedWeekStart.toDate();
+            final now = DateTime.now();
+            final currentWeekStart = now.subtract(Duration(days: now.weekday - 1));
+            final currentWeekStartNormalized = DateTime(currentWeekStart.year, currentWeekStart.month, currentWeekStart.day);
+            final cachedWeekStartNormalized = DateTime(weekStartDateTime.year, weekStartDateTime.month, weekStartDateTime.day);
+            
+            if (currentWeekStartNormalized.isAfter(cachedWeekStartNormalized)) {
+              setState(() {
+                _isInsightLoading = true;
+              });
+              _fetchWeeklyInsight(user.uid);
+            }
+          }
         }
       }
     } catch (e) {
@@ -730,6 +794,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 24),
+                      _buildFairnessMapCard(context),
                       const SizedBox(height: 32),
 
                       // Loader, Empty or Render View
@@ -754,13 +820,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           FloatingActionButton.extended(
             heroTag: 'sosBtn',
             onPressed: _triggerSOS,
-            backgroundColor: const Color(0xFFEF4444),
+            backgroundColor: const Color(0xFFE11D48),
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
               side: const BorderSide(color: PlayfulColors.border, width: 2),
             ),
-            icon: const Icon(Icons.sos, size: 24),
+            icon: const Icon(Icons.shield_outlined, size: 24),
             label: Text(
               "I feel unsafe",
               style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
@@ -889,7 +955,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             Expanded(
               child: _buildStatCard(
                 label: StringsProvider.instance.t('stat_earnings'),
-                value: "₹${_totalEarnings.toStringAsFixed(0)}",
+                value: "₹${formatIndianCurrency(_totalEarnings)}",
                 icon: Icons.currency_rupee,
                 iconColor: PlayfulColors.accent,
                 shadowColor: const Color(0xFFE2E8F0),
@@ -964,7 +1030,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                     if (_savingsEarned >= _savingsTarget)
                       Text(
-                        "₹${_savingsEarned.toStringAsFixed(0)} of ₹${_savingsTarget.toStringAsFixed(0)} — Ahead! 🎉",
+                        "₹${formatIndianCurrency(_savingsEarned)} of ₹${formatIndianCurrency(_savingsTarget)} — Ahead! 🎉",
                         style: GoogleFonts.outfit(
                           fontSize: 13,
                           fontWeight: FontWeight.w900,
@@ -1008,7 +1074,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      "₹${_savingsEarned.toStringAsFixed(0)} of ₹${_savingsTarget.toStringAsFixed(0)} this ${_savingsGoal!['period']}",
+                      "₹${formatIndianCurrency(_savingsEarned)} of ₹${formatIndianCurrency(_savingsTarget)} this ${_savingsGoal!['period']}",
                       style: GoogleFonts.plusJakartaSans(
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
@@ -1033,18 +1099,25 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     () {
                       final periodLength = _savingsGoal!['period'] == 'weekly' ? 7 : 30;
                       final daysElapsed = periodLength - _savingsDaysRemaining;
-                      final dailyAvg = _savingsEarned / (daysElapsed > 0 ? daysElapsed : 1);
-                      final projection = dailyAvg * _savingsDaysRemaining + _savingsEarned;
+                      if (daysElapsed <= 0) {
+                        return "Pacing details will appear after the first day of the goal period.";
+                      }
+                      final dailyAvg = _savingsEarned / daysElapsed;
+                      double projection = dailyAvg * periodLength;
+                      if (projection.isInfinite || projection.isNaN || projection > 1e12) {
+                        projection = _savingsTarget;
+                      }
                       
                       final String statusMsg;
                       if (projection >= _savingsTarget) {
                         statusMsg = "you are on track to reach your goal!";
                       } else {
                         final deficit = _savingsTarget - projection;
-                        statusMsg = "running about ₹${deficit.toStringAsFixed(0)} under pace.";
+                        final displayDeficit = (deficit.isInfinite || deficit.isNaN || deficit > 1e12 || deficit < 0) ? 0.0 : deficit;
+                        statusMsg = "running about ₹${formatIndianCurrency(displayDeficit)} under pace.";
                       }
                       
-                      return "Pacing: At your current rate, you are projected to reach ₹${projection.toStringAsFixed(0)} — $statusMsg";
+                      return "Pacing: At your current rate, you are projected to reach ₹${formatIndianCurrency(projection)} — $statusMsg";
                     }(),
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 12,
@@ -1158,44 +1231,125 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         ),
         const SizedBox(height: 16),
-        Wrap(
-          spacing: 8.0,
-          runSpacing: 8.0,
-          children: List.generate(_platformsBreakdown.length, (index) {
-            final pb = _platformsBreakdown[index];
-            final Color bg = _getPlatformColor(index);
-            final Color textCol = _getPlatformTextColor(bg);
-            final String nameCapitalized = pb.name.isNotEmpty
-                ? pb.name[0].toUpperCase() + pb.name.substring(1)
-                : '';
+        Builder(
+          builder: (context) {
+            final assignedColors = _assignPlatformColors();
+            return Wrap(
+              spacing: 8.0,
+              runSpacing: 8.0,
+              children: List.generate(_platformsBreakdown.length, (index) {
+                final pb = _platformsBreakdown[index];
+                final Color bg = assignedColors[pb.name.toLowerCase().trim()] ?? PlayfulColors.accent;
+                final Color textCol = _getPlatformTextColor(bg);
+                final String nameCapitalized = pb.name.isNotEmpty
+                    ? pb.name[0].toUpperCase() + pb.name.substring(1)
+                    : '';
 
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: bg,
-                borderRadius: BorderRadius.circular(9999),
-                border: Border.all(color: PlayfulColors.border, width: 2.0),
-                boxShadow: const [
-                  BoxShadow(
-                    color: PlayfulColors.border,
-                    offset: Offset(2, 2),
-                    blurRadius: 0,
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: bg,
+                    borderRadius: BorderRadius.circular(9999),
+                    border: Border.all(color: PlayfulColors.border, width: 2.0),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: PlayfulColors.border,
+                        offset: Offset(2, 2),
+                        blurRadius: 0,
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    "$nameCapitalized · ₹${formatIndianCurrency(pb.total)} · ${pb.count} jobs (Trust: ${pb.trustScore}%)",
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: textCol,
+                    ),
+                  ),
+                );
+              }),
+            );
+          },
+        ),
+        const SizedBox(height: 180),
+      ],
+    );
+  }
+
+  Widget _buildFairnessMapCard(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const FairnessMapScreen()),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE0F2FE), // Light blue background
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: PlayfulColors.border, width: 2.0),
+          boxShadow: const [
+            BoxShadow(
+              color: PlayfulColors.border,
+              offset: Offset(4, 4),
+              blurRadius: 0,
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.map_outlined, color: PlayfulColors.accent, size: 24),
+                      const SizedBox(width: 8),
+                      Text(
+                        "FAIRNESS MAP",
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: PlayfulColors.foreground,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "View live pay fairness trends and underpayment zones across Bengaluru.",
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: PlayfulColors.mutedForeground,
+                      height: 1.3,
+                    ),
                   ),
                 ],
               ),
-              child: Text(
-                "$nameCapitalized · ₹${pb.total.toStringAsFixed(0)} · ${pb.count} jobs (Trust: ${pb.trustScore}%)",
-                style: GoogleFonts.outfit(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: textCol,
-                ),
+            ),
+            const SizedBox(width: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: PlayfulColors.border, width: 2),
               ),
-            );
-          }),
+              child: const Icon(
+                Icons.arrow_forward,
+                color: PlayfulColors.accent,
+                size: 20,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 48),
-      ],
+      ),
     );
   }
 
@@ -1286,18 +1440,45 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     return maxVal;
   }
 
-  Color _getPlatformColor(int index) {
+  Map<String, Color> _assignPlatformColors() {
     final List<Color> colors = [
       PlayfulColors.accent,      // Violet
-      PlayfulColors.secondary,   // Pink
       PlayfulColors.tertiary,    // Amber
-      PlayfulColors.quaternary,  // Mint
+      PlayfulColors.blue,        // Blue
+      PlayfulColors.orange,      // Orange
+      PlayfulColors.teal,        // Teal
     ];
-    return colors[index % colors.length];
+
+    final Map<String, Color> assigned = {};
+    final Set<int> usedIndices = {};
+
+    for (var pb in _platformsBreakdown) {
+      final name = pb.name.toLowerCase().trim();
+      
+      // Hash name to get initial index
+      int hash = 0;
+      for (int i = 0; i < name.length; i++) {
+        hash = name.codeUnitAt(i) + ((hash << 5) - hash);
+      }
+      
+      int index = hash.abs() % colors.length;
+      
+      // Collision resolution: shift to next available index
+      int attempts = 0;
+      while (usedIndices.contains(index) && attempts < colors.length) {
+        index = (index + 1) % colors.length;
+        attempts++;
+      }
+      
+      usedIndices.add(index);
+      assigned[name] = colors[index];
+    }
+    
+    return assigned;
   }
 
   Color _getPlatformTextColor(Color bg) {
-    if (bg == PlayfulColors.tertiary) {
+    if (bg == PlayfulColors.tertiary || bg == PlayfulColors.blue || bg == PlayfulColors.teal) {
       return PlayfulColors.foreground;
     }
     return Colors.white;
@@ -1314,7 +1495,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (doc.exists) {
         final contacts = doc.data()?['emergencyContacts'] as List<dynamic>?;
         if (contacts != null && contacts.isNotEmpty) {
-          trustedContact = contacts.first as Map<String, dynamic>?;
+          trustedContact = Map<String, dynamic>.from(contacts.first);
         }
       }
     } catch (e) {
@@ -1324,186 +1505,118 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (!mounted) return;
 
     if (trustedContact == null || trustedContact['phone'] == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Please set an Emergency Contact in Settings first."),
-          backgroundColor: Color(0xFFEF4444),
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: PlayfulColors.border, width: 2),
+          ),
+          backgroundColor: Colors.white,
+          title: Text(
+            "Emergency Setup",
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: PlayfulColors.foreground),
+          ),
+          content: Text(
+            "You haven't set up any emergency contacts in Settings. One-tap SMS works best when a contact is configured.",
+            style: GoogleFonts.plusJakartaSans(color: PlayfulColors.foreground),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _sendSOSWithContact(null);
+              },
+              child: Text(
+                "SEND ANYWAY",
+                style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: const Color(0xFFE11D48)),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                MainNavigationController.selectTab(3); // settings tab
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: PlayfulColors.accent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: const BorderSide(color: PlayfulColors.border, width: 1.5),
+                ),
+              ),
+              child: Text(
+                "SET UP NOW",
+                style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ],
         ),
       );
       return;
     }
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Center(
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: PlayfulColors.border, width: 2),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(color: Color(0xFFEF4444)),
-              const SizedBox(height: 16),
-              Text(
-                "Drafting alert...",
-                style: GoogleFonts.plusJakartaSans(
-                  fontWeight: FontWeight.bold,
-                  color: PlayfulColors.foreground,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    try {
-      final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
-      final Uri url = Uri.parse('$baseUrl/sos-message');
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'user_id': user.uid}),
-      ).timeout(const Duration(seconds: 4));
-      
-      if (!mounted) return;
-      Navigator.pop(context); // close loader
-      
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final message = data['draft_message'] ?? data['message'] ?? "I am feeling unsafe during my current gig work trip. Please check in on me or be ready to help.";
-        _showSOBSheet(trustedContact, message);
-      } else {
-        final defaultMsg = "I am feeling unsafe during my current gig work trip. Please check in on me or be ready to help.";
-        _showSOBSheet(trustedContact, defaultMsg);
-      }
-    } catch (e) {
-      debugPrint("Error triggering SOS: $e");
-      if (mounted) {
-        Navigator.pop(context); // close loader
-        final defaultMsg = "I am feeling unsafe during my current gig work trip. Please check in on me or be ready to help.";
-        _showSOBSheet(trustedContact, defaultMsg);
-      }
-    }
+    await _sendSOSWithContact(trustedContact);
   }
 
-  void _showSOBSheet(Map<String, dynamic> contact, String message) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(24),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444)),
-                      const SizedBox(width: 8),
-                      Text(
-                        "Safety Alert",
-                        style: GoogleFonts.outfit(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          color: PlayfulColors.foreground,
-                        ),
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                "Send this message to ${contact['name'] ?? 'your contact'} (${contact['phone']}):",
-                style: GoogleFonts.plusJakartaSans(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  color: PlayfulColors.mutedForeground,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: PlayfulColors.muted,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: PlayfulColors.border),
-                ),
-                child: Text(
-                  message,
-                  style: GoogleFonts.plusJakartaSans(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                    color: PlayfulColors.foreground,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: PlayfulButton(
-                      backgroundColor: Colors.white,
-                      onPressed: () async {
-                        await Clipboard.setData(ClipboardData(text: message));
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Copied to clipboard')),
-                          );
-                        }
-                      },
-                      child: Text(
-                        "COPY",
-                        style: GoogleFonts.outfit(
-                          color: PlayfulColors.foreground,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: PlayfulButton(
-                      backgroundColor: const Color(0xFFEF4444),
-                      onPressed: () async {
-                        await Share.share(message);
-                      },
-                      child: Text(
-                        "SHARE",
-                        style: GoogleFonts.outfit(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        );
-      },
-    );
+  Future<void> _sendSOSWithContact(Map<String, dynamic>? contact) async {
+    // 1. Fetch location (timeout 3s)
+    String locationLink = "";
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      
+      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (serviceEnabled) {
+          final Position position = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+            ),
+          ).timeout(const Duration(seconds: 3));
+          locationLink = "\nLocation: https://maps.google.com/?q=${position.latitude},${position.longitude}";
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching location: $e");
+    }
+
+    // 2. Build message
+    final String lang = StringsProvider.instance.lang.toLowerCase();
+    final String template = _sosTemplates[lang] ?? _sosTemplates['en']!;
+    final String fullMessage = "$template$locationLink";
+
+    // 3. Launch SMS pre-filled
+    final String phone = contact != null && contact['phone'] != null
+        ? contact['phone'].toString().replaceAll(RegExp(r'\s+'), '')
+        : '';
+        
+    final String smsUri = "sms:$phone?body=${Uri.encodeComponent(fullMessage)}";
+    final Uri uri = Uri.parse(smsUri);
+
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        // Fallback for launch issues
+        final String fallbackSmsUri = "sms:?body=${Uri.encodeComponent(fullMessage)}";
+        final Uri fallbackUri = Uri.parse(fallbackSmsUri);
+        if (await canLaunchUrl(fallbackUri)) {
+          await launchUrl(fallbackUri);
+        } else {
+          // If all launch options fail, fallback to clipboard and prompt
+          await Clipboard.setData(ClipboardData(text: fullMessage));
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("SMS composer not available. Alert copied to clipboard.")),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error launching SMS: $e");
+    }
   }
 }
 
@@ -1653,196 +1766,4 @@ class _PlayfulSkeletonState extends State<PlayfulSkeleton> with SingleTickerProv
       },
     );
   }
-}
-
-
-  Future<void> _showSOSBottomSheet(BuildContext context) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || user.isAnonymous) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please sign in to use SOS features.")),
-      );
-      return;
-    }
-
-    // Fetch contacts
-    final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-    final data = doc.data();
-    final contacts = List<Map<String, dynamic>>.from((data?['emergencyContacts'] as List?)?.map((e) => Map<String,dynamic>.from(e)) ?? []);
-
-    if (contacts.isEmpty) {
-      showModalBottomSheet(
-        context: context,
-        backgroundColor: Colors.transparent,
-        builder: (ctx) => Container(
-          padding: const EdgeInsets.all(24),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.warning_amber_rounded, size: 48, color: PlayfulColors.secondary),
-              const SizedBox(height: 16),
-              Text(
-                "No Emergency Contacts Set",
-                style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 20),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                "You need to add at least one emergency contact in Settings before you can use the SOS feature.",
-                textAlign: TextAlign.center,
-                style: GoogleFonts.plusJakartaSans(color: PlayfulColors.mutedForeground),
-              ),
-              const SizedBox(height: 24),
-              PlayfulButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text("OK, I'LL ADD THEM LATER"),
-              ),
-            ],
-          ),
-        ),
-      );
-      return;
-    }
-
-    // Show SOS prepare sheet
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setStateSheet) {
-            bool isLoading = false;
-            String? draftMessage;
-
-            return Container(
-              padding: const EdgeInsets.all(24),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                border: Border(top: BorderSide(color: PlayfulColors.border, width: 2)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    "SOS / I Feel Unsafe",
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 22, color: const Color(0xFFEF4444)),
-                  ),
-                  const SizedBox(height: 16),
-                  if (draftMessage == null) ...[
-                    Text(
-                      "Feeling unsafe? We'll prepare an alert message for your ${contacts.length} emergency contacts.",
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.plusJakartaSans(color: PlayfulColors.foreground, fontSize: 16),
-                    ),
-                    const SizedBox(height: 24),
-                    PlayfulButton(
-                      backgroundColor: const Color(0xFFEF4444),
-                      onPressed: isLoading
-                          ? null
-                          : () async {
-                              setStateSheet(() => isLoading = true);
-                              try {
-                                final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
-                                final Uri url = Uri.parse('$baseUrl/sos-message');
-                                final response = await http.post(
-                                  url,
-                                  headers: {'Content-Type': 'application/json'},
-                                  body: json.encode({'user_id': user.uid}),
-                                );
-                                if (response.statusCode == 200) {
-                                  setStateSheet(() {
-                                    draftMessage = json.decode(response.body)['draft_message'];
-                                  });
-                                } else {
-                                  setStateSheet(() {
-                                    draftMessage = "I am feeling unsafe during my current gig work trip. Please check in on me or be ready to help.";
-                                  });
-                                }
-                              } catch (e) {
-                                setStateSheet(() {
-                                  draftMessage = "I am feeling unsafe during my current gig work trip. Please check in on me or be ready to help.";
-                                });
-                              } finally {
-                                setStateSheet(() => isLoading = false);
-                              }
-                            },
-                      child: isLoading
-                          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white))
-                          : Text(
-                              "PREPARE MESSAGE",
-                              style: GoogleFonts.outfit(fontWeight: FontWeight.w900, color: Colors.white),
-                            ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: Text(
-                        "CANCEL",
-                        style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: PlayfulColors.mutedForeground),
-                      ),
-                    ),
-                  ] else ...[
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: PlayfulColors.tertiary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: PlayfulColors.tertiary, width: 1.5),
-                      ),
-                      child: Text(
-                        draftMessage!,
-                        style: GoogleFonts.plusJakartaSans(fontSize: 16, height: 1.4),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    PlayfulButton(
-                      backgroundColor: PlayfulColors.accent,
-                      onPressed: () async {
-                        await Clipboard.setData(ClipboardData(text: draftMessage!));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Copied to clipboard!")),
-                        );
-                      },
-                      child: Text(
-                        "COPY MESSAGE",
-                        style: GoogleFonts.outfit(fontWeight: FontWeight.w900, color: PlayfulColors.foreground),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    PlayfulButton(
-                      backgroundColor: PlayfulColors.accent,
-                      onPressed: () {
-                        Share.share(draftMessage!);
-                      },
-                      child: Text(
-                        "SHARE ALERT",
-                        style: GoogleFonts.outfit(fontWeight: FontWeight.w900, color: Colors.white),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: Text(
-                        "DONE",
-                        style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: PlayfulColors.mutedForeground),
-                      ),
-                    ),
-                  ]
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  
-
-  
 }

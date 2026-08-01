@@ -38,49 +38,22 @@ def ask_gemma_stream(prompt: str, system_prompt: str = ""):
         print(f"Ollama connection or processing error: {e}")
         yield "OLLAMA_UNREACHABLE_ERROR"
 
-def get_chat_system_prompt(worker_type_desc: str, recent_jobs_json: str, conversation_history_str: str, language_name: str) -> str:
+def get_chat_system_prompt(query: str, worker_type_desc: str, recent_jobs_json: str, conversation_history_str: str, language_name: str) -> str:
+    from retriever import retrieve_top_k
+    relevant_chunks = retrieve_top_k(query)
+    
+    if relevant_chunks:
+        grounding_section = "\nReference facts you may cite when relevant to a worker's question. Do not invent additional legal specifics beyond what is given here — if asked about a detail not covered below, say plainly that you don't have verified information on that specific point rather than guessing:\n\n" + "\n\n".join(f"- {chunk}" for chunk in relevant_chunks)
+    else:
+        grounding_section = "\nNo specific verified reference facts found for this query. Say plainly that you don't have verified information on that specific point rather than guessing."
+
     return f"""You are GigChat, an assistant for Indian gig workers. Do NOT introduce yourself or restate what you are at the start of every response. Answer the question directly. Only mention your scope if the user's question is genuinely unrelated to gig work pay, safety, or rights, or if they explicitly ask what you are.
 
 ---
 # TODO: Keep this block updated when Karnataka's Welfare Board becomes fully operational 
 # with a public grievance portal/hotline number. Swap in the real number if one becomes 
 # publicly available before the demo.
-Reference facts you may cite when relevant to a worker's question. Do not
-invent additional legal specifics beyond what is given here — if asked about
-a detail not covered below, say plainly that you don't have verified
-information on that specific point rather than guessing:
-
-- Code on Social Security, 2020 (central law): in force since 21 November
-  2025. First time gig workers and platform workers are legally defined and
-  recognized in Indian law. Aggregators (e.g. Uber, Swiggy, Zomato) must
-  contribute 1-2% of annual turnover (capped at 5% of amounts paid to gig
-  workers) into a Social Security Fund. Covers life/disability cover,
-  accident insurance, health and maternity benefits, old-age protection.
-  Full scheme rollout is still being implemented as of this year — say
-  "schemes are being rolled out," not that all benefits are already fully
-  active and claimable today.
-
-- Karnataka Platform Based Gig Workers (Social Security and Welfare) Act,
-  2025: in force since 30 May 2025, rules notified 19 November 2025. Workers
-  get a unique registration ID, portable across platforms. Workers have the
-  right to refuse a task without penalty. Aggregators must give 14 days'
-  notice before changing contract terms. Payment deduction reasons must be
-  disclosed to the worker. Contracts and grievance processes must use simple,
-  local language. At least one human grievance contact point is required
-  (not fully automated). IMPORTANT: this Act does NOT mandate a minimum
-  guaranteed wage or a minimum per-km/per-trip rate, and does NOT guarantee
-  compensation for waiting time — never claim it does.
-
-- National Consumer Helpline: 1915 or 1800-11-4000, also via WhatsApp
-  (8800001915), the NCH web portal, or the NCH app. Operates in 17 languages.
-  Staffed 8 AM-8 PM daily including holidays (web/WhatsApp accept complaints
-  24/7, processed during those hours). This is a CONSUMER helpline for
-  disputes with a platform's service/goods — appropriate for consumer-side
-  complaints. For a wage or labor-specific grievance specifically (e.g.
-  underpayment, unfair deactivation), direct the worker toward their state's
-  Labour Department or, in Karnataka specifically, the Karnataka Platform
-  Based Gig Workers Welfare Board (headquartered in Bengaluru) instead of
-  1915 — do not conflate consumer complaints with labor/wage grievances.
+{grounding_section}
 ---
 
 CONTEXT:
@@ -113,9 +86,10 @@ Write a short, warm, honest weekly summary.
 RESPONSE STRUCTURE RULES:
 - Write exactly 2-3 sentences.
 - Lead with the most important finding or aggregate calculation FIRST (never bury the lead).
-- Use **bold** only around the single most important fact/number/action (e.g. the total underpaid amount, or the count of flagged trips) — do not bold multiple phrases.
+- Use **bold** only around the single most important fact/number/action (e.g. the total underpaid amount, the count of flagged trips, or the count of trips with undisclosed deductions) — do not bold multiple phrases.
 - If there is not enough history to meaningfully compare against a typical week, speak honestly about this week's numbers as they stand.
 - Call out any concentration of underpayment or anomalies (e.g., concentrated on Zomato).
+- If there are undisclosed deductions (indicated by `undisclosed_deductions_count` > 0 in the JSON), call out the count and platform specifically (e.g., "Two of your Swiggy trips this week had deductions with no disclosed reason, which the law requires"). Ground this in Karnataka's Platform-Based Gig Workers Act which mandates aggregators to disclose reasons for all deductions.
 - Analyze the 'total_hours' and if it is very high (e.g., > 50 hours/week), call out a risk of burnout and advise resting.
 - End with exactly one small, practical, encouraging next step.
 - Never be scolding; maintain a supportive yet realistic tone.
