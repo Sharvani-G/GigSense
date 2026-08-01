@@ -332,6 +332,189 @@ def get_weekly_aggregates(user_id: str) -> dict:
             "platforms": {}
         }
 
+def compute_weekly_forecast(user_id: str) -> dict | None:
+    if db is None:
+        return None
+    try:
+        # Fetch all historical jobs for the user
+        jobs_ref = db.collection("jobs")
+        docs = jobs_ref.where("user_id", "==", user_id).stream()
+        
+        user_jobs = []
+        for doc in docs:
+            user_jobs.append(doc.to_dict())
+            
+        # Filter for valid jobs
+        valid_user_jobs = []
+        for job in user_jobs:
+            fare = job.get("fare")
+            duration = job.get("duration_min")
+            ts = job.get("created_at") or job.get("job_timestamp")
+            platform = job.get("platform")
+            if fare is not None and duration is not None and duration > 0 and ts and platform:
+                valid_user_jobs.append(job)
+                
+        # Must have at least 10 jobs to trigger a prediction
+        if len(valid_user_jobs) < 10:
+            return None
+            
+        # Group user jobs by (day_of_week, time_of_day, platform)
+        day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+        
+        groups = {}
+        for job in valid_user_jobs:
+            ts = job.get("created_at") or job.get("job_timestamp")
+            try:
+                if hasattr(ts, "isoformat"):
+                    dt = ts
+                else:
+                    clean_ts = str(ts).replace("Z", "+00:00")
+                    dt = datetime.datetime.fromisoformat(clean_ts)
+            except Exception:
+                continue
+                
+            # Compute day name and time band
+            day_name = day_names[dt.weekday()]
+            hour = dt.hour
+            if 6 <= hour < 12:
+                time_band = "morning"
+            elif 12 <= hour < 16:
+                time_band = "afternoon"
+            elif 16 <= hour < 21:
+                time_band = "evening"
+            else:
+                time_band = "late-night"
+                
+            platform = str(job.get("platform")).lower().strip()
+            
+            key = (day_name, time_band, platform)
+            if key not in groups:
+                groups[key] = []
+            groups[key].append(job)
+            
+        if not groups:
+            return None
+            
+        # Find combination with highest average earnings per hour (EPH)
+        best_key = None
+        best_avg_eph = -1.0
+        
+        for key, group in groups.items():
+            ephs = []
+            for j in group:
+                fare = float(j.get("fare") or 0.0)
+                dur = float(j.get("duration_min") or 1.0)
+                ephs.append((fare / dur) * 60.0)
+            avg_eph = sum(ephs) / len(ephs)
+            if avg_eph > best_avg_eph:
+                best_avg_eph = avg_eph
+                best_key = key
+                
+        if best_key is None:
+            return None
+            
+        best_day, best_time, best_platform = best_key
+        
+        # Get platform display name
+        platform_display = best_platform.capitalize()
+        # Look up in Firestore benchmarks or static dict
+        static_names = {
+            'uber': 'Uber',
+            'rapido': 'Rapido',
+            'ola': 'Ola',
+            'indrive': 'InDrive',
+            'zomato': 'Zomato',
+            'swiggy': 'Swiggy',
+            'dunzo': 'Dunzo',
+            'blinkit': 'Blinkit',
+            'zepto': 'Zepto',
+            'bigbasket': 'BigBasket',
+            'amazon_flex': 'Amazon Flex',
+            'urban_company': 'Urban Company',
+            'porter': 'Porter',
+            'housejoy': 'Housejoy',
+            'other': 'Other'
+        }
+        if best_platform in static_names:
+            platform_display = static_names[best_platform]
+        else:
+            try:
+                bench_doc = db.collection("benchmarks").document(best_platform).get()
+                if bench_doc.exists:
+                    platform_display = bench_doc.to_dict().get("displayName", platform_display)
+            except Exception:
+                pass
+                
+        # Community Corroboration Check
+        # Query community jobs for the same platform
+        all_docs = db.collection("jobs").stream()
+        community_jobs = []
+        for doc in all_docs:
+            j = doc.to_dict()
+            if str(j.get("platform")).lower().strip() == best_platform:
+                fare = j.get("fare")
+                duration = j.get("duration_min")
+                ts = j.get("created_at") or j.get("job_timestamp")
+                if fare is not None and duration is not None and duration > 0 and ts:
+                    community_jobs.append(j)
+                    
+        # Group community platform jobs by (day_of_week, time_of_day)
+        community_platform_ephs = []
+        community_window_ephs = []
+        
+        for j in community_jobs:
+            ts = j.get("created_at") or j.get("job_timestamp")
+            try:
+                if hasattr(ts, "isoformat"):
+                    dt = ts
+                else:
+                    clean_ts = str(ts).replace("Z", "+00:00")
+                    dt = datetime.datetime.fromisoformat(clean_ts)
+            except Exception:
+                continue
+                
+            fare = float(j.get("fare") or 0.0)
+            dur = float(j.get("duration_min") or 1.0)
+            eph = (fare / dur) * 60.0
+            community_platform_ephs.append(eph)
+            
+            # Check if this job is in the best window (best_day, best_time)
+            weekday = dt.weekday()
+            day_name = day_names[weekday]
+            hour = dt.hour
+            if 6 <= hour < 12:
+                time_band_check = "morning"
+            elif 12 <= hour < 16:
+                time_band_check = "afternoon"
+            elif 16 <= hour < 21:
+                time_band_check = "evening"
+            else:
+                time_band_check = "late-night"
+                
+            if day_name == best_day and time_band_check == best_time:
+                community_window_ephs.append(eph)
+                
+        corroborated = False
+        if len(community_window_ephs) >= 3 and len(community_platform_ephs) > 0:
+            community_platform_avg = sum(community_platform_ephs) / len(community_platform_ephs)
+            community_window_avg = sum(community_window_ephs) / len(community_window_ephs)
+            if community_window_avg > community_platform_avg:
+                corroborated = True
+                
+        is_data_thin = len(valid_user_jobs) < 20
+        
+        return {
+            "best_day": best_day,
+            "best_time_band": best_time,
+            "platform": platform_display,
+            "user_total_jobs": len(valid_user_jobs),
+            "is_data_thin": is_data_thin,
+            "corroborated_by_community": corroborated
+        }
+    except Exception as e:
+        print(f"Error computing forecast pattern: {e}")
+        return None
+
 @app.get("/weekly-insight")
 async def weekly_insight(user_id: str):
     aggregates = get_weekly_aggregates(user_id)
@@ -345,10 +528,13 @@ async def weekly_insight(user_id: str):
         worker_type_desc = WORKER_TYPE_DESCRIPTIONS.get(worker_type, 'gig worker')
         language_name = LANGUAGE_NAMES.get(lang_code, 'English')
 
+        forecast = compute_weekly_forecast(user_id)
+
         prompt = get_weekly_insight_prompt(
             worker_type_desc=worker_type_desc,
             aggregates_json=json.dumps(aggregates),
-            language_name=language_name
+            language_name=language_name,
+            forecast_json=json.dumps(forecast) if forecast else None
         )
 
         insight_text = ask_gemma(prompt)

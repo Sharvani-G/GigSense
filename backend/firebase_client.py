@@ -13,8 +13,9 @@ cred_path = os.environ.get("FIREBASE_CREDENTIALS_PATH", "")
 db = None
 if cred_path and os.path.exists(cred_path):
     try:
-        cred = credentials.Certificate(cred_path)
-        firebase_admin.initialize_app(cred)
+        if not firebase_admin._apps:
+            cred = credentials.Certificate(cred_path)
+            firebase_admin.initialize_app(cred)
         db = firestore.client()
     except Exception as e:
         print(f"Firebase initialization failed: {e}")
