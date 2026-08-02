@@ -21,9 +21,10 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   bool _isLoading = true;
+  bool _isFetchingMore = false;
+  bool _hasMore = true;
+  DocumentSnapshot? _lastDocument;
   List<Map<String, dynamic>> _jobs = [];
-  List<Map<String, dynamic>> _filteredJobs = [];
-  int _loadedLimit = 20;
   final ScrollController _scrollController = ScrollController();
 
   // Filter states
@@ -36,7 +37,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     if (widget.initialFairnessFilter != null) {
       _selectedFairness = widget.initialFairnessFilter!;
     }
-    _fetchJobs();
+    _fetchJobs(isRefresh: true);
     _scrollController.addListener(_onScroll);
   }
 
@@ -48,10 +49,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   void _onScroll() {
     if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
-      if (_loadedLimit < _filteredJobs.length) {
-        setState(() {
-          _loadedLimit += 20;
-        });
+      if (!_isLoading && !_isFetchingMore && _hasMore) {
+        _fetchJobs(isRefresh: false);
       }
     }
   }
@@ -63,63 +62,76 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return null;
   }
 
-  Future<void> _fetchJobs() async {
-    setState(() {
-      _isLoading = true;
-    });
+  Future<void> _fetchJobs({required bool isRefresh}) async {
+    if (isRefresh) {
+      setState(() {
+        _isLoading = true;
+        _jobs.clear();
+        _lastDocument = null;
+        _hasMore = true;
+      });
+    } else {
+      setState(() {
+        _isFetchingMore = true;
+      });
+    }
 
     try {
       final userId = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous_user';
-      final querySnapshot = await FirebaseFirestore.instance
+      
+      Query query = FirebaseFirestore.instance
           .collection('jobs')
-          .where('user_id', isEqualTo: userId)
-          .get();
+          .where('user_id', isEqualTo: userId);
 
-      final List<Map<String, dynamic>> loaded = querySnapshot.docs
-          .map((doc) => {...doc.data(), 'id': doc.id})
+      if (_selectedPlatforms.isNotEmpty) {
+        final platformFilter = _selectedPlatforms.map((p) => p.toLowerCase()).take(10).toList();
+        query = query.where('platform', whereIn: platformFilter);
+      }
+
+      if (_selectedFairness == "Possibly Underpaid") {
+        query = query.where('is_underpaid', isEqualTo: true);
+      } else if (_selectedFairness == "Fair Pay") {
+        query = query.where('is_underpaid', isEqualTo: false);
+      }
+
+      query = query.orderBy('job_timestamp', descending: true).limit(20);
+
+      if (_lastDocument != null) {
+        query = query.startAfterDocument(_lastDocument!);
+      }
+
+      final querySnapshot = await query.get();
+      final docs = querySnapshot.docs;
+
+      if (docs.length < 20) {
+        _hasMore = false;
+      }
+
+      if (docs.isNotEmpty) {
+        _lastDocument = docs.last;
+      }
+
+      final List<Map<String, dynamic>> loaded = docs
+          .map((doc) => {...doc.data() as Map<String, dynamic>, 'id': doc.id})
           .toList();
 
-      loaded.sort((a, b) {
-        final tsA = _parseTimestamp(a['job_timestamp']) ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final tsB = _parseTimestamp(b['job_timestamp']) ?? DateTime.fromMillisecondsSinceEpoch(0);
-        return tsB.compareTo(tsA);
-      });
-
       setState(() {
-        _jobs = loaded;
-        _applyFilters();
+        if (isRefresh) {
+          _jobs = loaded;
+        } else {
+          _jobs.addAll(loaded);
+        }
         _isLoading = false;
+        _isFetchingMore = false;
       });
     } catch (e) {
       debugPrint("Error fetching history: $e");
       setState(() {
         _isLoading = false;
+        _isFetchingMore = false;
+        _hasMore = false;
       });
     }
-  }
-
-  void _applyFilters() {
-    List<Map<String, dynamic>> temp = List.from(_jobs);
-
-    // 1. Platform filter
-    if (_selectedPlatforms.isNotEmpty) {
-      temp = temp.where((job) {
-        final platform = (job['platform'] as String?)?.toLowerCase() ?? 'other';
-        return _selectedPlatforms.contains(platform);
-      }).toList();
-    }
-
-    // 2. Fairness status filter
-    if (_selectedFairness == "Possibly Underpaid") {
-      temp = temp.where((job) => job['is_underpaid'] == true).toList();
-    } else if (_selectedFairness == "Fair Pay") {
-      temp = temp.where((job) => job['is_underpaid'] != true).toList();
-    }
-
-    setState(() {
-      _filteredJobs = temp;
-      _loadedLimit = 20; // reset pagination page
-    });
   }
 
   Color _getPlatformColor(String platform) {
@@ -135,10 +147,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   void _showFilterBottomSheet() {
-    final allPlatforms = _jobs
-        .map((j) => ((j['platform'] as String?) ?? 'other').toLowerCase())
-        .toSet()
-        .toList();
+    final allPlatforms = [
+      'zomato',
+      'swiggy',
+      'uber',
+      'ola',
+      'rapido',
+      'dunzo',
+      'blinkit',
+      'zepto',
+      'bigbasket',
+      'amazon_flex',
+      'urban_company',
+      'porter',
+      'housejoy',
+      'other'
+    ];
 
     showModalBottomSheet(
       context: context,
@@ -313,8 +337,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             setState(() {
                               _selectedPlatforms.clear();
                               _selectedFairness = "All";
-                              _applyFilters();
                             });
+                            _fetchJobs(isRefresh: true);
                             Navigator.pop(context);
                           },
                           backgroundColor: Colors.white,
@@ -328,9 +352,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       Expanded(
                         child: PlayfulButton(
                           onPressed: () {
-                            setState(() {
-                              _applyFilters();
-                            });
+                            _fetchJobs(isRefresh: true);
                             Navigator.pop(context);
                           },
                           backgroundColor: PlayfulColors.accent,
@@ -350,7 +372,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final visibleJobs = _filteredJobs.take(_loadedLimit).toList();
+    final visibleJobs = _jobs;
 
     return Scaffold(
       backgroundColor: PlayfulColors.background,
@@ -381,12 +403,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 color: PlayfulColors.accent,
               ),
             )
-          : _filteredJobs.isEmpty
+          : _jobs.isEmpty
               ? _buildEmptyState()
               : ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  itemCount: visibleJobs.length + (_loadedLimit < _filteredJobs.length ? 1 : 0),
+                  itemCount: visibleJobs.length + (_hasMore ? 1 : 0),
                   itemBuilder: (context, index) {
                     if (index == visibleJobs.length) {
                       return const Padding(
