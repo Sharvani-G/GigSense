@@ -953,6 +953,19 @@ class _LogJobScreenState extends State<LogJobScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: PlayfulColors.background,
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 16.0),
+          child: PlayfulButton(
+            onPressed: _isFormValid && !_isLoading ? _submitJob : null,
+            child: _isLoading 
+                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
+                : Text(_jobSource == "ocr"
+                    ? StringsProvider.instance.t('logjob_btn_confirm')
+                    : StringsProvider.instance.t('logjob_btn')),
+          ),
+        ),
+      ),
       body: SafeArea(
         child: _isLoading
             ? const Center(
@@ -1279,16 +1292,6 @@ class _LogJobScreenState extends State<LogJobScreen> {
                           ] else ...[
                             const SizedBox(height: 12),
                           ],
-
-                          PlayfulButton(
-                            onPressed: _isFormValid && !_isLoading ? _submitJob : null,
-                            child: _isLoading 
-                                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
-                                : Text(_jobSource == "ocr"
-                                    ? StringsProvider.instance.t('logjob_btn_confirm')
-                                    : StringsProvider.instance.t('logjob_btn')),
-                          ),
-                          const SizedBox(height: 24),
                         ],
                       ],
                     ),

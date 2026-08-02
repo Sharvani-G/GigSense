@@ -197,6 +197,37 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
 
     return Scaffold(
       backgroundColor: PlayfulColors.background,
+      bottomNavigationBar: _isLoadingRates
+          ? null
+          : SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    PlayfulButton(
+                      onPressed: _isSaving ? null : () => _logJob(platformExpected, genericExpected),
+                      child: _isSaving
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            )
+                          : Text(s.t('logjob_btn_confirm')),
+                    ),
+                    const SizedBox(height: 12),
+                    PlayfulSecondaryButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        widget.onEdit();
+                      },
+                      child: const Text("EDIT DETAILS"),
+                    ),
+                  ],
+                ),
+              ),
+            ),
       body: SafeArea(
         child: _isLoadingRates
             ? const Center(child: CircularProgressIndicator(color: PlayfulColors.accent))
@@ -280,27 +311,6 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
                             ),
                           ),
                         ],
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Actions
-                      PlayfulButton(
-                        onPressed: _isSaving ? null : () => _logJob(platformExpected, genericExpected),
-                        child: _isSaving
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                              )
-                            : Text(s.t('logjob_btn_confirm')),
-                      ),
-                      const SizedBox(height: 14),
-                      PlayfulSecondaryButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          widget.onEdit();
-                        },
-                        child: const Text("EDIT DETAILS"),
                       ),
                     ],
                   ),

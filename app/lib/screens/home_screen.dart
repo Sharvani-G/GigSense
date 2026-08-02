@@ -1015,6 +1015,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         _buildEmptyState()
                       else
                         _buildMainDashboard(),
+                      const SizedBox(height: 140),
                     ],
                   ),
                 ),
