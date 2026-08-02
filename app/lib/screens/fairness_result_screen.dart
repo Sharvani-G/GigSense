@@ -222,7 +222,7 @@ class FairnessResultScreen extends StatelessWidget {
                       String text;
                       String status;
                       if (rateSource == 'seed' || rateSource == 'fallback' || size < 15) {
-                        text = "Estimated rate (Seed)";
+                        text = "Typical reported range";
                         status = "gathering data";
                       } else if (size < 50) {
                         text = "Community baseline";
@@ -234,7 +234,7 @@ class FairnessResultScreen extends StatelessWidget {
                       
                       String infoText = "";
                       if (status == "gathering data") {
-                        infoText = "We are still collecting enough trips for this platform to calculate a reliable community median. Currently falling back to standard estimates.";
+                        infoText = "We are still collecting enough trips for this platform to calculate a reliable community median. Currently falling back to typical reported range benchmarks (reference tables).";
                       } else if (status == "growing dataset") {
                         infoText = "We have collected enough recent trips to start calculating a real community median, but the dataset is still growing.";
                       } else {

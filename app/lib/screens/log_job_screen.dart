@@ -255,21 +255,21 @@ class _LogJobScreenState extends State<LogJobScreen> {
       final query = await firestore.collection('benchmarks').get();
       if (query.docs.length < 10) {
         final defaults = {
-          'uber': {'displayName': 'Uber', 'rate_per_km': 12.00, 'rate_per_min': 1.50, 'category': 'cab'},
-          'rapido': {'displayName': 'Rapido', 'rate_per_km': 9.00, 'rate_per_min': 1.20, 'category': 'cab'},
-          'ola': {'displayName': 'Ola', 'rate_per_km': 11.50, 'rate_per_min': 1.40, 'category': 'cab'},
-          'indrive': {'displayName': 'InDrive', 'rate_per_km': 10.00, 'rate_per_min': 1.10, 'category': 'cab'},
-          'zomato': {'displayName': 'Zomato', 'rate_per_km': 8.00, 'rate_per_min': 1.00, 'category': 'delivery'},
-          'swiggy': {'displayName': 'Swiggy', 'rate_per_km': 8.00, 'rate_per_min': 1.00, 'category': 'delivery'},
-          'dunzo': {'displayName': 'Dunzo', 'rate_per_km': 8.50, 'rate_per_min': 1.10, 'category': 'delivery'},
-          'blinkit': {'displayName': 'Blinkit', 'rate_per_km': 9.00, 'rate_per_min': 1.05, 'category': 'delivery'},
-          'zepto': {'displayName': 'Zepto', 'rate_per_km': 8.50, 'rate_per_min': 1.00, 'category': 'delivery'},
-          'bigbasket': {'displayName': 'BigBasket', 'rate_per_km': 9.50, 'rate_per_min': 1.15, 'category': 'delivery'},
-          'amazon_flex': {'displayName': 'Amazon Flex', 'rate_per_km': 10.50, 'rate_per_min': 1.20, 'category': 'delivery'},
-          'urban_company': {'displayName': 'Urban Company', 'rate_per_km': 14.00, 'rate_per_min': 1.70, 'category': 'other_gig'},
-          'porter': {'displayName': 'Porter', 'rate_per_km': 13.00, 'rate_per_min': 1.50, 'category': 'other_gig'},
-          'housejoy': {'displayName': 'Housejoy', 'rate_per_km': 12.50, 'rate_per_min': 1.40, 'category': 'other_gig'},
-          'other': {'displayName': 'Other', 'rate_per_km': 10.00, 'rate_per_min': 1.30, 'category': 'other_gig'},
+          'uber': {'displayName': 'Uber', 'rate_per_km': 16.00, 'rate_per_min': 1.50, 'category': 'cab'},
+          'rapido': {'displayName': 'Rapido', 'rate_per_km': 16.50, 'rate_per_min': 1.20, 'category': 'cab'},
+          'ola': {'displayName': 'Ola', 'rate_per_km': 15.50, 'rate_per_min': 1.40, 'category': 'cab'},
+          'indrive': {'displayName': 'InDrive', 'rate_per_km': 14.50, 'rate_per_min': 1.30, 'category': 'cab'},
+          'zomato': {'displayName': 'Zomato', 'rate_per_km': 8.50, 'rate_per_min': 0.80, 'category': 'delivery'},
+          'swiggy': {'displayName': 'Swiggy', 'rate_per_km': 8.50, 'rate_per_min': 0.80, 'category': 'delivery'},
+          'dunzo': {'displayName': 'Dunzo', 'rate_per_km': 9.00, 'rate_per_min': 0.90, 'category': 'delivery'},
+          'blinkit': {'displayName': 'Blinkit', 'rate_per_km': 10.00, 'rate_per_min': 0.60, 'category': 'delivery'},
+          'zepto': {'displayName': 'Zepto', 'rate_per_km': 9.50, 'rate_per_min': 0.50, 'category': 'delivery'},
+          'bigbasket': {'displayName': 'BigBasket', 'rate_per_km': 11.00, 'rate_per_min': 1.00, 'category': 'delivery'},
+          'amazon_flex': {'displayName': 'Amazon Flex', 'rate_per_km': 12.00, 'rate_per_min': 1.10, 'category': 'delivery'},
+          'urban_company': {'displayName': 'Urban Company', 'rate_per_km': 15.00, 'rate_per_min': 1.50, 'category': 'other_gig'},
+          'porter': {'displayName': 'Porter', 'rate_per_km': 14.00, 'rate_per_min': 1.30, 'category': 'other_gig'},
+          'housejoy': {'displayName': 'Housejoy', 'rate_per_km': 13.00, 'rate_per_min': 1.20, 'category': 'other_gig'},
+          'other': {'displayName': 'Other', 'rate_per_km': 12.00, 'rate_per_min': 1.00, 'category': 'other_gig'},
         };
         for (var entry in defaults.entries) {
           final data = Map<String, dynamic>.from(entry.value);
@@ -350,21 +350,21 @@ class _LogJobScreenState extends State<LogJobScreen> {
 
     if (_allPlatforms.isEmpty) {
       final defaults = [
-        PlatformItem(id: 'uber', displayName: 'Uber', category: 'cab', ratePerKm: 12.0, ratePerMin: 1.50, sampleSize: 0),
-        PlatformItem(id: 'rapido', displayName: 'Rapido', category: 'cab', ratePerKm: 9.0, ratePerMin: 1.20, sampleSize: 0),
-        PlatformItem(id: 'ola', displayName: 'Ola', category: 'cab', ratePerKm: 11.50, ratePerMin: 1.40, sampleSize: 0),
-        PlatformItem(id: 'indrive', displayName: 'InDrive', category: 'cab', ratePerKm: 10.0, ratePerMin: 1.10, sampleSize: 0),
-        PlatformItem(id: 'zomato', displayName: 'Zomato', category: 'delivery', ratePerKm: 8.0, ratePerMin: 1.00, sampleSize: 0),
-        PlatformItem(id: 'swiggy', displayName: 'Swiggy', category: 'delivery', ratePerKm: 8.0, ratePerMin: 1.00, sampleSize: 0),
-        PlatformItem(id: 'dunzo', displayName: 'Dunzo', category: 'delivery', ratePerKm: 8.50, ratePerMin: 1.10, sampleSize: 0),
-        PlatformItem(id: 'blinkit', displayName: 'Blinkit', category: 'delivery', ratePerKm: 9.0, ratePerMin: 1.05, sampleSize: 0),
-        PlatformItem(id: 'zepto', displayName: 'Zepto', category: 'delivery', ratePerKm: 8.50, ratePerMin: 1.00, sampleSize: 0),
-        PlatformItem(id: 'bigbasket', displayName: 'BigBasket', category: 'delivery', ratePerKm: 9.50, ratePerMin: 1.15, sampleSize: 0),
-        PlatformItem(id: 'amazon_flex', displayName: 'Amazon Flex', category: 'delivery', ratePerKm: 10.50, ratePerMin: 1.20, sampleSize: 0),
-        PlatformItem(id: 'urban_company', displayName: 'Urban Company', category: 'other_gig', ratePerKm: 14.00, ratePerMin: 1.70, sampleSize: 0),
-        PlatformItem(id: 'porter', displayName: 'Porter', category: 'other_gig', ratePerKm: 13.00, ratePerMin: 1.50, sampleSize: 0),
-        PlatformItem(id: 'housejoy', displayName: 'Housejoy', category: 'other_gig', ratePerKm: 12.50, ratePerMin: 1.40, sampleSize: 0),
-        PlatformItem(id: 'other', displayName: 'Other', category: 'other_gig', ratePerKm: 10.0, ratePerMin: 1.30, sampleSize: 0),
+        PlatformItem(id: 'uber', displayName: 'Uber', category: 'cab', ratePerKm: 16.0, ratePerMin: 1.50, sampleSize: 0),
+        PlatformItem(id: 'rapido', displayName: 'Rapido', category: 'cab', ratePerKm: 16.50, ratePerMin: 1.20, sampleSize: 0),
+        PlatformItem(id: 'ola', displayName: 'Ola', category: 'cab', ratePerKm: 15.50, ratePerMin: 1.40, sampleSize: 0),
+        PlatformItem(id: 'indrive', displayName: 'InDrive', category: 'cab', ratePerKm: 14.50, ratePerMin: 1.30, sampleSize: 0),
+        PlatformItem(id: 'zomato', displayName: 'Zomato', category: 'delivery', ratePerKm: 8.50, ratePerMin: 0.80, sampleSize: 0),
+        PlatformItem(id: 'swiggy', displayName: 'Swiggy', category: 'delivery', ratePerKm: 8.50, ratePerMin: 0.80, sampleSize: 0),
+        PlatformItem(id: 'dunzo', displayName: 'Dunzo', category: 'delivery', ratePerKm: 9.00, ratePerMin: 0.90, sampleSize: 0),
+        PlatformItem(id: 'blinkit', displayName: 'Blinkit', category: 'delivery', ratePerKm: 10.00, ratePerMin: 0.60, sampleSize: 0),
+        PlatformItem(id: 'zepto', displayName: 'Zepto', category: 'delivery', ratePerKm: 9.50, ratePerMin: 0.50, sampleSize: 0),
+        PlatformItem(id: 'bigbasket', displayName: 'BigBasket', category: 'delivery', ratePerKm: 11.00, ratePerMin: 1.00, sampleSize: 0),
+        PlatformItem(id: 'amazon_flex', displayName: 'Amazon Flex', category: 'delivery', ratePerKm: 12.00, ratePerMin: 1.10, sampleSize: 0),
+        PlatformItem(id: 'urban_company', displayName: 'Urban Company', category: 'other_gig', ratePerKm: 15.00, ratePerMin: 1.50, sampleSize: 0),
+        PlatformItem(id: 'porter', displayName: 'Porter', category: 'other_gig', ratePerKm: 14.00, ratePerMin: 1.30, sampleSize: 0),
+        PlatformItem(id: 'housejoy', displayName: 'Housejoy', category: 'other_gig', ratePerKm: 13.00, ratePerMin: 1.20, sampleSize: 0),
+        PlatformItem(id: 'other', displayName: 'Other', category: 'other_gig', ratePerKm: 12.00, ratePerMin: 1.00, sampleSize: 0),
       ];
       setState(() {
         _allPlatforms = defaults;

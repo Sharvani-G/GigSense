@@ -801,10 +801,12 @@ async def seed_demo_community_data():
 
         # 2. Setup platforms & benchmark rates for expected fare computation
         platforms = {
-            'uber': {'rate_per_km': 12.00, 'rate_per_min': 1.50},
-            'ola': {'rate_per_km': 11.50, 'rate_per_min': 1.40},
-            'zomato': {'rate_per_km': 8.00, 'rate_per_min': 1.00},
-            'swiggy': {'rate_per_km': 8.00, 'rate_per_min': 1.00},
+            'uber': {'rate_per_km': 16.00, 'rate_per_min': 1.50},
+            'ola': {'rate_per_km': 15.50, 'rate_per_min': 1.40},
+            'zomato': {'rate_per_km': 8.50, 'rate_per_min': 0.80},
+            'swiggy': {'rate_per_km': 8.50, 'rate_per_min': 0.80},
+            'blinkit': {'rate_per_km': 10.00, 'rate_per_min': 0.60},
+            'zepto': {'rate_per_km': 9.50, 'rate_per_min': 0.50},
         }
 
         # 3. Setup localities and their underpaid skews
