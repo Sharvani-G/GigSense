@@ -1575,7 +1575,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               accuracy: LocationAccuracy.high,
             ),
           ).timeout(const Duration(seconds: 3));
-          locationLink = "\nLocation: https://maps.google.com/?q=${position.latitude},${position.longitude}";
+          locationLink = "\nMy current location: https://www.google.com/maps?q=${position.latitude},${position.longitude}";
         }
       }
     } catch (e) {
@@ -1587,36 +1587,91 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final String template = _sosTemplates[lang] ?? _sosTemplates['en']!;
     final String fullMessage = "$template$locationLink";
 
-    // 3. Launch SMS pre-filled
+    // 3. Send via WhatsApp
     final String phone = contact != null && contact['phone'] != null
-        ? contact['phone'].toString().replaceAll(RegExp(r'\s+'), '')
+        ? contact['phone'].toString()
         : '';
-        
-    final String smsUri = "sms:$phone?body=${Uri.encodeComponent(fullMessage)}";
-    final Uri uri = Uri.parse(smsUri);
+
+    final bool sent = await _sendSosViaWhatsApp(phoneNumber: phone, message: fullMessage);
+    if (!sent) {
+      _showFallbackClipboardDialog(fullMessage);
+    }
+  }
+
+  Future<bool> _sendSosViaWhatsApp({
+    required String phoneNumber,
+    required String message,
+  }) async {
+    final cleanDigits = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    String sanitizedNumber = cleanDigits;
+    if (cleanDigits.length == 10) {
+      sanitizedNumber = '91$cleanDigits';
+    }
+
+    final encodedMessage = Uri.encodeComponent(message);
+    final whatsappUri = sanitizedNumber.isNotEmpty
+        ? Uri.parse('https://wa.me/$sanitizedNumber?text=$encodedMessage')
+        : Uri.parse('https://api.whatsapp.com/send?text=$encodedMessage');
 
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-      } else {
-        // Fallback for launch issues
-        final String fallbackSmsUri = "sms:?body=${Uri.encodeComponent(fullMessage)}";
-        final Uri fallbackUri = Uri.parse(fallbackSmsUri);
-        if (await canLaunchUrl(fallbackUri)) {
-          await launchUrl(fallbackUri);
-        } else {
-          // If all launch options fail, fallback to clipboard and prompt
-          await Clipboard.setData(ClipboardData(text: fullMessage));
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("SMS composer not available. Alert copied to clipboard.")),
-            );
-          }
-        }
+      if (await canLaunchUrl(whatsappUri)) {
+        return await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
       }
     } catch (e) {
-      debugPrint("Error launching SMS: $e");
+      debugPrint("Error launching WhatsApp: $e");
     }
+    return false;
+  }
+
+  void _showFallbackClipboardDialog(String fullMessage) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: PlayfulColors.border, width: 2),
+        ),
+        backgroundColor: Colors.white,
+        title: Text(
+          "WhatsApp Unavailable",
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: PlayfulColors.foreground),
+        ),
+        content: Text(
+          "WhatsApp is not installed or could not be opened. Would you like to copy the SOS alert message to your clipboard instead?",
+          style: GoogleFonts.plusJakartaSans(color: PlayfulColors.foreground),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              "CANCEL",
+              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: PlayfulColors.mutedForeground),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Clipboard.setData(ClipboardData(text: fullMessage));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("SOS alert copied to clipboard.")),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: PlayfulColors.accent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: const BorderSide(color: PlayfulColors.border, width: 1.5),
+              ),
+            ),
+            child: Text(
+              "COPY ALERT",
+              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
