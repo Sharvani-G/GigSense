@@ -133,6 +133,15 @@ class GigShieldApp extends StatelessWidget {
               ),
             ),
           ),
+          builder: (context, child) {
+            final mediaQuery = MediaQuery.of(context);
+            return MediaQuery(
+              data: mediaQuery.copyWith(
+                textScaler: TextScaler.linear(StringsProvider.instance.textScaleFactor),
+              ),
+              child: child!,
+            );
+          },
           home: const AuthGateway(),
         );
       },
@@ -199,6 +208,10 @@ class _AuthGatewayState extends State<AuthGateway> {
         final lang = doc.data()?['preferredLanguage'] as String?;
         if (lang != null && lang.isNotEmpty) {
           StringsProvider.instance.setLanguage(lang);
+        }
+        final fs = doc.data()?['fontSizePreference'] as String?;
+        if (fs != null && fs.isNotEmpty) {
+          StringsProvider.instance.setFontSize(fs);
         }
       }
 

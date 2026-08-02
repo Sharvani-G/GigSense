@@ -263,6 +263,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 ),
                                 _buildDivider(),
 
+                                // Font Size row
+                                _buildSettingsRow(
+                                  icon: Icons.format_size_outlined,
+                                  label: s.t('settings_font_size'),
+                                  trailingText: s.t('font_${StringsProvider.instance.fontSize}'),
+                                  onTap: () => _showFontSizePicker(context),
+                                ),
+                                _buildDivider(),
+
                                 // Savings Goal row
                                 _buildSettingsRow(
                                   icon: Icons.savings_outlined,
@@ -491,6 +500,129 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       height: 1.5,
       color: PlayfulColors.border.withOpacity(0.15),
+    );
+  }
+
+  void _showFontSizePicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final s = StringsProvider.instance;
+        final currentSize = s.fontSize;
+        final sizes = ['small', 'medium', 'large'];
+
+        return Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFFFFFDF5),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border(
+              top: BorderSide(color: Color(0xFF1A1A1A), width: 2),
+            ),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A1A),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                s.t('settings_font_size'),
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: const Color(0xFF1A1A1A),
+                  letterSpacing: 1.0,
+                ),
+              ),
+              const SizedBox(height: 20),
+              for (final size in sizes) ...[
+                _buildFontSizeCard(
+                  context,
+                  label: s.t('font_$size'),
+                  sizeKey: size,
+                  isSelected: currentSize == size,
+                ),
+                const SizedBox(height: 12),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildFontSizeCard(BuildContext context, {required String label, required String sizeKey, required bool isSelected}) {
+    return GestureDetector(
+      onTap: () async {
+        Navigator.pop(context);
+        StringsProvider.instance.setFontSize(sizeKey);
+
+        // Persist to Firestore (best-effort — never blocks UI)
+        final uid = FirebaseAuth.instance.currentUser?.uid;
+        if (uid != null) {
+          try {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(uid)
+                .update({'fontSizePreference': sizeKey});
+          } catch (e) {
+            debugPrint('Failed to persist font size preference: $e');
+          }
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF8B5CF6) : const Color(0xFF1A1A1A),
+            width: 2.0,
+          ),
+          boxShadow: [
+            if (isSelected)
+              const BoxShadow(
+                color: Color(0xFF8B5CF6),
+                offset: Offset(4, 4),
+                blurRadius: 0,
+              )
+            else
+              const BoxShadow(
+                color: Color(0xFF1A1A1A),
+                offset: Offset(2, 2),
+                blurRadius: 0,
+              ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: GoogleFonts.outfit(
+                  fontSize: sizeKey == 'small' ? 14 : (sizeKey == 'large' ? 18 : 16),
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF1A1A1A),
+                ),
+              ),
+            ),
+            if (isSelected)
+              const Icon(Icons.check_circle, color: Color(0xFF8B5CF6), size: 22),
+          ],
+        ),
+      ),
     );
   }
 

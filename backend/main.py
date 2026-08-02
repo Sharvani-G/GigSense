@@ -1209,27 +1209,33 @@ def regex_parse_transcript(transcript: str):
             break
             
     # 2. Fare (Rupees)
-    # E.g., "87 rupees", "rs 87", "rs. 87", "87 rs", "₹87"
     fare = None
-    fare_match = re.search(r'(?:rs\.?|rupees|inr|₹|rs)\s*(\d+(?:\.\d+)?)', transcript_lower)
+    fare_match = re.search(r'(?:rs\.?|rupees|inr|₹|rs|रुपये|रुपया|रू|रु|ರೂಪಾಯಿ|ರೂಪಾಯಿಗಳು|ರೂ|రూపాయలు|రూపాయి|రూபாய்|രൂപ)\s*(\d+(?:\.\d+)?)', transcript_lower)
     if not fare_match:
-        fare_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:rupees|rs|rs\.)', transcript_lower)
+        fare_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:rupees|rs|rs\.?|रुपये|रुपया|रू|रु|ರೂಪಾಯಿ|ರೂಪಾಯಿಗಳು|ರೂ|రూపాయలు|రూపాయి|రూபாய்|രൂപ)', transcript_lower)
     if fare_match:
-        fare = float(fare_match.group(1))
+        try:
+            fare = float(fare_match.group(1))
+        except ValueError:
+            pass
         
     # 3. Distance (km)
-    # E.g., "4 km", "4 kilometers", "4.5 kms"
     distance_km = None
-    dist_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:km|kms|kilometers|kilometer|kilo\s*meter)', transcript_lower)
+    dist_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:km|kms|kilometers|kilometer|kilo\s*meter|किमी|किलोमीटर|ಕಿಮೀ|ಕಿಲೋಮೀಟರ್|ಕಿಲೋಮೀಟರ್‌ಗಳು|కిమీ|కిలోమీటర్లు|కిలోమీటర్|கிமீ|கிலோமீட்டர்|കിലോമീറ്റർ|കിമീ)', transcript_lower)
     if dist_match:
-        distance_km = float(dist_match.group(1))
+        try:
+            distance_km = float(dist_match.group(1))
+        except ValueError:
+            pass
         
     # 4. Duration (min)
-    # E.g., "18 mins", "18 minutes", "18 min"
     duration_min = None
-    dur_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:mins|min|minutes|minute)', transcript_lower)
+    dur_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:mins|min|minutes|minute|मिनट|ನಿಮಿಷ|ನಿಮಿಷಗಳು|నిమిషాలు|నిమిషం|நிமிடங்கள்|நிமிடம்|മിനിറ്റ്)', transcript_lower)
     if dur_match:
-        duration_min = float(dur_match.group(1))
+        try:
+            duration_min = float(dur_match.group(1))
+        except ValueError:
+            pass
         
     return {
         "platform": platform,

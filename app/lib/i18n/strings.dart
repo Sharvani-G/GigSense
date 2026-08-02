@@ -118,6 +118,10 @@ class AppStrings {
       // Settings / Language picker
       'settings_title': 'SETTINGS',
       'settings_language': 'LANGUAGE',
+      'settings_font_size': 'FONT SIZE',
+      'font_small': 'Small',
+      'font_medium': 'Medium',
+      'font_large': 'Large',
       'lang_en': 'English',
       'lang_hi': 'हिन्दी (Hindi)',
       'lang_kn': 'ಕನ್ನಡ (Kannada)',
@@ -345,6 +349,10 @@ class AppStrings {
       // Settings / Language picker
       'settings_title': 'सेटिंग्स',
       'settings_language': 'भाषा',
+      'settings_font_size': 'फ़ॉन्ट आकार',
+      'font_small': 'छोटा',
+      'font_medium': 'मध्यम',
+      'font_large': 'बड़ा',
       'lang_en': 'English',
       'lang_hi': 'हिन्दी (Hindi)',
       'lang_kn': 'ಕನ್ನಡ (Kannada)',
@@ -573,6 +581,10 @@ class AppStrings {
       // Settings / Language picker
       'settings_title': 'ಸೆಟ್ಟಿಂಗ್‌ಗಳು',
       'settings_language': 'ಭಾಷೆ',
+      'settings_font_size': 'ಅಕ್ಷರದ ಗಾತ್ರ',
+      'font_small': 'ಸಣ್ಣ',
+      'font_medium': 'ಮಧ್ಯಮ',
+      'font_large': 'ದೊಡ್ಡದು',
       'lang_en': 'English',
       'lang_hi': 'हिन्दी (Hindi)',
       'lang_kn': 'ಕನ್ನಡ (Kannada)',
@@ -799,6 +811,10 @@ class AppStrings {
       // Settings / Language picker
       'settings_title': 'அமைப்புகள்',
       'settings_language': 'மொழி',
+      'settings_font_size': 'எழுத்து அளவு',
+      'font_small': 'சிறியது',
+      'font_medium': 'நடுத்தரம்',
+      'font_large': 'பெரியது',
       'lang_en': 'English',
       'lang_hi': 'हिन्दी (Hindi)',
       'lang_kn': 'ಕನ್ನಡ (Kannada)',
@@ -1026,6 +1042,10 @@ class AppStrings {
       // Settings / Language picker
       'settings_title': 'సెట్టింగులు',
       'settings_language': 'భాష',
+      'settings_font_size': 'అక్షర పరిమాణం',
+      'font_small': 'చిన్న',
+      'font_medium': 'మధ్యస్థ',
+      'font_large': 'పెద్ద',
       'lang_en': 'English',
       'lang_hi': 'हिन्दी (Hindi)',
       'lang_kn': 'ಕನ್ನಡ (Kannada)',
@@ -1217,6 +1237,10 @@ class AppStrings {
       'chip_deductions': 'കുറവുകളെക്കുറിച്ച് നിയമം എന്താണ് പറയുന്നത്?',
       'settings_title': 'സെറ്റിംഗ്സ്',
       'settings_language': 'ഭാഷ',
+      'settings_font_size': 'അക്ഷര വലിപ്പം',
+      'font_small': 'ചെറുത്',
+      'font_medium': 'ഇടത്തരം',
+      'font_large': 'വലുത്',
       'lang_en': 'English',
       'lang_hi': 'हिन्दी (Hindi)',
       'lang_kn': 'ಕನ್ನಡ (Kannada)',
@@ -1368,6 +1392,26 @@ class StringsProvider extends ChangeNotifier {
 
   String _lang = 'en';
   String get lang => _lang;
+
+  String _fontSize = 'medium'; // 'small', 'medium', 'large'
+  String get fontSize => _fontSize;
+
+  double get textScaleFactor {
+    switch (_fontSize) {
+      case 'small':
+        return 0.85;
+      case 'large':
+        return 1.2;
+      default:
+        return 1.0;
+    }
+  }
+
+  void setFontSize(String size) {
+    if (_fontSize == size) return;
+    _fontSize = size;
+    notifyListeners();
+  }
 
   /// Change language and notify all listeners (triggers full UI rebuild via
   /// ListenableBuilder in main.dart).
