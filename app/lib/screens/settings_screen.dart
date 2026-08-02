@@ -383,7 +383,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         baseUrl = baseUrl.replaceAll("127.0.0.1", "10.0.2.2").replaceAll("localhost", "10.0.2.2");
       }
       final Uri url = Uri.parse('$baseUrl/admin/recalculate-benchmarks');
-      final response = await http.post(url).timeout(const Duration(seconds: 30));
+      final response = await http.post(url, headers: {'ngrok-skip-browser-warning': 'true'}).timeout(const Duration(seconds: 30));
       
       if (mounted && !dialogClosed) {
         Navigator.pop(context);

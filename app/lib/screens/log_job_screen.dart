@@ -462,6 +462,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
 
     try {
       final request = http.MultipartRequest('POST', url)
+        ..headers['ngrok-skip-browser-warning'] = 'true'
         ..files.add(await http.MultipartFile.fromPath('file', pickedFile.path));
       
       final streamedResponse = await request.send();
@@ -811,7 +812,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
 
       // Trigger background community rates recalculation for this specific platform
       final Uri recalculateUrl = Uri.parse('$baseUrl/admin/recalculate-benchmarks?platform=${platform.toLowerCase()}');
-      http.post(recalculateUrl).then((response) {
+      http.post(recalculateUrl, headers: {'ngrok-skip-browser-warning': 'true'}).then((response) {
         debugPrint("Background auto-recalculate triggered for $platform: ${response.statusCode}");
       }).catchError((err) {
         debugPrint("Failed to trigger background auto-recalculate for $platform: $err");
@@ -819,7 +820,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
 
       if (userId != 'anonymous_user') {
         final Uri url = Uri.parse('$baseUrl/weekly-insight?user_id=$userId');
-        http.get(url).then((response) {
+        http.get(url, headers: {'ngrok-skip-browser-warning': 'true'}).then((response) {
           debugPrint("Background weekly-insight regeneration triggered: ${response.statusCode}");
         }).catchError((err) {
           debugPrint("Failed to trigger background weekly-insight: $err");
@@ -1538,7 +1539,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
     try {
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true'},
         body: json.encode({
           'transcript': transcript,
           'language_name': getLanguageName(s.lang),

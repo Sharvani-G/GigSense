@@ -579,7 +579,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final Uri url = Uri.parse('$baseUrl/fatigue-nudge');
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true'},
         body: json.encode({
           'user_id': userId,
           'total_hours': hours,
@@ -702,7 +702,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         baseUrl = baseUrl.replaceAll("127.0.0.1", "10.0.2.2").replaceAll("localhost", "10.0.2.2");
       }
       final Uri url = Uri.parse('$baseUrl/weekly-insight?user_id=$userId');
-      final response = await http.get(url);
+      final response = await http.get(url, headers: {'ngrok-skip-browser-warning': 'true'});
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);

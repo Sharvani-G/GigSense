@@ -389,6 +389,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final client = http.Client();
       final request = http.Request('POST', url);
       request.headers['Content-Type'] = 'application/json';
+      request.headers['ngrok-skip-browser-warning'] = 'true';
       request.body = json.encode({
         'message': text,
         'user_id': userId,
@@ -1493,6 +1494,7 @@ class _PlayfulImagePickerButtonState extends State<PlayfulImagePickerButton> {
 
     try {
       final request = http.MultipartRequest('POST', url)
+        ..headers['ngrok-skip-browser-warning'] = 'true'
         ..files.add(await http.MultipartFile.fromPath('file', pickedFile.path));
       
       final streamedResponse = await request.send();

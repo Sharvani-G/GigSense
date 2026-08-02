@@ -771,10 +771,11 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
       }
       final Uri url = Uri.parse('$baseUrl/stt');
 
-      final request = http.MultipartRequest('POST', url);
+      final request = http.MultipartRequest('POST', url)
+        ..headers['ngrok-skip-browser-warning'] = 'true';
 
       if (kIsWeb) {
-        final response = await http.get(Uri.parse(_recordedFilePath!));
+        final response = await http.get(Uri.parse(_recordedFilePath!), headers: {'ngrok-skip-browser-warning': 'true'});
         final bytes = response.bodyBytes;
         request.files.add(http.MultipartFile.fromBytes(
           'audio',
@@ -1298,7 +1299,7 @@ class _PlayfulSafetyContextWidgetState extends State<PlayfulSafetyContextWidget>
       final Uri url = Uri.parse('$baseUrl/route-safety');
       final response = await http.post(
         url,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true'},
         body: json.encode({
           'job_timestamp': widget.timestamp!.toUtc().toIso8601String(),
           'area_hint': widget.areaHint ?? '',

@@ -329,7 +329,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
 
       final response = await http.get(
         url,
-        headers: {'User-Agent': 'com.gigshield.app'},
+        headers: {'User-Agent': 'com.gigshield.app', 'ngrok-skip-browser-warning': 'true'},
       );
 
       if (response.statusCode == 200) {

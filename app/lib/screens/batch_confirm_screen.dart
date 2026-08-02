@@ -208,7 +208,7 @@ class _BatchConfirmScreenState extends State<BatchConfirmScreen> {
       }
       for (final platform in distinctPlatforms) {
         final Uri recalculateUrl = Uri.parse('$baseUrl/admin/recalculate-benchmarks?platform=$platform');
-        http.post(recalculateUrl).then((response) {
+        http.post(recalculateUrl, headers: {'ngrok-skip-browser-warning': 'true'}).then((response) {
           debugPrint("Background batch auto-recalculate triggered for $platform: ${response.statusCode}");
         }).catchError((err) {
           debugPrint("Failed to trigger background batch auto-recalculate for $platform: $err");
@@ -218,7 +218,7 @@ class _BatchConfirmScreenState extends State<BatchConfirmScreen> {
       // Fire insight regeneration once
       if (uid != 'anonymous_user') {
         final Uri url = Uri.parse('$baseUrl/weekly-insight?user_id=$uid');
-        http.get(url).then((response) {
+        http.get(url, headers: {'ngrok-skip-browser-warning': 'true'}).then((response) {
           debugPrint("Background batch weekly-insight regeneration triggered: ${response.statusCode}");
         }).catchError((err) {
           debugPrint("Failed to trigger background weekly-insight: $err");

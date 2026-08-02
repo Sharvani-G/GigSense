@@ -550,7 +550,7 @@ class FairnessResultScreen extends StatelessWidget {
 
                   final response = await http.post(
                     url,
-                    headers: {'Content-Type': 'application/json'},
+                    headers: {'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true'},
                     body: json.encode({
                       'job_id': job['id'] ?? '',
                       'user_id': uid,
