@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:image_picker/image_picker.dart';
 import '../main.dart';
 import '../i18n/strings.dart';
 import 'playful_widgets.dart';
@@ -790,7 +791,18 @@ class _ChatScreenState extends State<ChatScreen> {
                           });
                         },
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
+                      PlayfulImagePickerButton(
+                        onLoadingChanged: (loading) {
+                          setState(() {
+                            _isLoading = loading;
+                          });
+                        },
+                        onImageScanned: (prompt) {
+                          _sendMessage(prompt);
+                        },
+                      ),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: PlayfulInput(
                           labelText: "",
@@ -1048,7 +1060,11 @@ class _MessageBubbleState extends State<_MessageBubble> with SingleTickerProvide
             ),
           ),
           child: Text(
-            message.text,
+            message.text.startsWith('[IMAGE SCAN RESULT]')
+                ? '📷 Scanned Receipt Details'
+                : message.text.startsWith('[IMAGE RAW TEXT]')
+                    ? '📷 Scanned General Image'
+                    : message.text,
             style: GoogleFonts.plusJakartaSans(
               color: Colors.white,
               fontSize: 15,
@@ -1378,6 +1394,182 @@ class _PlayfulSendButtonState extends State<PlayfulSendButton> {
         child: const Icon(
           Icons.send,
           color: Colors.white,
+          size: 20,
+        ),
+      ),
+    );
+  }
+}
+
+class PlayfulImagePickerButton extends StatefulWidget {
+  final ValueChanged<String> onImageScanned;
+  final ValueChanged<bool> onLoadingChanged;
+
+  const PlayfulImagePickerButton({
+    super.key,
+    required this.onImageScanned,
+    required this.onLoadingChanged,
+  });
+
+  @override
+  State<PlayfulImagePickerButton> createState() => _PlayfulImagePickerButtonState();
+}
+
+class _PlayfulImagePickerButtonState extends State<PlayfulImagePickerButton> {
+  bool _isPressed = false;
+
+  Future<void> _pickAndScanImage() async {
+    final picker = ImagePicker();
+    
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Color(0xFFFFFDF5),
+          border: Border(top: BorderSide(color: PlayfulColors.border, width: 4)),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              "SELECT IMAGE SOURCE",
+              style: GoogleFonts.outfit(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                color: PlayfulColors.foreground,
+              ),
+            ),
+            const SizedBox(height: 16),
+            PlayfulButton(
+              onPressed: () => Navigator.pop(context, ImageSource.camera),
+              child: const Text("📸 TAKE PHOTO"),
+            ),
+            const SizedBox(height: 12),
+            PlayfulButton(
+              onPressed: () => Navigator.pop(context, ImageSource.gallery),
+              child: const Text("📁 CHOOSE FROM GALLERY"),
+            ),
+            const SizedBox(height: 12),
+            PlayfulButton(
+              onPressed: () => Navigator.pop(context),
+              backgroundColor: const Color(0xFFE2E8F0),
+              child: const Text("CANCEL", style: TextStyle(color: PlayfulColors.foreground)),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    final pickedFile = await picker.pickImage(source: source, imageQuality: 50, maxWidth: 1024);
+    if (pickedFile == null) return;
+
+    widget.onLoadingChanged(true);
+    
+    final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+    final Uri url = Uri.parse('$baseUrl/jobs/scan');
+
+    try {
+      final request = http.MultipartRequest('POST', url)
+        ..files.add(await http.MultipartFile.fromPath('file', pickedFile.path));
+      
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final bool relevant = data['relevant'] ?? false;
+        final bool isBatch = data['is_batch'] ?? false;
+        final String rawText = data['raw_text'] ?? '';
+
+        String promptToSend = "";
+        
+        if (relevant) {
+          if (isBatch) {
+            final List<dynamic> candidates = data['candidates'] ?? [];
+            promptToSend = "[IMAGE SCAN RESULT]: Batch screenshot detected with ${candidates.length} candidate trips. Details: ${json.encode(candidates)}. Explain these and summarize the pay fairness for each.";
+          } else {
+            final platform = data['platform'] ?? 'other';
+            final fare = data['fare'];
+            final dist = data['distance'];
+            final dur = data['duration'];
+            final base = data['base_fare'];
+            final inc = data['incentive_amount'];
+            final surge = data['surge_amount'];
+            final ded = data['deduction_amount'];
+            final reason = data['deduction_reason_stated'] ?? false;
+
+            promptToSend = "[IMAGE SCAN RESULT]: Single trip screenshot analyzed.\n"
+                "- Platform: $platform\n"
+                "- Total Fare: $fare\n"
+                "- Distance: $dist\n"
+                "- Duration: $dur\n"
+                "- Base Fare: $base\n"
+                "- Incentive: $inc\n"
+                "- Surge: $surge\n"
+                "- Deduction: $ded (reason disclosed: $reason)\n"
+                "Please analyze this gig trip receipt payout breakdown, legal compliance, and provide recommendations.";
+          }
+        } else {
+          promptToSend = "[IMAGE RAW TEXT]: \"$rawText\". The user uploaded this screenshot or receipt in chat. Please interpret the details or answer the user's questions about it.";
+        }
+
+        widget.onImageScanned(promptToSend);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to parse receipt screenshot. Please try again.")),
+        );
+      }
+    } catch (e) {
+      debugPrint("Error scanning image in chat: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Error connecting to scan service.")),
+      );
+    } finally {
+      widget.onLoadingChanged(false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Offset translateOffset = _isPressed ? const Offset(1, 1) : Offset.zero;
+    Offset shadowOffset = _isPressed ? const Offset(1, 1) : const Offset(2, 2);
+
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        _pickAndScanImage();
+      },
+      onTapCancel: () => setState(() => _isPressed = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 60),
+        transform: Matrix4.translationValues(translateOffset.dx, translateOffset.dy, 0),
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(color: PlayfulColors.border, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: PlayfulColors.border,
+              offset: shadowOffset,
+              blurRadius: 0,
+            ),
+          ],
+        ),
+        child: const Icon(
+          Icons.image_outlined,
+          color: PlayfulColors.foreground,
           size: 20,
         ),
       ),

@@ -77,21 +77,36 @@ LANGUAGE AND SCRIPT RULES:
 
 """
 
-def get_weekly_insight_prompt(worker_type_desc: str, aggregates_json: str, language_name: str) -> str:
+def get_weekly_insight_prompt(worker_type_desc: str, aggregates_json: str, language_name: str, forecast_json: str = None) -> str:
+    forecast_section = ""
+    if forecast_json:
+        forecast_section = f"""
+
+FORECAST PATTERN CONTEXT (ground truth computed from worker history):
+{forecast_json}
+
+FORECAST INSTRUCTIONS:
+- You MUST replace or supplement the encouraging next step with exactly ONE forward-looking sentence forecasting their best shift.
+- The forward-looking sentence must state that based on the worker's own logging pattern, a specific day of week and time of day combination on a platform (e.g. Friday evenings on Zomato) is their highest-paying window, and they should prioritize logging on during this time.
+- HONESTY GUARD: If `is_data_thin` is true in the FORECAST PATTERN CONTEXT, you MUST qualify the prediction with lower-confidence phrasing like "based on a small amount of data so far". If `is_data_thin` is false, you can state it with regular confidence.
+- COMMUNITY CORROBORATION: If `corroborated_by_community` is true in the FORECAST PATTERN CONTEXT, you MUST explicitly mention that community data corroborates this pattern (e.g. "which is also backed by other workers' experience in the community"). If false, do not mention the community corroboration.
+"""
+
     return f"""You are a supportive coach helping an Indian gig worker improve their earnings and monitor pay fairness. The worker is a {worker_type_desc}.
 Here is their weekly earnings data in JSON:
-{aggregates_json}
+{aggregates_json}{forecast_section}
 
 Write a short, warm, honest weekly summary.
 RESPONSE STRUCTURE RULES:
 - Write exactly 2-3 sentences.
+- Do NOT include any introductory remarks, greeting phrases, conversational meta-commentary, or markdown JSON/code block wraps before or after the summary text. Start directly with the first sentence of your summary.
 - Lead with the most important finding or aggregate calculation FIRST (never bury the lead).
-- Use **bold** only around the single most important fact/number/action (e.g. the total underpaid amount, the count of flagged trips, or the count of trips with undisclosed deductions) — do not bold multiple phrases.
+- Use **bold** only around the single most important fact/number/action (e.g. the total underpaid amount, the count of flagged trips, the count of trips with undisclosed deductions, or the predicted best-paying shift window if it is the highlight of the summary) — do not bold multiple separate phrases.
 - If there is not enough history to meaningfully compare against a typical week, speak honestly about this week's numbers as they stand.
 - Call out any concentration of underpayment or anomalies (e.g., concentrated on Zomato).
 - If there are undisclosed deductions (indicated by `undisclosed_deductions_count` > 0 in the JSON), call out the count and platform specifically (e.g., "Two of your Swiggy trips this week had deductions with no disclosed reason, which the law requires"). Ground this in Karnataka's Platform-Based Gig Workers Act which mandates aggregators to disclose reasons for all deductions.
 - Analyze the 'total_hours' and if it is very high (e.g., > 50 hours/week), call out a risk of burnout and advise resting.
-- End with exactly one small, practical, encouraging next step.
+- End with exactly one small, practical, encouraging next step (or the forward-looking prediction if forecast context is present).
 - Never be scolding; maintain a supportive yet realistic tone.
 
 Respond in {language_name}."""

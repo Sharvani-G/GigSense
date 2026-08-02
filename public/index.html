@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GigShield Safety Tracker</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@800;900&family=Plus+Jakarta+Sans:wght@600;700;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg: #FFFDF5;
+      --fg: #1E293B;
+      --border: #1E293B;
+      --accent: #8B5CF6;
+      --danger: #E11D48;
+      --success: #2DD4BF;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--bg);
+      color: var(--fg);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Neobrutalist Header */
+    header {
+      background-color: #white;
+      border-bottom: 4px solid var(--border);
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    h1 {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 900;
+      font-size: 24px;
+      letter-spacing: 1px;
+      color: var(--fg);
+      text-transform: uppercase;
+    }
+
+    /* Container */
+    #container {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      position: relative;
+    }
+
+    #map {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* Floating Status Card */
+    #status-card {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      background: white;
+      border: 3px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      z-index: 1000;
+      box-shadow: 4px 4px 0px var(--border);
+      max-width: 480px;
+    }
+
+    @media(min-width: 600px) {
+      #status-card {
+        left: 24px;
+        right: auto;
+        width: 380px;
+      }
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      font-weight: 800;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border: 2px solid var(--border);
+      margin-bottom: 8px;
+    }
+
+    .badge.active {
+      background-color: var(--danger);
+      color: white;
+    }
+
+    .badge.inactive {
+      background-color: #CBD5E1;
+      color: var(--fg);
+    }
+
+    .status-title {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 900;
+      font-size: 16px;
+      margin-bottom: 4px;
+    }
+
+    .status-desc {
+      font-size: 12px;
+      color: #64748B;
+      margin-bottom: 12px;
+    }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      border-top: 2px dashed #E2E8F0;
+      padding-top: 10px;
+      font-size: 12px;
+    }
+
+    .meta-label {
+      font-weight: 700;
+      color: #64748B;
+    }
+
+    .meta-value {
+      font-family: 'Share Tech Mono', monospace;
+      font-weight: bold;
+    }
+
+    #error-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(255, 253, 245, 0.9);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+      padding: 32px;
+      text-align: center;
+    }
+
+    .error-card {
+      background: white;
+      border: 4px solid var(--border);
+      box-shadow: 6px 6px 0px var(--border);
+      padding: 24px;
+      border-radius: 20px;
+      max-width: 400px;
+    }
+
+    .error-title {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 900;
+      font-size: 20px;
+      margin-bottom: 12px;
+      color: var(--danger);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>GigShield Safety</h1>
+  </header>
+
+  <div id="container">
+    <div id="map"></div>
+
+    <div id="status-card">
+      <div id="status-badge" class="badge active">LIVE TRACKING</div>
+      <div class="status-title" id="status-text">Locating worker...</div>
+      <div class="status-desc" id="status-updated">Updates live in real-time.</div>
+      
+      <div class="meta-row">
+        <div>
+          <span class="meta-label">LAST UPDATED: </span>
+          <span class="meta-value" id="last-time">--:--:--</span>
+        </div>
+        <div>
+          <span class="meta-label">POINTS: </span>
+          <span class="meta-value" id="points-count">0</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="error-overlay" style="display: none;">
+      <div class="error-card">
+        <div class="error-title" id="error-title">Tracking Ended</div>
+        <p id="error-desc">This location sharing session is no longer active.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- Firebase Compatibility SDKs -->
+  <script src="/__/firebase/10.8.0/firebase-app-compat.js"></script>
+  <script src="/__/firebase/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="/__/firebase/init.js"></script>
+
+  <script>
+    // 1. Initialize Map
+    const map = L.map('map').setView([12.9716, 77.5946], 13);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    let marker = null;
+    let pathLine = L.polyline([], { color: '#8B5CF6', weight: 5, opacity: 0.8 }).addTo(map);
+
+    // Custom Neobrutalist Pin Icon
+    const customIcon = L.divIcon({
+      className: 'custom-div-icon',
+      html: `<div style="
+        width: 24px;
+        height: 24px;
+        background-color: #E11D48;
+        border: 3px solid #1E293B;
+        border-radius: 50%;
+        box-shadow: 2px 2px 0px #1E293B;
+      "></div>`,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
+    });
+
+    // 2. Parse Session ID
+    const pathParts = window.location.pathname.split('/');
+    const sessionId = pathParts[pathParts.length - 1];
+
+    if (!sessionId || sessionId === 'track' || sessionId === 'index.html') {
+      showError("Invalid Session", "Please use the unique link shared by the worker.");
+    } else {
+      startTracking(sessionId);
+    }
+
+    function showError(title, desc) {
+      document.getElementById('error-overlay').style.display = 'flex';
+      document.getElementById('error-title').innerText = title;
+      document.getElementById('error-desc').innerText = desc;
+      document.getElementById('status-card').style.display = 'none';
+    }
+
+    function startTracking(id) {
+      try {
+        const db = firebase.firestore();
+        db.collection('liveLocations').doc(id).onSnapshot((doc) => {
+          if (!doc.exists) {
+            showError("Alert Not Found", "This tracking session does not exist or has been deleted.");
+            return;
+          }
+
+          const data = doc.data();
+          const now = new Date();
+          const expiresAt = data.expiresAt ? data.expiresAt.toDate() : null;
+          const isExpired = expiresAt && now > expiresAt;
+
+          if (!data.active || isExpired) {
+            // Sharing ended
+            const badge = document.getElementById('status-badge');
+            badge.className = 'badge inactive';
+            badge.innerText = 'SHARING ENDED';
+            document.getElementById('status-text').innerText = "Location sharing has ended";
+            document.getElementById('status-updated').innerText = "The worker stopped broadcasting or the session expired.";
+            document.getElementById('error-overlay').style.display = 'flex';
+            document.getElementById('error-title').innerText = "Location Sharing Ended";
+            document.getElementById('error-desc').innerText = "The worker has stopped broadcasting their live location.";
+          } else {
+            document.getElementById('status-text').innerText = "Emergency Alert Active";
+            document.getElementById('status-updated').innerText = "Receiving real-time GPS locations from worker.";
+          }
+
+          const locations = data.locations || [];
+          document.getElementById('points-count').innerText = locations.length;
+
+          if (locations.length > 0) {
+            // Sort by timestamp
+            locations.sort((a, b) => a.timestamp.toDate() - b.timestamp.toDate());
+            
+            const latest = locations[locations.length - 1];
+            const lat = latest.latitude;
+            const lng = latest.longitude;
+            const coords = [lat, lng];
+
+            // Update Marker
+            if (!marker) {
+              marker = L.marker(coords, { icon: customIcon }).addTo(map);
+            } else {
+              marker.setLatLng(coords);
+            }
+
+            // Update path history
+            const pathCoords = locations.map(loc => [loc.latitude, loc.longitude]);
+            pathLine.setLatLngs(pathCoords);
+
+            // Center map on latest point
+            map.setView(coords, 16);
+
+            // Update timestamp
+            const ts = latest.timestamp ? latest.timestamp.toDate() : new Date();
+            document.getElementById('last-time').innerText = ts.toLocaleTimeString();
+          }
+        }, (error) => {
+          console.error("Firestore Listen Error:", error);
+          showError("Connection Failed", "Unable to load live location coordinates.");
+        });
+      } catch (err) {
+        console.error("Firebase Init Error:", err);
+        showError("Initialization Error", "Failed to connect to safety tracking services.");
+      }
+    }
+  </script>
+</body>
+</html>

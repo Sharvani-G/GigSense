@@ -146,9 +146,13 @@ def extract_job_data(image_bytes: bytes) -> dict:
                 "raw_text": raw_text
             }
             
-    # 2. Fare (₹ or Rs followed by digits)
+    # 2. Fare (allow optional non-digit noise inside same line)
     fare = None
-    fare_match = re.search(r'(?:₹|Rs\.?)\s*(\d+(?:\.\d+)?)', raw_text, re.IGNORECASE)
+    fare_match = re.search(
+        r'(?:total[ \t]*earnings|total[ \t]*payout|net[ \t]*pay|total|fare|earnings)[ \t]*[:\- \t]*[^\d\n]*?[ \t]*(\d+(?:\.\d+)?)',
+        raw_text,
+        re.IGNORECASE
+    )
     if fare_match:
         try:
             fare = float(fare_match.group(1))
@@ -157,7 +161,11 @@ def extract_job_data(image_bytes: bytes) -> dict:
 
     # Expanded single-job breakdown parsing
     base_fare = None
-    base_match = re.search(r'(?:base\s*fare|base|trip\s*fare|minimum\s*fare)\s*(?:₹|Rs\.?|INR)?\s*(\d+(?:\.\d+)?)', raw_text, re.IGNORECASE)
+    base_match = re.search(
+        r'(?:base[ \t]*fare|base|trip[ \t]*fare|minimum[ \t]*fare)[ \t]*[:\- \t]*[^\d\n]*?[ \t]*(\d+(?:\.\d+)?)',
+        raw_text,
+        re.IGNORECASE
+    )
     if base_match:
         try:
             base_fare = float(base_match.group(1))
@@ -165,7 +173,11 @@ def extract_job_data(image_bytes: bytes) -> dict:
             pass
 
     incentive = None
-    inc_match = re.search(r'(?:incentive|bonus|quest|promo)\s*(?:₹|Rs\.?|INR)?\s*(\d+(?:\.\d+)?)', raw_text, re.IGNORECASE)
+    inc_match = re.search(
+        r'(?:incentive|bonus|quest|promo)[ \t]*[:\- \t]*[^\d\n]*?[ \t]*(\d+(?:\.\d+)?)',
+        raw_text,
+        re.IGNORECASE
+    )
     if inc_match:
         try:
             incentive = float(inc_match.group(1))
@@ -173,7 +185,11 @@ def extract_job_data(image_bytes: bytes) -> dict:
             pass
 
     surge = None
-    surge_match = re.search(r'(?:surge|peak|boost|demand\s*pricing)\s*(?:₹|Rs\.?|INR)?\s*(\d+(?:\.\d+)?)', raw_text, re.IGNORECASE)
+    surge_match = re.search(
+        r'(?:surge|peak|boost|demand[ \t]*pricing)[ \t]*[:\- \t]*[^\d\n]*?[ \t]*(\d+(?:\.\d+)?)',
+        raw_text,
+        re.IGNORECASE
+    )
     if surge_match:
         try:
             surge = float(surge_match.group(1))
@@ -182,7 +198,11 @@ def extract_job_data(image_bytes: bytes) -> dict:
 
     deduction = None
     deduction_reason_stated = False
-    ded_match = re.search(r'(?:deduction|commission|service\s*fee|fee)\s*(?:₹|Rs\.?|INR)?\s*(\d+(?:\.\d+)?)', raw_text, re.IGNORECASE)
+    ded_match = re.search(
+        r'(?:deduction|commission|service[ \t]*fee|fee|platform[ \t]*fee)[ \t]*[:\- \t]*[^\d\n]*?[ \t]*(\d+(?:\.\d+)?)',
+        raw_text,
+        re.IGNORECASE
+    )
     if ded_match:
         try:
             deduction = float(ded_match.group(1))

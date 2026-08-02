@@ -14,6 +14,7 @@ import 'playful_widgets.dart';
 import 'history_screen.dart';
 import 'fairness_map_screen.dart';
 import '../i18n/strings.dart';
+import 'sos_active_screen.dart';
 import '../main.dart' show showLanguagePicker, MainNavigationController;
 
 class HomeScreen extends StatefulWidget {
@@ -29,14 +30,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  static const Map<String, String> _sosTemplates = {
-    'en': 'I feel unsafe right now and need help. This is an automatic alert from GigShield.',
-    'hi': 'मुझे अभी असुरक्षित महसूस हो रहा है और मदद की ज़रूरत है। यह गीगशील्ड (GigShield) से एक स्वचालित अलर्ट है।',
-    'kn': 'ನನಗೆ ಈಗ ಅಸುರಕ್ಷಿತ ಅನಿಸುತ್ತಿದೆ ಮತ್ತು ಸಹಾಯದ ಅಗತ್ಯವಿದೆ. ಇದು ಗೀಗ್‌ಶೀಲ್ಡ್ (GigShield) ನಿಂದ ಸ್ವಯಂಚಾಲಿತ ಎಚ್ಚರಿಕೆಯಾಗಿದೆ.',
-    'te': 'నేను ఇప్పుడు అసురక్షితంగా భావిస్తున్నాను మరియు సహాయం కావాలి. ఇది గీగ్‌షీల్డ్ (GigShield) నుండి ఒక ఆటోమేటిక్ అలర్ట్.',
-    'ta': 'நான் இப்போது பாதுகாப்பற்றதாக உணர்கிறேன், உதவி தேவை. இது கிக்ஷீல்ட் (GigShield) இன் தானியங்கி எச்சரிக்கை ஆகும்.',
-    'ml': 'എനിക്ക് ഇപ്പോൾ സുരക്ഷിതത്വമില്ലായ്മ തോന്നുന്നു, സഹായം ആവശ്യമുണ്ട്. ഇത് ഗിഗ്ഷീൽഡിൽ (GigShield) നിന്നുള്ള ഒരു ഓട്ടോമാറ്റിക് അലേർട്ട് ആണ്.',
-  };
+
 
   bool _isLoading = true;
   bool _hasError = false;
@@ -109,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             setState(() {
               _userName = (data['name'] as String?)?.toUpperCase() ?? "THERE";
               _savingsGoal = data['savingsGoal'] as Map<String, dynamic>?;
-              if (cachedText != null && cachedText != _insightText) {
+              if (cachedText != null) {
                 _insightText = cachedText;
                 _isInsightLoading = false;
                 _insightAnimationController.forward(from: 0.0);
@@ -121,6 +115,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         });
       }
     }
+    
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (SOSManager.instance.isActive && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SOSActiveScreen(contact: SOSManager.instance.activeContact!),
+          ),
+        );
+      }
+    });
   }
 
   void _onTabChanged() {
@@ -158,7 +163,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Future<void> _fetchAndProcessJobs() async {
     setState(() {
       _isLoading = true;
-      _isInsightLoading = true;
+      if (!_userFetched) {
+        _isInsightLoading = true;
+      }
       _hasError = false;
     });
 
@@ -1525,7 +1532,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             TextButton(
               onPressed: () {
                 Navigator.pop(ctx);
-                _sendSOSWithContact(null);
+                _triggerSOSWithContact({'name': 'Emergency Contact', 'phone': ''});
               },
               child: Text(
                 "SEND ANYWAY",
@@ -1555,123 +1562,38 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return;
     }
 
-    await _sendSOSWithContact(trustedContact);
+    await _triggerSOSWithContact(trustedContact);
   }
 
-  Future<void> _sendSOSWithContact(Map<String, dynamic>? contact) async {
-    // 1. Fetch location (timeout 3s)
-    String locationLink = "";
+  Future<void> _triggerSOSWithContact(Map<String, dynamic> contact) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    // Fetch settings and name
+    Map<String, dynamic> sosSettings = {
+      'channels': {'sms': true, 'whatsapp': false, 'call': false},
+      'primaryChannel': 'sms',
+      'locationMode': 'live',
+      'liveLocationDurationMinutes': 30,
+      'messageTemplate': null,
+    };
+    String workerName = "Worker";
+    
     try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      
-      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        if (serviceEnabled) {
-          final Position position = await Geolocator.getCurrentPosition(
-            locationSettings: const LocationSettings(
-              accuracy: LocationAccuracy.high,
-            ),
-          ).timeout(const Duration(seconds: 3));
-          locationLink = "\nMy current location: https://www.google.com/maps?q=${position.latitude},${position.longitude}";
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        workerName = data['name'] ?? "Worker";
+        if (data['sosSettings'] != null) {
+          sosSettings = Map<String, dynamic>.from(data['sosSettings']);
         }
       }
     } catch (e) {
-      debugPrint("Error fetching location: $e");
+      debugPrint("Error fetching settings for SOS: $e");
     }
 
-    // 2. Build message
-    final String lang = StringsProvider.instance.lang.toLowerCase();
-    final String template = _sosTemplates[lang] ?? _sosTemplates['en']!;
-    final String fullMessage = "$template$locationLink";
-
-    // 3. Send via WhatsApp
-    final String phone = contact != null && contact['phone'] != null
-        ? contact['phone'].toString()
-        : '';
-
-    final bool sent = await _sendSosViaWhatsApp(phoneNumber: phone, message: fullMessage);
-    if (!sent) {
-      _showFallbackClipboardDialog(fullMessage);
-    }
-  }
-
-  Future<bool> _sendSosViaWhatsApp({
-    required String phoneNumber,
-    required String message,
-  }) async {
-    final cleanDigits = phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
-    String sanitizedNumber = cleanDigits;
-    if (cleanDigits.length == 10) {
-      sanitizedNumber = '91$cleanDigits';
-    }
-
-    final encodedMessage = Uri.encodeComponent(message);
-    final whatsappUri = sanitizedNumber.isNotEmpty
-        ? Uri.parse('https://wa.me/$sanitizedNumber?text=$encodedMessage')
-        : Uri.parse('https://api.whatsapp.com/send?text=$encodedMessage');
-
-    try {
-      if (await canLaunchUrl(whatsappUri)) {
-        return await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
-      }
-    } catch (e) {
-      debugPrint("Error launching WhatsApp: $e");
-    }
-    return false;
-  }
-
-  void _showFallbackClipboardDialog(String fullMessage) {
     if (!mounted) return;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: PlayfulColors.border, width: 2),
-        ),
-        backgroundColor: Colors.white,
-        title: Text(
-          "WhatsApp Unavailable",
-          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: PlayfulColors.foreground),
-        ),
-        content: Text(
-          "WhatsApp is not installed or could not be opened. Would you like to copy the SOS alert message to your clipboard instead?",
-          style: GoogleFonts.plusJakartaSans(color: PlayfulColors.foreground),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              "CANCEL",
-              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: PlayfulColors.mutedForeground),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              Clipboard.setData(ClipboardData(text: fullMessage));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("SOS alert copied to clipboard.")),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: PlayfulColors.accent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: const BorderSide(color: PlayfulColors.border, width: 1.5),
-              ),
-            ),
-            child: Text(
-              "COPY ALERT",
-              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
+    await SOSManager.instance.startSOS(contact, sosSettings, workerName, context);
   }
 }
 
