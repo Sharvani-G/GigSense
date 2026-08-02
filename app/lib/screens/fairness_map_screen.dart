@@ -87,6 +87,57 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
     'malleshwaram': const LatLng(13.0031, 77.5697),
   };
 
+  final Map<String, List<LatLng>> _zonePolygons = {
+    'koramangala': [
+      const LatLng(12.9420, 77.6150),
+      const LatLng(12.9450, 77.6320),
+      const LatLng(12.9250, 77.6350),
+      const LatLng(12.9220, 77.6180),
+    ],
+    'indiranagar': [
+      const LatLng(12.9850, 77.6320),
+      const LatLng(12.9820, 77.6520),
+      const LatLng(12.9680, 77.6500),
+      const LatLng(12.9650, 77.6350),
+    ],
+    'hsr layout': [
+      const LatLng(12.9200, 77.6350),
+      const LatLng(12.9150, 77.6600),
+      const LatLng(12.9000, 77.6550),
+      const LatLng(12.9020, 77.6320),
+    ],
+    'whitefield': [
+      const LatLng(12.9850, 77.7350),
+      const LatLng(12.9820, 77.7680),
+      const LatLng(12.9520, 77.7650),
+      const LatLng(12.9550, 77.7320),
+    ],
+    'jayanagar': [
+      const LatLng(12.9400, 77.5700),
+      const LatLng(12.9380, 77.5920),
+      const LatLng(12.9180, 77.5900),
+      const LatLng(12.9200, 77.5720),
+    ],
+    'yelahanka': [
+      const LatLng(13.1150, 77.5820),
+      const LatLng(13.1120, 77.6120),
+      const LatLng(13.0850, 77.6100),
+      const LatLng(13.0880, 77.5800),
+    ],
+    'electronic city': [
+      const LatLng(12.8650, 77.6650),
+      const LatLng(12.8620, 77.6980),
+      const LatLng(12.8320, 77.6950),
+      const LatLng(12.8350, 77.6620),
+    ],
+    'malleshwaram': [
+      const LatLng(13.0150, 77.5620),
+      const LatLng(13.0120, 77.5780),
+      const LatLng(12.9920, 77.5750),
+      const LatLng(12.9950, 77.5580),
+    ],
+  };
+
   @override
   void dispose() {
     _debounceTimer?.cancel();
@@ -216,7 +267,28 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
     return list;
   }
 
-  // Locating User (GPS centering)
+  bool _isPointInPolygon(LatLng point, List<LatLng> polygon) {
+    int i, j = polygon.length - 1;
+    bool oddNodes = false;
+    double x = point.longitude;
+    double y = point.latitude;
+
+    for (i = 0; i < polygon.length; i++) {
+      double ypI = polygon[i].latitude;
+      double xpI = polygon[i].longitude;
+      double ypJ = polygon[j].latitude;
+      double xpJ = polygon[j].longitude;
+
+      if (((ypI < y && ypJ >= y) || (ypJ < y && ypI >= y)) &&
+          (xpI + (y - ypI) / (ypJ - ypI) * (xpJ - xpI) < x)) {
+        oddNodes = !oddNodes;
+      }
+      j = i;
+    }
+    return oddNodes;
+  }
+
+  // Locating User (GPS centering & showing region details)
   Future<void> _locateUser() async {
     setState(() {
       _isLocatingUser = true;
@@ -262,6 +334,58 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
       });
 
       _mapController.move(_userLocation!, 13.5);
+
+      // Query jobs to check against local stats
+      final jobsSnapshot = await FirebaseFirestore.instance.collection('jobs').get();
+      final statsList = _computeZoneStats(jobsSnapshot.docs);
+
+      ZoneStats? matchedZone;
+
+      // 1. Ray-casting check for exact polygon boundaries
+      for (var s in statsList) {
+        final polygon = _zonePolygons[s.zone];
+        if (polygon != null && _isPointInPolygon(_userLocation!, polygon)) {
+          matchedZone = s;
+          break;
+        }
+      }
+
+      // 2. Nearest zone check (if not inside any polygon)
+      if (matchedZone == null) {
+        double minDistance = double.infinity;
+        ZoneStats? nearest;
+        for (var s in statsList) {
+          final coords = _zoneCoordinates[s.zone]!;
+          final double distance = Geolocator.distanceBetween(
+            _userLocation!.latitude,
+            _userLocation!.longitude,
+            coords.latitude,
+            coords.longitude,
+          ) / 1000.0;
+
+          if (distance < minDistance) {
+            minDistance = distance;
+            nearest = s;
+          }
+        }
+
+        // If nearest zone is within 8km, consider it the active zone for this location
+        if (nearest != null && minDistance <= 8.0) {
+          matchedZone = nearest;
+        }
+      }
+
+      if (matchedZone != null) {
+        if (mounted) {
+          _showZoneDetailBottomSheet(context, matchedZone);
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("You are outside the monitored Bangalore zones.")),
+          );
+        }
+      }
     } catch (e) {
       debugPrint("Error getting user location: $e");
       setState(() => _isLocatingUser = false);
@@ -846,23 +970,25 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
   }
 
   Widget _buildMapView(List<ZoneStats> stats) {
-    final List<CircleMarker> circles = [];
+    final List<Polygon> polygons = [];
     final List<Marker> markers = [];
 
-    // 1. Plot Zone Circles & Labels
+    // 1. Plot Zone Polygons & Labels
     for (var s in stats) {
-      if (s.totalTrips < 2) continue; // Only draw circles/markers with data
+      if (s.totalTrips < 2) continue; // Only draw zones with data
+
+      final polygonPoints = _zonePolygons[s.zone];
+      if (polygonPoints != null) {
+        polygons.add(Polygon(
+          points: polygonPoints,
+          color: s.statusColor.withOpacity(0.25),
+          borderColor: s.statusColor,
+          borderStrokeWidth: 3.0,
+          isFilled: true,
+        ));
+      }
 
       final coords = _zoneCoordinates[s.zone]!;
-      circles.add(CircleMarker(
-        point: coords,
-        radius: 1200,
-        useRadiusInMeter: true,
-        color: s.statusColor.withOpacity(0.35),
-        borderColor: s.statusColor,
-        borderStrokeWidth: 3.0,
-      ));
-
       markers.add(Marker(
         point: coords,
         width: 140,
@@ -965,7 +1091,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.gigshield.app',
                 ),
-                CircleLayer(circles: circles),
+                PolygonLayer(polygons: polygons),
                 MarkerLayer(markers: markers),
               ],
             ),

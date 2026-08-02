@@ -1524,7 +1524,7 @@ class _PlayfulImagePickerButtonState extends State<PlayfulImagePickerButton> {
             final reason = data['deduction_reason_stated'] ?? false;
 
             if (fare == null) {
-              promptToSend = "[IMAGE NO FARE]: Single trip details found but no fare/price detected. Raw text: \"$rawText\"";
+              promptToSend = "[IMAGE SCAN RESULT]: Relevant gig work image (such as contract, platform message, or receipt details) with no direct fare amount detected. Raw OCR text: \"$rawText\". Analyze this text and explain its contents, terms, or implications for the worker.";
             } else {
               promptToSend = "[IMAGE SCAN RESULT]: Single trip screenshot analyzed.\n"
                   "- Platform: $platform\n"

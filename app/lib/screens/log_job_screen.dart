@@ -528,11 +528,10 @@ class _LogJobScreenState extends State<LogJobScreen> {
           } else {
             if (ocrStatus == 'irrelevant') {
               _ocrGeneralNote = "This doesn't look like an earnings receipt — try a clearer screenshot of the trip summary.";
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("This doesn't look like an earnings receipt — try a clearer screenshot of the trip summary."),
-                  backgroundColor: PlayfulColors.secondary,
-                ),
+              showPlayfulSnackBar(
+                context,
+                "This doesn't look like an earnings receipt — try a clearer screenshot of the trip summary.",
+                isError: true,
               );
               _fareController.clear();
               _distanceController.clear();
@@ -549,11 +548,10 @@ class _LogJobScreenState extends State<LogJobScreen> {
               _deductionReasonStated = null;
             } else {
               _ocrGeneralNote = "Couldn't confidently read some details (fare, distance, or duration) from this screenshot. Please verify or enter them manually.";
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("Couldn't confidently read some details (fare, distance, or duration) from this screenshot. Please verify or enter them manually."),
-                  backgroundColor: PlayfulColors.secondary,
-                ),
+              showPlayfulSnackBar(
+                context,
+                "Couldn't confidently read some details (fare, distance, or duration) from this screenshot. Please verify or enter them manually.",
+                isError: true,
               );
               _prefillManualEntry(data);
             }

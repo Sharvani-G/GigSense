@@ -152,16 +152,17 @@ The navigation handles flow transitions from the `LoginScreen` or `OnboardingScr
 ---
 
 ## Recent Changes
-1. Swapped walkthrough text widgets for `PlayfulMarkdownText` to support bold tags.
-2. Upgraded input placeholder styling colors in `PlayfulInput` to pass WCAG 4.5:1 contrast thresholds.
-3. Upgraded `PlayfulToggle`, `PlayfulUnitInput`, and `PlayfulMicButton` background elements to pass WCAG color contrast criteria.
-4. Corrected emergency contact and permission modal button styles.
-5. Added runtime exception handling in STT uploads to alert users when whisper output is empty.
-6. Implemented automatic loopback IP converter (`127.0.0.1` -> `10.0.2.2`) inside mobile endpoints on Android.
-7. Declared `NSMicrophoneUsageDescription` and `NSSpeechRecognitionUsageDescription` keys inside iOS `Info.plist`.
-8. Imported missing localization elements in `settings_screen.dart` and `fairness_map_screen.dart`.
-9. Added a new `ocr_result_screen.dart` to display clean receipt calculations comparing payout against community stats.
-10. Added `seed_jobs.py` for populating dummy databases.
+1. Replaced circular locality map markers with realistic boundary polygons and implemented point-in-polygon checks to trigger detail sheets on user location centering.
+2. Swapped walkthrough text widgets for `PlayfulMarkdownText` to support bold tags.
+3. Upgraded input placeholder styling colors in `PlayfulInput` to pass WCAG 4.5:1 contrast thresholds.
+4. Upgraded `PlayfulToggle`, `PlayfulUnitInput`, and `PlayfulMicButton` background elements to pass WCAG color contrast criteria.
+5. Corrected emergency contact and permission modal button styles.
+6. Added runtime exception handling in STT uploads to alert users when whisper output is empty.
+7. Implemented automatic loopback IP converter (`127.0.0.1` -> `10.0.2.2`) inside mobile endpoints on Android.
+8. Declared `NSMicrophoneUsageDescription` and `NSSpeechRecognitionUsageDescription` keys inside iOS `Info.plist`.
+9. Imported missing localization elements in `settings_screen.dart` and `fairness_map_screen.dart`.
+10. Added a new `ocr_result_screen.dart` to display clean receipt calculations comparing payout against community stats.
+11. Added `seed_jobs.py` for populating dummy databases.
 
 ---
 

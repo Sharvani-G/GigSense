@@ -1584,3 +1584,25 @@ Color getPlatformColor(String platform) {
   final index = hash.abs() % colors.length;
   return colors[index];
 }
+
+void showPlayfulSnackBar(BuildContext context, String message, {bool isError = false, double bottomMargin = 120.0}) {
+  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      behavior: SnackBarBehavior.floating,
+      margin: EdgeInsets.only(bottom: bottomMargin, left: 16, right: 16),
+      content: Text(
+        message,
+        style: GoogleFonts.plusJakartaSans(
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
+      backgroundColor: isError ? PlayfulColors.secondary : PlayfulColors.accent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: PlayfulColors.border, width: 2),
+      ),
+    ),
+  );
+}
