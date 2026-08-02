@@ -1739,6 +1739,45 @@ class AboutScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = StringsProvider.instance;
 
+    final List<Map<String, dynamic>> features = [
+      {
+        'title': s.t('about_feat_map_title'),
+        'desc': s.t('about_feat_map_desc'),
+        'icon': Icons.map,
+        'color': PlayfulColors.teal,
+      },
+      {
+        'title': s.t('about_feat_check_title'),
+        'desc': s.t('about_feat_check_desc'),
+        'icon': Icons.check_circle_outline,
+        'color': PlayfulColors.accent,
+      },
+      {
+        'title': s.t('about_feat_ocr_title'),
+        'desc': s.t('about_feat_ocr_desc'),
+        'icon': Icons.qr_code_scanner,
+        'color': PlayfulColors.secondary,
+      },
+      {
+        'title': s.t('about_feat_chat_title'),
+        'desc': s.t('about_feat_chat_desc'),
+        'icon': Icons.chat_bubble_outline,
+        'color': PlayfulColors.tertiary,
+      },
+      {
+        'title': s.t('about_feat_sos_title'),
+        'desc': s.t('about_feat_sos_desc'),
+        'icon': Icons.emergency_share,
+        'color': const Color(0xFFE11D48),
+      },
+      {
+        'title': s.t('about_feat_fatigue_title'),
+        'desc': s.t('about_feat_fatigue_desc'),
+        'icon': Icons.access_time,
+        'color': PlayfulColors.orange,
+      },
+    ];
+
     return Scaffold(
       backgroundColor: PlayfulColors.background,
       appBar: AppBar(
@@ -1754,8 +1793,8 @@ class AboutScreen extends StatelessWidget {
         ),
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -1778,13 +1817,13 @@ class AboutScreen extends StatelessWidget {
                     Text(
                       s.t('app_name'),
                       style: GoogleFonts.outfit(
-                        fontSize: 24,
+                        fontSize: 28,
                         fontWeight: FontWeight.w900,
                         color: PlayfulColors.foreground,
                         letterSpacing: 2.0,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     Text(
                       s.t('about_desc'),
                       textAlign: TextAlign.center,
@@ -1798,7 +1837,82 @@ class AboutScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const Spacer(),
+              const SizedBox(height: 32),
+              Text(
+                s.t('about_features_title'),
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: PlayfulColors.foreground,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ...features.map((feat) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 18.0),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: PlayfulColors.border, width: 2.0),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: PlayfulColors.border,
+                          offset: Offset(4, 4),
+                          blurRadius: 0,
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: feat['color'],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: PlayfulColors.border, width: 2.0),
+                          ),
+                          child: Icon(
+                            feat['icon'],
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                feat['title'],
+                                style: GoogleFonts.outfit(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                  color: PlayfulColors.foreground,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                feat['desc'],
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.4,
+                                  color: PlayfulColors.mutedForeground,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+              const SizedBox(height: 16),
               Text(
                 s.t('chat_disclaimer'),
                 textAlign: TextAlign.center,
@@ -1808,7 +1922,7 @@ class AboutScreen extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
             ],
           ),
         ),
