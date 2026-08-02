@@ -157,6 +157,24 @@ LANGUAGE_NAMES = {
     'ml': 'Malayalam',
 }
 
+NO_FARE_RESPONSES = {
+    'en': "I don't see a fare or price in this image — can you describe what you'd like me to check?",
+    'hi': "मुझे इस छवि में कोई किराया या कीमत नहीं दिख रही है — क्या आप बता सकते हैं कि आप मुझसे क्या जाँच करवाना चाहते हैं?",
+    'kn': "ಈ ಚಿತ್ರದಲ್ಲಿ ಯಾವುದೇ ದರ ಅಥವಾ ಬೆಲೆ ನನಗೆ ಕಾಣಿಸುತ್ತಿಲ್ಲ — ನಾನು ಏನನ್ನು ಪರಿಶೀಲಿಸಬೇಕೆಂದು ನೀವು ಬಯಸುತ್ತೀರಿ ಎಂದು ವಿವರಿಸಬಹುದೇ?",
+    'ta': "இந்தப் படத்தில் கட்டணம் அல்லது விலை எதுவும் எனக்குத் தெரியவில்லை — நான் எதைச் சரிபார்க்க வேண்டும் என்று நீங்கள் விரும்புகிறீர்கள் என்பதை விവரிக்க முடியுமா?",
+    'te': "ఈ చిత్రంలో నాకు ఎటువంటి ఛാർజీ లేదా ధర కనిపించడం లేదు — నేను దేనిని తనిఖీ చేయాలో మీరు వివరించగలరా?",
+    'ml': "ഈ ചിത്രത്തിൽ എനിക്ക് നിരക്കോ വിലയോ കാണാൻ കഴിയുന്നില്ല — ഞാൻ എന്താണ് പരിശോധിക്കേണ്ടതെന്ന് നിങ്ങൾക്ക് വിവരിക്കാമോ?"
+}
+
+REPEATED_IRRELEVANT_RESPONSES = {
+    'en': "Please upload a relevant gig work screenshot, receipt, or platform message so I can help you analyze it.",
+    'hi': "कृपया एक प्रासंगिक गिग काम का स्क्रीनशॉट, रसीद या प्लेटफॉर्म संदेश अपलोड करें ताकि मैं इसका विश्लेषण करने में आपकी मदद कर सकूं।",
+    'kn': "ದಯವಿಟ್ಟು ಸಂಬಂಧಿತ ಗಿಗ್ ಕೆಲಸದ ಸ್ಕ್ರೀನ್‌ಶಾಟ್, ರಶೀದಿ ಅಥವಾ ಪ್ಲಾಟ್‌ಫಾರ್ಮ್ ಸಂದೇಶವನ್ನು ಅಪ್‌ಲೋಡ್ ಮಾಡಿ ಇದರಿಂದ ನಾನು ಅದನ್ನು ವಿಶ್ಲೇಷಿಸಲು ನಿಮಗೆ ಸಹಾಯ ಮಾಡಬಹುದು.",
+    'ta': "தொடர்புடைய கிக் வேலை ஸ்கிரێنیஷாட், ரசீது அல்லது பிளாட்ஃபார்ம் செய்தியைப் பதிவேற்றவும், இதனால் அதை பகுப்பாய்வு செய்ய நான் உங்களுக்கு உதவ முடியும்.",
+    'te': "దయచేసి సంబంధಿತ గిగ్ వర్క్ స్క్రీన్‌షాట్, రసీదు లేదా ప్లాట్‌ఫారమ్ సందೇಶాన్ని అప్‌లోഡ് చేయండి, తద్വారా నేను దానిని విಶ್ಲೇషించడంలో మీకు సహాయపడగలను.",
+    'ml': "ദയവായി പ്രസക്തമായ ഒരു ഗിഗ് വർക്ക് സ്ക്രീൻഷോട്ട്, രസീത് അല്ലെങ്കിൽ പ്ലാറ്റ്ഫോം സന്ദേശം അപ്‌ലോഡ് ചെയ്യുക, അതുവഴി അത് വിശകലനം ചെയ്യാൻ എനിക്ക് നിങ്ങളെ സഹായിക്കാനാകും."
+}
+
 def get_user_profile(user_id: str) -> dict:
     """Fetch the user's profile from Firestore. Returns defaults on error."""
     if db is None or not user_id or user_id == 'anonymous_user':
@@ -188,6 +206,7 @@ async def chat_endpoint(request: ChatRequest):
     recent_jobs = get_recent_jobs(request.user_id)[:5]
     recent_jobs_json = json.dumps(recent_jobs)
 
+    history = []
     conversation_history_str = ""
     messages_ref = None
     if db is not None:
@@ -251,14 +270,31 @@ async def chat_endpoint(request: ChatRequest):
         language_name=language_name
     )
 
-    def event_generator():
+    async def event_generator():
         full_response = ""
-        for chunk in ask_gemma_stream(request.message, system_prompt):
-            if chunk == "OLLAMA_UNREACHABLE_ERROR":
-                yield json.dumps({"error": "Assistant is temporarily unavailable — please try again in a moment."}) + "\n"
-                return
-            full_response += chunk
-            yield json.dumps({"chunk": chunk}) + "\n"
+        if request.message.startswith("[IMAGE NO FARE]:"):
+            has_previous_irrelevant = any(msg.get("role") == "user" and msg.get("content", "").startswith("[IMAGE NO FARE]:") for msg in history)
+            if has_previous_irrelevant:
+                static_res = REPEATED_IRRELEVANT_RESPONSES.get(lang_code, REPEATED_IRRELEVANT_RESPONSES['en'])
+            else:
+                static_res = NO_FARE_RESPONSES.get(lang_code, NO_FARE_RESPONSES['en'])
+                
+            # Stream static response chunk by chunk to simulate typing
+            words = static_res.split(" ")
+            for i, word in enumerate(words):
+                chunk = word + (" " if i < len(words) - 1 else "")
+                full_response += chunk
+                yield json.dumps({"chunk": chunk}) + "\n"
+                await asyncio.sleep(0.02)
+        else:
+            for chunk in ask_gemma_stream(request.message, system_prompt):
+                if chunk == "OLLAMA_UNREACHABLE_ERROR":
+                    yield json.dumps({"error": "Assistant is temporarily unavailable — please try again in a moment."}) + "\n"
+                    return
+                full_response += chunk
+                yield json.dumps({"chunk": chunk}) + "\n"
+                await asyncio.sleep(0.001)
+
             
         # Save user message and assistant reply to Firestore server-side
         if messages_ref is not None and full_response:

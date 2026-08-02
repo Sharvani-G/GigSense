@@ -1523,19 +1523,23 @@ class _PlayfulImagePickerButtonState extends State<PlayfulImagePickerButton> {
             final ded = data['deduction_amount'];
             final reason = data['deduction_reason_stated'] ?? false;
 
-            promptToSend = "[IMAGE SCAN RESULT]: Single trip screenshot analyzed.\n"
-                "- Platform: $platform\n"
-                "- Total Fare: $fare\n"
-                "- Distance: $dist\n"
-                "- Duration: $dur\n"
-                "- Base Fare: $base\n"
-                "- Incentive: $inc\n"
-                "- Surge: $surge\n"
-                "- Deduction: $ded (reason disclosed: $reason)\n"
-                "Please analyze this gig trip receipt payout breakdown, legal compliance, and provide recommendations.";
+            if (fare == null) {
+              promptToSend = "[IMAGE NO FARE]: Single trip details found but no fare/price detected. Raw text: \"$rawText\"";
+            } else {
+              promptToSend = "[IMAGE SCAN RESULT]: Single trip screenshot analyzed.\n"
+                  "- Platform: $platform\n"
+                  "- Total Fare: $fare\n"
+                  "- Distance: $dist\n"
+                  "- Duration: $dur\n"
+                  "- Base Fare: $base\n"
+                  "- Incentive: $inc\n"
+                  "- Surge: $surge\n"
+                  "- Deduction: $ded (reason disclosed: $reason)\n"
+                  "Please analyze this gig trip receipt payout breakdown, legal compliance, and provide recommendations.";
+            }
           }
         } else {
-          promptToSend = "[IMAGE RAW TEXT]: \"$rawText\". The user uploaded this screenshot or receipt in chat. Please interpret the details or answer the user's questions about it.";
+          promptToSend = "[IMAGE NO FARE]: Irrelevant image with no trip/fare details. Raw text: \"$rawText\"";
         }
 
         widget.onImageScanned(promptToSend);
