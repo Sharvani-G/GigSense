@@ -1,4 +1,6 @@
 import '../i18n/strings.dart';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -269,12 +271,12 @@ class FairnessResultScreen extends StatelessWidget {
                                       borderRadius: BorderRadius.circular(16),
                                       side: const BorderSide(color: PlayfulColors.border, width: 2),
                                     ),
-                                    title: Text("Rate Source", style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+                                    title: Text(StringsProvider.instance.t('label_rate_source'), style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
                                     content: Text(infoText, style: GoogleFonts.plusJakartaSans()),
                                     actions: [
                                       TextButton(
                                         onPressed: () => Navigator.pop(context),
-                                        child: Text("Got it", style: GoogleFonts.plusJakartaSans(color: PlayfulColors.accent, fontWeight: FontWeight.bold)),
+                                        child: Text(StringsProvider.instance.t('btn_got_it'), style: GoogleFonts.plusJakartaSans(color: PlayfulColors.accent, fontWeight: FontWeight.bold)),
                                       ),
                                     ],
                                   ),
@@ -358,9 +360,9 @@ class FairnessResultScreen extends StatelessWidget {
                           // 3. Pop result screen
                           Navigator.pop(context);
                         },
-                        child: const FittedBox(
+                        child: FittedBox(
                           fit: BoxFit.scaleDown,
-                          child: Text("ASK ABOUT THIS"),
+                          child: Text(StringsProvider.instance.t('btn_ask_about_this')),
                         ),
                       ),
                     ),
@@ -368,9 +370,9 @@ class FairnessResultScreen extends StatelessWidget {
                     Expanded(
                       child: PlayfulSecondaryButton(
                         onPressed: () => _showComplaintDraftBottomSheet(context),
-                        child: const FittedBox(
+                        child: FittedBox(
                           fit: BoxFit.scaleDown,
-                          child: Text("DRAFT COMPLAINT"),
+                          child: Text(StringsProvider.instance.t('btn_draft_complaint')),
                         ),
                       ),
                     ),
@@ -539,7 +541,10 @@ class FairnessResultScreen extends StatelessWidget {
             if (loading && errorMsg.isEmpty) {
               () async {
                 try {
-                  final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+                  String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+                  if (!kIsWeb && Platform.isAndroid && (baseUrl.contains("127.0.0.1") || baseUrl.contains("localhost"))) {
+                    baseUrl = baseUrl.replaceAll("127.0.0.1", "10.0.2.2").replaceAll("localhost", "10.0.2.2");
+                  }
                   final Uri url = Uri.parse('$baseUrl/complaint-draft');
                   final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous_user';
 
@@ -777,7 +782,7 @@ class _ComplaintBottomSheetContentState extends State<_ComplaintBottomSheetConte
                         SnackBar(
                           backgroundColor: PlayfulColors.accent,
                           content: Text(
-                            "Copied to clipboard!",
+                            StringsProvider.instance.t('copied_to_clipboard'),
                             style: GoogleFonts.plusJakartaSans(
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
@@ -787,7 +792,7 @@ class _ComplaintBottomSheetContentState extends State<_ComplaintBottomSheetConte
                       );
                       Navigator.pop(context);
                     },
-                    child: const FittedBox(fit: BoxFit.scaleDown, child: Text("COPY")),
+                    child: FittedBox(fit: BoxFit.scaleDown, child: Text(StringsProvider.instance.t('btn_copy'))),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -796,7 +801,7 @@ class _ComplaintBottomSheetContentState extends State<_ComplaintBottomSheetConte
                     onPressed: () {
                       Share.share(_controller.text);
                     },
-                    child: const FittedBox(fit: BoxFit.scaleDown, child: Text("SHARE")),
+                    child: FittedBox(fit: BoxFit.scaleDown, child: Text(StringsProvider.instance.t('btn_share'))),
                   ),
                 ),
               ],
@@ -804,7 +809,7 @@ class _ComplaintBottomSheetContentState extends State<_ComplaintBottomSheetConte
             const SizedBox(height: 12),
             Center(
               child: Text(
-                "General guidance, not legal advice — review before sending.",
+                StringsProvider.instance.t('draft_disclaimer'),
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,

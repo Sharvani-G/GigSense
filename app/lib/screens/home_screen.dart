@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -278,7 +279,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     else
                       PlayfulButton(
                         onPressed: canSubmit ? submit : null,
-                        child: const Text("SAVE AND CONTINUE"),
+                        child: Text(StringsProvider.instance.t('btn_save_continue')),
                       ),
                   ],
                 ),
@@ -696,7 +697,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Future<void> _fetchWeeklyInsight(String userId) async {
     try {
-      final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+      String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+      if (!kIsWeb && Platform.isAndroid && (baseUrl.contains("127.0.0.1") || baseUrl.contains("localhost"))) {
+        baseUrl = baseUrl.replaceAll("127.0.0.1", "10.0.2.2").replaceAll("localhost", "10.0.2.2");
+      }
       final Uri url = Uri.parse('$baseUrl/weekly-insight?user_id=$userId');
       final response = await http.get(url);
       

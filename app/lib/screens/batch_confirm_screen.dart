@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -200,7 +202,10 @@ class _BatchConfirmScreenState extends State<BatchConfirmScreen> {
 
       // Fire background community rates recalculation for distinct platforms imported in this batch
       final distinctPlatforms = _rows.map((r) => r.platform.toLowerCase().trim()).where((p) => p.isNotEmpty).toSet();
-      final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+      String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+      if (!kIsWeb && Platform.isAndroid && (baseUrl.contains("127.0.0.1") || baseUrl.contains("localhost"))) {
+        baseUrl = baseUrl.replaceAll("127.0.0.1", "10.0.2.2").replaceAll("localhost", "10.0.2.2");
+      }
       for (final platform in distinctPlatforms) {
         final Uri recalculateUrl = Uri.parse('$baseUrl/admin/recalculate-benchmarks?platform=$platform');
         http.post(recalculateUrl).then((response) {

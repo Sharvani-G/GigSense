@@ -72,6 +72,10 @@
 	<string>GigSense needs camera access to take a profile photo or scan payslips.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>GigSense needs library access to let you pick a profile photo or select payslip screenshots.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>GigSense needs microphone access to record your voice logs and convert them to text.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>GigSense needs speech recognition access to transcribe your spoken voice logs.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>whatsapp</string>

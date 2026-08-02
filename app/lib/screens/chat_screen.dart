@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
@@ -377,7 +379,10 @@ class _ChatScreenState extends State<ChatScreen> {
     // Auto title asynchronously
     _autoTitleIfNeeded(sessionId, text);
 
-    final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+    String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+    if (!kIsWeb && Platform.isAndroid && (baseUrl.contains("127.0.0.1") || baseUrl.contains("localhost"))) {
+      baseUrl = baseUrl.replaceAll("127.0.0.1", "10.0.2.2").replaceAll("localhost", "10.0.2.2");
+    }
     final Uri url = Uri.parse('$baseUrl/chat');
 
     try {
@@ -1480,7 +1485,10 @@ class _PlayfulImagePickerButtonState extends State<PlayfulImagePickerButton> {
 
     widget.onLoadingChanged(true);
     
-    final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+    String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+    if (!kIsWeb && Platform.isAndroid && (baseUrl.contains("127.0.0.1") || baseUrl.contains("localhost"))) {
+      baseUrl = baseUrl.replaceAll("127.0.0.1", "10.0.2.2").replaceAll("localhost", "10.0.2.2");
+    }
     final Uri url = Uri.parse('$baseUrl/jobs/scan');
 
     try {
@@ -1531,13 +1539,13 @@ class _PlayfulImagePickerButtonState extends State<PlayfulImagePickerButton> {
         widget.onImageScanned(promptToSend);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to parse receipt screenshot. Please try again.")),
+          SnackBar(content: Text(StringsProvider.instance.t('err_failed_parse_receipt'))),
         );
       }
     } catch (e) {
       debugPrint("Error scanning image in chat: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Error connecting to scan service.")),
+        SnackBar(content: Text(StringsProvider.instance.t('err_connecting_scan_service'))),
       );
     } finally {
       widget.onLoadingChanged(false);

@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -413,12 +415,12 @@ class _LogJobScreenState extends State<LogJobScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library, color: PlayfulColors.accent),
-                title: Text("Gallery", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
+                title: Text(StringsProvider.instance.t('picker_gallery'), style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
                 onTap: () => Navigator.pop(context, ImageSource.gallery),
               ),
               ListTile(
                 leading: const Icon(Icons.camera_alt, color: PlayfulColors.accent),
-                title: Text("Camera", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
+                title: Text(StringsProvider.instance.t('picker_camera'), style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
                 onTap: () => Navigator.pop(context, ImageSource.camera),
               ),
             ],
@@ -452,7 +454,10 @@ class _LogJobScreenState extends State<LogJobScreen> {
       _durationOcrNote = null;
     });
 
-    final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+    String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+    if (!kIsWeb && Platform.isAndroid && (baseUrl.contains("127.0.0.1") || baseUrl.contains("localhost"))) {
+      baseUrl = baseUrl.replaceAll("127.0.0.1", "10.0.2.2").replaceAll("localhost", "10.0.2.2");
+    }
     final Uri url = Uri.parse('$baseUrl/jobs/scan');
 
     try {
@@ -477,7 +482,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
             );
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("No trips could be read from this batch screenshot.")),
+              SnackBar(content: Text(StringsProvider.instance.t('err_ocr_no_trips'))),
             );
           }
           return;
@@ -643,11 +648,11 @@ class _LogJobScreenState extends State<LogJobScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: Text(StringsProvider.instance.t('stt_cancel'), style: GoogleFonts.plusJakartaSans(color: PlayfulColors.mutedForeground)),
+              child: Text(StringsProvider.instance.t('stt_cancel'), style: GoogleFonts.plusJakartaSans(color: PlayfulColors.foreground)),
             ),
             PlayfulSecondaryButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text("Yes, it's correct"),
+              child: Text(StringsProvider.instance.t('btn_yes_correct')),
             ),
           ],
         ),
@@ -799,7 +804,10 @@ class _LogJobScreenState extends State<LogJobScreen> {
       localJobData['id'] = docRef.id;
       debugPrint("Successfully saved job to Firestore with ID: ${docRef.id}");
 
-      final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+      String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+      if (!kIsWeb && Platform.isAndroid && (baseUrl.contains("127.0.0.1") || baseUrl.contains("localhost"))) {
+        baseUrl = baseUrl.replaceAll("127.0.0.1", "10.0.2.2").replaceAll("localhost", "10.0.2.2");
+      }
 
       // Trigger background community rates recalculation for this specific platform
       final Uri recalculateUrl = Uri.parse('$baseUrl/admin/recalculate-benchmarks?platform=${platform.toLowerCase()}');
@@ -900,7 +908,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                           style: GoogleFonts.plusJakartaSans(
                             fontWeight: FontWeight.w500,
                             fontSize: 14,
-                            color: PlayfulColors.mutedForeground,
+                            color: PlayfulColors.foreground,
                           ),
                         ),
                         const SizedBox(height: 24),
@@ -953,6 +961,8 @@ class _LogJobScreenState extends State<LogJobScreen> {
                             ),
                           ),
                         ] else ...[
+                          _buildVoiceLoggingCard(),
+                          const SizedBox(height: 24),
                           if (_ocrGeneralNote != null) ...[
                             Container(
                               padding: const EdgeInsets.all(12),
@@ -1083,7 +1093,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                                 _fareOcrNote!,
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 12,
-                                  color: PlayfulColors.mutedForeground,
+                                  color: PlayfulColors.foreground,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -1135,7 +1145,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                                 _distanceOcrNote!,
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 12,
-                                  color: PlayfulColors.mutedForeground,
+                                  color: PlayfulColors.foreground,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -1187,7 +1197,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                                 _durationOcrNote!,
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 12,
-                                  color: PlayfulColors.mutedForeground,
+                                  color: PlayfulColors.foreground,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -1415,6 +1425,281 @@ class _LogJobScreenState extends State<LogJobScreen> {
     } else {
       return ['other_gig', 'delivery', 'cab'];
     }
+  }
+
+  Widget _buildVoiceLoggingCard() {
+    final s = StringsProvider.instance;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: PlayfulColors.secondary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: PlayfulColors.border, width: 2),
+        boxShadow: const [
+          BoxShadow(
+            color: PlayfulColors.border,
+            offset: Offset(4, 4),
+            blurRadius: 0,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      s.t('logjob_voice_title'),
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        color: PlayfulColors.foreground,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      s.t('logjob_voice_desc'),
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: PlayfulColors.mutedForeground,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              PlayfulMicButton(
+                textOnLeft: false,
+                onSpeechResult: (transcript) {
+                  _processVoiceRecording(transcript);
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLoadingDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: AlertDialog(
+            backgroundColor: PlayfulColors.background,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+              side: const BorderSide(color: PlayfulColors.border, width: 2),
+            ),
+            content: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(color: PlayfulColors.accent),
+                  const SizedBox(height: 20),
+                  Text(
+                    message,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: PlayfulColors.foreground,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _processVoiceRecording(String transcript) async {
+    if (transcript.isEmpty) return;
+    
+    final s = StringsProvider.instance;
+    _showLoadingDialog(context, s.t('logjob_voice_parsing'));
+    
+    String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+    if (!kIsWeb && Platform.isAndroid && (baseUrl.contains("127.0.0.1") || baseUrl.contains("localhost"))) {
+      baseUrl = baseUrl.replaceAll("127.0.0.1", "10.0.2.2").replaceAll("localhost", "10.0.2.2");
+    }
+    final Uri url = Uri.parse('$baseUrl/jobs/voice-parse');
+    
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'transcript': transcript,
+          'language_name': getLanguageName(s.lang),
+        }),
+      );
+      
+      if (mounted) Navigator.pop(context); // Pop loading dialog
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (mounted) {
+          _showVoiceLoggingConfirmationSheet(context, data);
+        }
+      } else {
+        throw Exception("Server returned status ${response.statusCode}");
+      }
+    } catch (e) {
+      debugPrint("Error voice parsing transcript: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to parse voice command. Please enter details manually.")),
+        );
+      }
+    }
+  }
+
+  void _showVoiceLoggingConfirmationSheet(BuildContext context, Map<String, dynamic> parsedData) {
+    final s = StringsProvider.instance;
+    
+    final platformController = TextEditingController(text: parsedData['platform'] ?? '');
+    final fareController = TextEditingController(text: parsedData['fare'] != null ? parsedData['fare'].toString() : '');
+    final distanceController = TextEditingController(text: parsedData['distance_km'] != null ? parsedData['distance_km'].toString() : '');
+    final durationController = TextEditingController(text: parsedData['duration_min'] != null ? parsedData['duration_min'].toString() : '');
+    
+    String tempSelectedPlatform = (parsedData['platform'] as String?)?.toLowerCase() ?? 'other';
+    final List<String> validPlatforms = ["zomato", "swiggy", "uber", "ola", "rapido", "zepto", "blinkit", "porter", "other"];
+    if (!validPlatforms.contains(tempSelectedPlatform)) {
+      tempSelectedPlatform = 'other';
+    }
+    
+    platformController.text = tempSelectedPlatform[0].toUpperCase() + tempSelectedPlatform.substring(1);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: PlayfulColors.background,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        side: BorderSide(color: PlayfulColors.border, width: 2),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            left: 24,
+            right: 24,
+            top: 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                s.t('logjob_voice_confirm_title'),
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 20,
+                  color: PlayfulColors.foreground,
+                ),
+              ),
+              const SizedBox(height: 20),
+              
+              PlayfulInput(
+                labelText: s.t('logjob_platform'),
+                hintText: s.t('logjob_platform_hint'),
+                controller: platformController,
+                readOnly: true,
+                onTap: () async {
+                  final String? choice = await showModalBottomSheet<String>(
+                    context: ctx,
+                    backgroundColor: PlayfulColors.background,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                      side: BorderSide(color: PlayfulColors.border, width: 2),
+                    ),
+                    builder: (pickerCtx) {
+                      return Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: validPlatforms.map((p) {
+                            return ListTile(
+                              title: Text(p[0].toUpperCase() + p.substring(1), style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
+                              onTap: () => Navigator.pop(pickerCtx, p),
+                            );
+                          }).toList(),
+                        ),
+                      );
+                    }
+                  );
+                  if (choice != null) {
+                    tempSelectedPlatform = choice;
+                    platformController.text = choice[0].toUpperCase() + choice.substring(1);
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              PlayfulInput(
+                labelText: s.t('logjob_fare'),
+                hintText: s.t('logjob_fare_hint'),
+                controller: fareController,
+                prefixText: "₹ ",
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              ),
+              const SizedBox(height: 16),
+              
+              Row(
+                children: [
+                  Expanded(
+                    child: PlayfulInput(
+                      labelText: s.t('logjob_distance') + " (km)",
+                      hintText: s.t('logjob_distance_hint'),
+                      controller: distanceController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: PlayfulInput(
+                      labelText: s.t('logjob_duration') + " (min)",
+                      hintText: s.t('logjob_duration_hint'),
+                      controller: durationController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              
+              PlayfulButton(
+                onPressed: () {
+                  setState(() {
+                    _selectedPlatform = tempSelectedPlatform;
+                    _platformFieldController.text = platformController.text;
+                    _fareController.text = fareController.text;
+                    _distanceController.text = distanceController.text;
+                    _durationController.text = durationController.text;
+                    _distanceUnit = 'km';
+                    _durationUnit = 'min';
+                  });
+                  Navigator.pop(ctx);
+                  _submitJob();
+                },
+                child: Text(s.t('btn_save_continue')),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
 

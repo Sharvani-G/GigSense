@@ -176,7 +176,7 @@ class SOSManager {
               if (context != null && context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text("Automatic emergency SMS sent to $cleanPhone"),
+                    content: Text(StringsProvider.instance.t('err_auto_sms_sent').replaceAll('{}', cleanPhone)),
                     backgroundColor: Colors.green,
                   ),
                 );
@@ -190,7 +190,7 @@ class SOSManager {
             if (context != null && context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text("Automatic SMS failed: $e. Triggering manual backup..."),
+                  content: Text(StringsProvider.instance.t('err_auto_sms_failed')),
                   backgroundColor: const Color(0xFFE11D48),
                 ),
               );
@@ -201,9 +201,9 @@ class SOSManager {
           debugPrint("Automatic SMS skipped because SEND_SMS permission is not granted.");
           if (context != null && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("SMS permission not granted — enable it in Settings. Launching manual SMS fallback..."),
-                backgroundColor: Color(0xFFE11D48),
+              SnackBar(
+                content: Text(StringsProvider.instance.t('err_sms_permission_not_granted')),
+                backgroundColor: const Color(0xFFE11D48),
               ),
             );
           }
@@ -222,7 +222,7 @@ class SOSManager {
         await Clipboard.setData(ClipboardData(text: message));
         if (context != null && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("SMS composer not available. Alert text copied to clipboard.")),
+            SnackBar(content: Text(StringsProvider.instance.t('err_sms_composer_not_available'))),
           );
         }
       }
@@ -293,7 +293,7 @@ class SOSManager {
               Navigator.pop(ctx);
               Clipboard.setData(ClipboardData(text: message));
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("SOS alert copied to clipboard.")),
+                SnackBar(content: Text(StringsProvider.instance.t('snack_sos_alert_copied'))),
               );
             },
             style: ElevatedButton.styleFrom(
@@ -304,7 +304,7 @@ class SOSManager {
               ),
             ),
             child: Text(
-              "COPY ALERT",
+              StringsProvider.instance.t('btn_copy_alert'),
               style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white),
             ),
           ),

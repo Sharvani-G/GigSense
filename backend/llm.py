@@ -77,7 +77,6 @@ LANGUAGE AND SCRIPT RULES:
 - If the user's most recent message is written in {language_name} (in its native script OR romanized/Latin letters), respond in fluent {language_name} using its native script — never romanized.
 - Only fall back to the stored preference ({language_name}) when the message gives no clear language signal at all — e.g. a single emoji, a bare number, or a proper noun with no other words.
 - Do not mix in English words except for proper nouns (e.g., Uber, Zomato, ₹), when responding in {language_name}.
-
 """
 
 def get_weekly_insight_prompt(worker_type_desc: str, aggregates_json: str, language_name: str, forecast_json: str = None) -> str:
@@ -107,12 +106,16 @@ RESPONSE STRUCTURE RULES:
 - Use **bold** only around the single most important fact/number/action (e.g. the total underpaid amount, the count of flagged trips, the count of trips with undisclosed deductions, or the predicted best-paying shift window if it is the highlight of the summary) — do not bold multiple separate phrases.
 - If there is not enough history to meaningfully compare against a typical week, speak honestly about this week's numbers as they stand.
 - Call out any concentration of underpayment or anomalies (e.g., concentrated on Zomato).
-- If there are undisclosed deductions (indicated by `undisclosed_deductions_count` > 0 in the JSON), call out the count and platform specifically (e.g., "Two of your Swiggy trips this week had deductions with no disclosed reason, which the law requires"). Ground this in Karnataka's Platform-Based Gig Workers Act which mandates aggregators to disclose reasons for all deductions.
+- If there are undisclosed deductions (indicated by `undisclosed_deductions_count` > 0 in the JSON), call out the count and platform specifically (e.g. translate the statement "Two of your Swiggy trips this week had deductions with no disclosed reason, which the law requires" fully into {language_name}). Ground this in Karnataka's Platform-Based Gig Workers Act which mandates aggregators to disclose reasons for all deductions.
 - Analyze the 'total_hours' and if it is very high (e.g., > 50 hours/week), call out a risk of burnout and advise resting.
 - End with exactly one small, practical, encouraging next step (or the forward-looking prediction if forecast context is present).
 - Never be scolding; maintain a supportive yet realistic tone.
 
-Respond in {language_name}."""
+LANGUAGE AND SCRIPT RULES:
+- You MUST respond ONLY in fluent, natural {language_name} using its native script. Do not mix in English words except for proper nouns (e.g., Uber, Zomato, ₹).
+- Translate all explanations, calculations, numbers, and warnings fully into the native script of {language_name}.
+- Write the entire response in the script of {language_name}, never in Latin/English characters (unless {language_name} is English).
+"""
 
 def get_complaint_draft_prompt(platform: str, fare: float, expected_fare: float, distance_km: float, duration_min: float, formatted_date: str, language_name: str) -> str:
     return f"""You are a drafting helper inside GigShield.
@@ -132,6 +135,9 @@ INSTRUCTIONS:
 - Do NOT claim any specific legal entitlement, refund guarantee, or assert a legal right to compensation (we are not providing legal counsel).
 - Keep it concise: 3-5 sentences total.
 
+LANGUAGE AND SCRIPT RULES:
+- You MUST respond ONLY in fluent, natural {language_name} using its native script. Do not mix in English words except for proper nouns (e.g., Uber, Zomato, ₹).
+- Write the entire message in {language_name} script, never in Latin/English characters (unless {language_name} is English).
 """
 
 def get_route_safety_prompt(time_band: str, area_hint: str, language_name: str) -> str:
@@ -144,8 +150,30 @@ Your task is to produce ONE honest, calibrated sentence contextualizing the safe
 CRITICAL RULES:
 - Do NOT fabricate specific crime statistics, named incidents, or claims about this area's real safety record (you do not have real-time data).
 - Speak only in general, honest, precautionary terms tied to the time-of-day heuristic and the unfamiliarity of areas.
-- For example: "Late-night trips in unfamiliar areas warrant extra caution; consider sharing your trip details with someone you trust."
 - Do NOT provide advice on how to use the app.
 - Provide only the single sentence.
 
-Respond in {language_name}."""
+LANGUAGE AND SCRIPT RULES:
+- You MUST respond ONLY in fluent, natural {language_name} using its native script. Do not mix in English words except for proper nouns (e.g., Uber, Zomato, ₹).
+- Fully translate all risk advice and cautions into {language_name}.
+"""
+
+def get_voice_parse_prompt(transcript: str, language_name: str) -> str:
+    return f"""You are a structured information extraction assistant.
+Analyze the following voice recording transcript from a gig worker (which could be in English, {language_name}, or a mix) and extract trip details:
+- Platform (e.g. Swiggy, Zomato, Uber, Ola, Rapido, Zepto, Blinkit, Porter, etc.)
+- Fare (earnings in Rupees)
+- Distance (in kilometers)
+- Duration (in minutes)
+
+Transcript: "{transcript}"
+
+Response MUST be a single raw JSON block ONLY. Do not include markdown code block formatting (such as ```json ... ```) or any other text before or after the JSON.
+JSON format:
+{{
+  "platform": <string or null>,
+  "fare": <float or null>,
+  "distance_km": <float or null>,
+  "duration_min": <float or null>
+}}
+"""

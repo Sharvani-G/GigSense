@@ -108,7 +108,7 @@ class _PlayfulButtonState extends State<PlayfulButton> {
               style: GoogleFonts.outfit(
                 fontSize: 16,
                 fontWeight: FontWeight.w800, // Extra Bold
-                color: isEnabled ? Colors.white : const Color(0xFF94A3B8),
+                color: isEnabled ? Colors.white : PlayfulColors.foreground,
               ),
               child: widget.child,
             ),
@@ -265,7 +265,7 @@ class _PlayfulInputState extends State<PlayfulInput> with SingleTickerProviderSt
                   decoration: InputDecoration(
                     hintText: widget.hintText,
                     hintStyle: GoogleFonts.plusJakartaSans(
-                      color: const Color(0xFF94A3B8),
+                      color: PlayfulColors.foreground.withOpacity(0.75),
                       fontWeight: FontWeight.w500,
                     ),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -309,7 +309,7 @@ class _PlayfulInputState extends State<PlayfulInput> with SingleTickerProviderSt
                     ),
                     hintText: widget.hintText,
                     hintStyle: GoogleFonts.plusJakartaSans(
-                      color: const Color(0xFF94A3B8),
+                      color: PlayfulColors.foreground.withOpacity(0.75),
                       fontWeight: FontWeight.w500,
                     ),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -438,7 +438,7 @@ class PlayfulToggle extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: activeOption == "manual" ? PlayfulColors.accent : Colors.transparent,
+                  color: activeOption == "manual" ? PlayfulColors.foreground : Colors.transparent,
                   borderRadius: BorderRadius.circular(9999),
                 ),
                 child: Center(
@@ -460,7 +460,7 @@ class PlayfulToggle extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: activeOption == "scan" ? PlayfulColors.accent : Colors.transparent,
+                  color: activeOption == "scan" ? PlayfulColors.foreground : Colors.transparent,
                   borderRadius: BorderRadius.circular(9999),
                 ),
                 child: Center(
@@ -677,7 +677,7 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(StringsProvider.instance.t('stt_cancel'), style: GoogleFonts.plusJakartaSans(color: PlayfulColors.mutedForeground)),
+            child: Text(StringsProvider.instance.t('stt_cancel'), style: GoogleFonts.plusJakartaSans(color: PlayfulColors.foreground)),
           ),
           PlayfulSecondaryButton(
             onPressed: () {
@@ -765,7 +765,10 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
     }
 
     try {
-      final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+      String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+      if (!kIsWeb && io.Platform.isAndroid && (baseUrl.contains("127.0.0.1") || baseUrl.contains("localhost"))) {
+        baseUrl = baseUrl.replaceAll("127.0.0.1", "10.0.2.2").replaceAll("localhost", "10.0.2.2");
+      }
       final Uri url = Uri.parse('$baseUrl/stt');
 
       final request = http.MultipartRequest('POST', url);
@@ -800,7 +803,11 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
           });
         }
 
-        widget.onSpeechResult(transcript);
+        if (transcript.toString().trim().isEmpty) {
+          _handleSttError();
+        } else {
+          widget.onSpeechResult(transcript);
+        }
       } else {
         debugPrint("STT server error: ${response.statusCode} - ${response.body}");
         _handleSttError();
@@ -858,7 +865,7 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
               )
             : Icon(
                 _isListening ? Icons.mic : Icons.mic_none,
-                color: Colors.white,
+                color: btnBg == PlayfulColors.tertiary ? PlayfulColors.foreground : Colors.white,
                 size: 20,
               ),
       ),
@@ -907,7 +914,7 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
                 style: GoogleFonts.outfit(
                   fontSize: 10,
                   fontWeight: FontWeight.w900,
-                  color: Colors.white,
+                  color: PlayfulColors.foreground,
                 ),
               ),
             ),
@@ -1505,7 +1512,7 @@ class PlayfulUnitInput extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: isSelected ? PlayfulColors.accent : Colors.transparent,
+                    color: isSelected ? PlayfulColors.foreground : Colors.transparent,
                     borderRadius: BorderRadius.circular(9999),
                   ),
                   child: Text(

@@ -16,7 +16,7 @@ import datetime
 from ocr import extract_job_data
 from stt import transcribe_audio
 from llm import ask_gemma, ask_gemma_stream, get_chat_system_prompt, get_weekly_insight_prompt, get_complaint_draft_prompt
-from schemas import JobScanResponse, ChatRequest, ChatResponse, ComplaintRequest, DraftRequest, FatigueRequest, SOSRequest, RouteSafetyRequest, RouteSafetyResponse
+from schemas import JobScanResponse, ChatRequest, ChatResponse, ComplaintRequest, DraftRequest, FatigueRequest, SOSRequest, RouteSafetyRequest, RouteSafetyResponse, VoiceParseRequest
 from firebase_client import db
 from firebase_admin import firestore
 
@@ -559,12 +559,30 @@ def compute_weekly_forecast(user_id: str) -> dict | None:
 @app.get("/weekly-insight")
 async def weekly_insight(user_id: str):
     aggregates = get_weekly_aggregates(user_id)
+    profile = get_user_profile(user_id) if user_id and user_id != 'anonymous_user' else {}
+    lang_code = profile.get('preferredLanguage', 'en') or 'en'
     
+    placeholders = {
+        'en': "Log a few jobs and I'll have your first weekly insight ready.",
+        'hi': "कुछ काम दर्ज करें और मैं आपकी पहली साप्ताहिक जानकारी तैयार करूंगा।",
+        'kn': "ಕೆಲವು ಕೆಲಸಗಳನ್ನು ಲಾಗ್ ಮಾಡಿ ಮತ್ತು ನಿಮ್ಮ ಮೊದಲ ಸಾಪ್ತಾಹಿಕ ಒಳനೋಟವನ್ನು ನಾನು ಸಿದ್ಧಪಡಿಸುತ್ತೇನೆ.",
+        'ta': "ஒரு சில வேலைகளைப் பதிவுചെയ്യவும், உங்களுடைய முதல் வாரാந்திர நுண்ணறிவை ഞാൻ தயார் செய்வேன்.",
+        'te': "కొన్ని పనులను నమోదు చేయండి మరియు నేను మీ మొదటి వారపు అంతర్దృష్టిని సిద్ధంగా ఉంచుతాను.",
+        'ml': "കുറച്ച് ജോലികൾ ലോഗ് ചെയ്യുക, നിങ്ങളുടെ ആദ്യത്തെ പ്രതിവാര ഉൾക്കാഴ്ച ഞാൻ തയ്യാറാക്കും."
+    }
+
+    errors = {
+        'en': "I'm having trouble generating your weekly summary right now. Your logged stats below are safe and up to date.",
+        'hi': "मैं अभी आपकी साप्ताहिक जानकारी जनरेट नहीं कर पा रहा हूँ। आपके आंकड़े सुरक्षित हैं।",
+        'kn': "ನಿಮ್ಮ ಸಾಪ್ತಾಹಿಕ ಸಾರಾಂಶವನ್ನು ರಚಿಸಲು ತೊಂದರೆಯಾಗುತ್ತಿದೆ. ನಿಮ್ಮ ಅಂಕಿಅಂಶಗಳು ಸುರಕ್ಷಿತವಾಗಿವೆ.",
+        'ta': "உங்கள் வாரാந்திர சுരുക്കത്തെ உருவாக்குவதில் சிக்கல் உள்ளது. உங்கள் புள்ளிവിവരങ്ങൾ பாதுகாப்பாக உள்ளன.",
+        'te': "మీ వారపు సారాంశాన్ని రూపొందించడంలో సమస్య ఉంది. మీ గణాంకాలు సురક્ષితంగా ఉన్నాయి.",
+        'ml': "പ്രതിവാര സംഗ്രഹം തയ്യാറാക്കുന്നതിൽ പ്രശ്നമുണ്ട്. നിങ്ങളുടെ വിവരങ്ങൾ സുരക്ഷിതമാണ്."
+    }
+
     if aggregates["total_jobs"] == 0:
-        insight_text = "Log a few jobs and I'll have your first weekly insight ready."
+        insight_text = placeholders.get(lang_code, placeholders['en'])
     else:
-        profile = get_user_profile(user_id)
-        lang_code = profile.get('preferredLanguage', 'en')
         worker_type = profile.get('workerType', 'other_gig_worker')
         worker_types = profile.get('workerTypes')
         if not isinstance(worker_types, list):
@@ -606,7 +624,7 @@ async def weekly_insight(user_id: str):
         insight_text = ask_gemma(prompt)
         
         if insight_text == "OLLAMA_UNREACHABLE_ERROR":
-            insight_text = "I'm having trouble generating your weekly summary right now. Your logged stats below are safe and up to date."
+            insight_text = errors.get(lang_code, errors['en'])
             
     # Write to Firestore user cache document
     if db is not None and user_id and user_id != 'anonymous_user':
@@ -1042,7 +1060,8 @@ async def complaint_draft_endpoint(request: DraftRequest):
                 'hi': "नमस्ते सहायता टीम। मैं {platform} पर {date} को अपनी सवारी के संबंध में लिख रहा हूँ। मुझे {distance_km:.1f} किमी और {duration_min:.0f} मिनट की यात्रा के लिए ₹{fare:.2f} का भुगतान किया गया था। बेंचमार्क दरों के आधार पर, अपेक्षित किराया ₹{expected_fare:.2f} होना चाहिए। कृपया इस भुगतान की समीक्षा करें। धन्यवाद।",
                 'kn': "{platform} ನಲ್ಲಿ {date} ರಂದು ನನ್ನ ಪಯಣದ ಕುರಿತು ನಾನು ಬರೆಯುತ್ತಿದ್ದೇನೆ. {distance_km:.1f} ಕಿಮೀ ಮತ್ತು {duration_min:.0f} ನಿಮಿಷಗಳ ಪ್ರಯಾಣಕ್ಕೆ ನನಗೆ ₹{fare:.2f} ಪಾವತಿಸಲಾಗಿದೆ. ದರಗಳ ಪ್ರಕಾರ, ನಿರೀಕ್ಷಿತ ದರ ₹{expected_fare:.2f} ಇರಬೇಕು. ದಯವಿಟ್ಟು ಇದನ್ನು ಪರಿಶೀಲಿಸಿ ನನ್ನ ಪಾವತಿಯನ್ನು ಸರಿಪಡಿಸಿ. ಧನ್ಯವಾದಗಳು.",
                 'ta': "{platform} இல் {date} அன்று எனது பயணம் குறித்து நான் எழுதுகிறேன். {distance_km:.1f} கிமீ மற்றும் {duration_min:.0f} நிமிட பயணத்திற்கு எனக்கு ₹{fare:.2f} வழங்கப்பட்டது. தரநிலைகளின்படி, எதிர்பார்க்கப்படும் கட்டணம் ₹{expected_fare:.2f} ஆகும். தயவுசெய்து ಇದನ್ನು மறுபரிசீலனை செய்து சரிசெய்யவும். நன்றி.",
-                'te': "{platform} లో {date} న నా ప్రయాణానికి సంబంధించి నేను వ్రాస్తున్నాను. {distance_km:.1f} కిమీ మరియు {duration_min:.0f} నిమిషాల ప్రయాణానికి నాకు ₹{fare:.2f} చెల్లించబడింది. ప్రామాణిక రేట్ల ప్రకారం, ఆశించిన ఛార్జీ ₹{expected_fare:.2f} ఉండాలి. దయస చేసి దీనిని సమీక్షించండి. ಧನ್ಯವಾದಗಳು."
+                'te': "{platform} లో {date} న నా ప్రయాణానికి సంబంధించి నేను వ్రాస్తున్నాను. {distance_km:.1f} కిమీ మరియు {duration_min:.0f} నిమిషాల ప్రయాణానికి నాకు ₹{fare:.2f} చెల్లించబడింది. ప్రామాణిక రేట్ల ప్రకారం, ఆశించిన ఛార్జీ ₹{expected_fare:.2f} ఉండాలి. దయస చేసి దీనిని సమీక్షించండి. ಧನ್ಯವಾದಗಳು.",
+                'ml': "{platform} ൽ {date} ലെ എന്റെ യാത്രയെക്കുറിച്ച് ഞാൻ എഴുതുന്നു. {distance_km:.1f} കിമീ, {duration_min:.0f} മിനിറ്റ് യാത്രയ്ക്ക് എനിക്ക് ₹{fare:.2f} ആണ് ലഭിച്ചത്. ബെഞ്ച്മാർക്ക് നിരക്കുകൾ അനുസരിച്ച് ₹{expected_fare:.2f} ലഭിക്കേണ്ടതായിരുന്നു. ദയവായി ഇത് പരിശോധിച്ച് തുക തിരുത്തുക. നന്ദി."
             }
             tmpl = fallbacks.get(lang_code, fallbacks['en'])
             draft_text = tmpl.format(
@@ -1070,7 +1089,11 @@ async def fatigue_nudge_endpoint(request: FatigueRequest):
     lang_code = profile.get('preferredLanguage', 'en')
     language_name = LANGUAGE_NAMES.get(lang_code, 'English')
     
-    prompt = f"This gig worker has logged over {request.total_hours:.1f} hours of work in the last 24 hours. Write one short, warm sentence in {language_name} gently checking in and suggesting they consider a break — do not be alarming or clinical, be supportive, like a friend noticing they've been at it a while."
+    prompt = (
+        f"This gig worker has logged over {request.total_hours:.1f} hours of work in the last 24 hours. "
+        f"Write one short, warm sentence in fluent, natural {language_name} using its native script gently checking in and suggesting they consider a break. "
+        f"Do not mix in English words or script (except for numbers). Respond ONLY in {language_name} script."
+    )
     
     msg = ask_gemma(prompt)
     if msg == "OLLAMA_UNREACHABLE_ERROR":
@@ -1093,7 +1116,11 @@ async def sos_message_endpoint(request: SOSRequest):
     lang_code = profile.get('preferredLanguage', 'en')
     language_name = LANGUAGE_NAMES.get(lang_code, 'English')
     
-    prompt = f"Draft a short, clear, calm safety alert message a gig worker can send to emergency contacts if they feel unsafe during a job. Include placeholders for [current approximate location] and [platform/trip details]. Keep it under 3 sentences, direct and actionable, not panicked in tone. Write it in {language_name}."
+    prompt = (
+        f"Draft a short, clear, calm safety alert message a gig worker can send to emergency contacts if they feel unsafe during a job. "
+        f"Include placeholders for [current approximate location] and [platform/trip details]. Keep it under 3 sentences, direct and actionable, not panicked in tone. "
+        f"Write it strictly in fluent, natural {language_name} using its native script. Do not mix in English words or script."
+    )
     
     msg = ask_gemma(prompt)
     if msg == "OLLAMA_UNREACHABLE_ERROR":
@@ -1131,3 +1158,96 @@ async def route_safety_endpoint(request: RouteSafetyRequest):
             "score": "low",
             "message": "Error calculating safety score."
         }
+
+import re
+
+def regex_parse_transcript(transcript: str):
+    transcript_lower = transcript.lower()
+    
+    # 1. Platform
+    platform = None
+    platforms = ["zomato", "swiggy", "uber", "ola", "rapido", "zepto", "blinkit", "porter"]
+    for p in platforms:
+        if p in transcript_lower:
+            platform = p.capitalize()
+            break
+            
+    # 2. Fare (Rupees)
+    # E.g., "87 rupees", "rs 87", "rs. 87", "87 rs", "₹87"
+    fare = None
+    fare_match = re.search(r'(?:rs\.?|rupees|inr|₹|rs)\s*(\d+(?:\.\d+)?)', transcript_lower)
+    if not fare_match:
+        fare_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:rupees|rs|rs\.)', transcript_lower)
+    if fare_match:
+        fare = float(fare_match.group(1))
+        
+    # 3. Distance (km)
+    # E.g., "4 km", "4 kilometers", "4.5 kms"
+    distance_km = None
+    dist_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:km|kms|kilometers|kilometer|kilo\s*meter)', transcript_lower)
+    if dist_match:
+        distance_km = float(dist_match.group(1))
+        
+    # 4. Duration (min)
+    # E.g., "18 mins", "18 minutes", "18 min"
+    duration_min = None
+    dur_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:mins|min|minutes|minute)', transcript_lower)
+    if dur_match:
+        duration_min = float(dur_match.group(1))
+        
+    return {
+        "platform": platform,
+        "fare": fare,
+        "distance_km": distance_km,
+        "duration_min": duration_min
+    }
+
+@app.post("/jobs/voice-parse")
+async def voice_parse_job(req: VoiceParseRequest):
+    print(f"[VOICE LOG] Parsing transcript: '{req.transcript}' in language '{req.language_name}'")
+    
+    # 1. Run regex parser as baseline/fallback
+    regex_data = regex_parse_transcript(req.transcript)
+    
+    # 2. Get prompt and run LLM
+    from llm import get_voice_parse_prompt
+    prompt = get_voice_parse_prompt(req.transcript, req.language_name)
+    response_text = ask_gemma(prompt)
+    
+    parsed_json = {}
+    if response_text != "OLLAMA_UNREACHABLE_ERROR":
+        # Extract JSON block
+        try:
+            # Strip any markdown backticks if returned
+            clean_text = response_text.strip()
+            if clean_text.startswith("```"):
+                clean_text = clean_text.split("```")[1]
+                if clean_text.startswith("json"):
+                    clean_text = clean_text[4:]
+            clean_text = clean_text.strip()
+            
+            # Parse json
+            parsed_json = json.loads(clean_text)
+            print(f"[VOICE LOG] LLM parsed JSON: {parsed_json}")
+        except Exception as e:
+            print(f"[VOICE LOG] LLM response JSON parsing error: {e}. Raw response: {response_text}")
+            
+    # 3. Merge LLM parsed data with regex data fallbacks
+    platform = parsed_json.get("platform") or regex_data.get("platform")
+    fare = parsed_json.get("fare") or regex_data.get("fare")
+    distance_km = parsed_json.get("distance_km") or regex_data.get("distance_km")
+    duration_min = parsed_json.get("duration_min") or regex_data.get("duration_min")
+    
+    # Standardize platform casing
+    if platform and isinstance(platform, str):
+        platform = platform.strip().capitalize()
+        
+    result = {
+        "platform": platform,
+        "fare": fare,
+        "distance_km": distance_km,
+        "duration_min": duration_min
+    }
+    print(f"[VOICE LOG] Final merged output: {result}")
+    return result
+

@@ -1,5 +1,6 @@
-import 'dart:io';
+import 'dart:io' show Platform;
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -377,7 +378,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     try {
-      final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+      String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+      if (!kIsWeb && Platform.isAndroid && (baseUrl.contains("127.0.0.1") || baseUrl.contains("localhost"))) {
+        baseUrl = baseUrl.replaceAll("127.0.0.1", "10.0.2.2").replaceAll("localhost", "10.0.2.2");
+      }
       final Uri url = Uri.parse('$baseUrl/admin/recalculate-benchmarks');
       final response = await http.post(url).timeout(const Duration(seconds: 30));
       
@@ -673,14 +677,14 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
     final amountText = _amountController.text.trim();
     if (amountText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter a target amount.")),
+        SnackBar(content: Text(StringsProvider.instance.t('snack_enter_target_amount'))),
       );
       return;
     }
     final amount = double.tryParse(amountText);
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter a valid amount greater than 0.")),
+        SnackBar(content: Text(StringsProvider.instance.t('snack_enter_valid_amount'))),
       );
       return;
     }
@@ -708,9 +712,9 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
         if (mounted) {
           Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               backgroundColor: PlayfulColors.accent,
-              content: Text("Savings goal updated successfully!"),
+              content: Text(StringsProvider.instance.t('snack_savings_goal_updated')),
             ),
           );
         }
@@ -718,7 +722,7 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
         debugPrint("Error setting savings goal: $e");
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Failed to save goal. Please try again.")),
+            SnackBar(content: Text(StringsProvider.instance.t('snack_savings_goal_failed'))),
           );
         }
       }
@@ -740,9 +744,9 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
         if (mounted) {
           Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
+            SnackBar(
               backgroundColor: PlayfulColors.accent,
-              content: Text("Savings goal removed."),
+              content: Text(StringsProvider.instance.t('snack_savings_goal_removed')),
             ),
           );
         }
@@ -750,7 +754,7 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
         debugPrint("Error removing savings goal: $e");
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Failed to remove goal.")),
+            SnackBar(content: Text(StringsProvider.instance.t('snack_savings_goal_remove_failed'))),
           );
         }
       }
@@ -998,7 +1002,7 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
           ] else ...[
             PlayfulButton(
               onPressed: _setGoal,
-              child: const Text("SET SAVINGS GOAL"),
+              child: Text(StringsProvider.instance.t('btn_set_savings_goal')),
             ),
             if (widget.initialGoal != null) ...[
               const SizedBox(height: 16),
@@ -1006,7 +1010,7 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
                 child: GestureDetector(
                   onTap: _removeGoal,
                   child: Text(
-                    "Remove Goal",
+                    StringsProvider.instance.t('btn_remove_goal'),
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
@@ -1174,8 +1178,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     if (name.isEmpty || normalized.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Enter a valid name and 10-digit mobile number."),
+        SnackBar(
+          content: Text(StringsProvider.instance.t('err_valid_name_phone')),
           backgroundColor: PlayfulColors.secondary,
         ),
       );
@@ -1184,8 +1188,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     if (_emergencyContacts.length >= 5) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Maximum of 5 emergency contacts allowed."),
+        SnackBar(
+          content: Text(StringsProvider.instance.t('err_max_contacts')),
           backgroundColor: PlayfulColors.secondary,
         ),
       );
@@ -1215,8 +1219,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     if (name.isEmpty || normalizedPhone.isEmpty || _selectedWorkerTypes.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Name, phone, and at least one worker type are required."),
+        SnackBar(
+          content: Text(StringsProvider.instance.t('err_profile_required')),
           backgroundColor: PlayfulColors.secondary,
         ),
       );
@@ -2008,7 +2012,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text("CANCEL", style: TextStyle(color: PlayfulColors.mutedForeground)),
+            child: Text(StringsProvider.instance.t('btn_cancel'), style: const TextStyle(color: PlayfulColors.foreground)),
           ),
           PlayfulButton(
             onPressed: () {
@@ -2022,7 +2026,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                 Navigator.pop(ctx);
               }
             },
-            child: const Text("ADD"),
+            child: Text(StringsProvider.instance.t('btn_add')),
           ),
         ],
       ),
@@ -2218,7 +2222,7 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
   Future<void> _saveSettings() async {
     if (!_whatsappEnabled && !_autoSmsEnabled && !_manualSmsEnabled) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enable at least one channel.")),
+        SnackBar(content: Text(StringsProvider.instance.t('err_enable_channel'))),
       );
       return;
     }
@@ -2248,7 +2252,7 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
     if (mounted) {
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("SOS settings updated successfully!")),
+        SnackBar(content: Text(StringsProvider.instance.t('snack_sos_updated'))),
       );
     }
   }
@@ -2256,7 +2260,7 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
   Future<void> _sendTestAlert() async {
     if (widget.emergencyContacts.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please configure at least 1 emergency contact in settings first.")),
+        SnackBar(content: Text(StringsProvider.instance.t('err_configure_contact'))),
       );
       return;
     }
@@ -2291,6 +2295,7 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
+    final s = StringsProvider.instance;
     return Container(
       padding: EdgeInsets.only(
         top: 24,
@@ -2345,8 +2350,8 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
             const SizedBox(height: 8),
             
             CheckboxListTile(
-              title: Text("WhatsApp Alert", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13)),
-              subtitle: Text("Opens WhatsApp pre-filled. Requires manual send tap.", style: GoogleFonts.plusJakartaSans(fontSize: 11, color: PlayfulColors.mutedForeground)),
+              title: Text(s.t('alert_whatsapp_title'), style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: Text(s.t('alert_whatsapp_subtitle'), style: GoogleFonts.plusJakartaSans(fontSize: 11, color: PlayfulColors.mutedForeground)),
               value: _whatsappEnabled,
               activeColor: PlayfulColors.accent,
               onChanged: (val) {
@@ -2380,9 +2385,9 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
                       });
                     } else {
                       messenger.showSnackBar(
-                        const SnackBar(
-                          content: Text("SMS permission is required to enable Automatic SMS alerts."),
-                          backgroundColor: Color(0xFFE11D48),
+                        SnackBar(
+                          content: Text(s.t('err_sms_permission_required')),
+                          backgroundColor: const Color(0xFFE11D48),
                         ),
                       );
                       setState(() {
@@ -2397,8 +2402,8 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
                 },
               ),
             CheckboxListTile(
-              title: Text("Manual SMS Alert", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13)),
-              subtitle: Text("Opens Messages app pre-filled. Requires manual send tap.", style: GoogleFonts.plusJakartaSans(fontSize: 11, color: PlayfulColors.mutedForeground)),
+              title: Text(s.t('alert_manual_sms_title'), style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: Text(s.t('alert_manual_sms_subtitle'), style: GoogleFonts.plusJakartaSans(fontSize: 11, color: PlayfulColors.mutedForeground)),
               value: _manualSmsEnabled,
               activeColor: PlayfulColors.accent,
               onChanged: (val) {
@@ -2425,7 +2430,7 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
                 if (_autoSmsEnabled && Platform.isAndroid)
                   Expanded(
                     child: RadioListTile<String>(
-                      title: Text("Auto SMS", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 11)),
+                      title: Text(s.t('alert_auto_sms'), style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 11)),
                       value: 'autoSms',
                       groupValue: _primaryChannel,
                       activeColor: PlayfulColors.accent,
@@ -2435,7 +2440,7 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
                 if (_manualSmsEnabled)
                   Expanded(
                     child: RadioListTile<String>(
-                      title: Text("Manual SMS", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 11)),
+                      title: Text(s.t('alert_manual_sms'), style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 11)),
                       value: 'manualSms',
                       groupValue: _primaryChannel,
                       activeColor: PlayfulColors.accent,
@@ -2445,7 +2450,7 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
                 if (_whatsappEnabled)
                   Expanded(
                     child: RadioListTile<String>(
-                      title: Text("WhatsApp", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 11)),
+                      title: Text(s.t('alert_whatsapp'), style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 11)),
                       value: 'whatsapp',
                       groupValue: _primaryChannel,
                       activeColor: PlayfulColors.accent,

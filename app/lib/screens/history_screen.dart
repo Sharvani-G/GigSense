@@ -356,7 +356,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             Navigator.pop(context);
                           },
                           backgroundColor: PlayfulColors.accent,
-                          child: const Text("APPLY"),
+                          child: Text(StringsProvider.instance.t('btn_apply')),
                         ),
                       ),
                     ],

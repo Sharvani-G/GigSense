@@ -45,3 +45,8 @@ class RouteSafetyRequest(BaseModel):
 class RouteSafetyResponse(BaseModel):
     score: str # "low", "moderate", "higher"
     message: str
+
+class VoiceParseRequest(BaseModel):
+    transcript: str
+    language_name: str
+

@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'playful_widgets.dart';
+import '../i18n/strings.dart';
 
 // ---------------------------------------------------------------------------
 // ZoneStats — Data Model representing aggregated metrics per zone
@@ -225,7 +226,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Location services are disabled.")),
+          SnackBar(content: Text(StringsProvider.instance.t('err_location_disabled'))),
         );
         setState(() => _isLocatingUser = false);
         return;
@@ -236,7 +237,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Location permissions are denied.")),
+            SnackBar(content: Text(StringsProvider.instance.t('err_location_denied'))),
           );
           setState(() => _isLocatingUser = false);
           return;
@@ -245,7 +246,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
 
       if (permission == LocationPermission.deniedForever) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Location permissions are permanently denied.")),
+          SnackBar(content: Text(StringsProvider.instance.t('err_location_permanently_denied'))),
         );
         setState(() => _isLocatingUser = false);
         return;
@@ -371,7 +372,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
 
         if (list.isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("No results found in Bengaluru region.")),
+            SnackBar(content: Text(StringsProvider.instance.t('err_no_results_bengaluru'))),
           );
         }
       } else {
@@ -494,7 +495,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
               const SizedBox(height: 20),
               PlayfulButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text("GOT IT"),
+                child: Text(StringsProvider.instance.t('btn_got_it').toUpperCase()),
               ),
             ],
           ),
