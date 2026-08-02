@@ -227,6 +227,12 @@ class _HelpWalkthroughScreenState extends State<HelpWalkthroughScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          _FeatureIllustration(
+            icon: icon,
+            color: iconColor,
+            title: title,
+          ),
           const SizedBox(height: 14),
           PlayfulMarkdownText(
             text: description,
@@ -239,6 +245,141 @@ class _HelpWalkthroughScreenState extends State<HelpWalkthroughScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _FeatureIllustration extends StatefulWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+
+  const _FeatureIllustration({required this.icon, required this.color, required this.title});
+
+  @override
+  State<_FeatureIllustration> createState() => _FeatureIllustrationState();
+}
+
+class _FeatureIllustrationState extends State<_FeatureIllustration> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    );
+    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _controller.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        double offset = _animation.value * 6.0 - 3.0; // small translation motion
+        double scale = 1.0 + (_animation.value * 0.06); // small scale motion
+        
+        Widget illustration;
+        final titleLower = widget.title.toLowerCase();
+        if (titleLower.contains("ocr") || titleLower.contains("log") || titleLower.contains("trip")) {
+          // OCR/Scan diagram flow animation: a document icon sliding into a scanning box!
+          illustration = SizedBox(
+            height: 60,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Transform.translate(
+                  offset: Offset(_animation.value * 20.0 - 10.0, 0),
+                  child: Icon(Icons.description_outlined, color: widget.color, size: 28),
+                ),
+                const SizedBox(width: 8),
+                Icon(Icons.arrow_forward_rounded, color: widget.color.withOpacity(0.5), size: 18),
+                const SizedBox(width: 8),
+                Icon(Icons.document_scanner_outlined, color: widget.color, size: 32),
+              ],
+            ),
+          );
+        } else if (titleLower.contains("chat") || titleLower.contains("ai") || titleLower.contains("assistant")) {
+          // Chat: pulsing message bubbles!
+          illustration = SizedBox(
+            height: 60,
+            child: Center(
+              child: Transform.scale(
+                scale: scale,
+                child: Icon(widget.icon, color: widget.color, size: 36),
+              ),
+            ),
+          );
+        } else if (titleLower.contains("map") || titleLower.contains("locality")) {
+          // Map: radar scan pulse!
+          illustration = SizedBox(
+            height: 60,
+            child: Center(
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    width: 32 + (_animation.value * 24),
+                    height: 32 + (_animation.value * 24),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: widget.color.withOpacity(0.15 * (1.0 - _animation.value)),
+                      border: Border.all(color: widget.color.withOpacity(0.3 * (1.0 - _animation.value)), width: 2),
+                    ),
+                  ),
+                  Icon(widget.icon, color: widget.color, size: 28),
+                ],
+              ),
+            ),
+          );
+        } else if (titleLower.contains("sos") || titleLower.contains("unsafe") || titleLower.contains("shield")) {
+          // SOS: flashing beacon pulse!
+          illustration = SizedBox(
+            height: 60,
+            child: Center(
+              child: Icon(
+                widget.icon,
+                color: _animation.value > 0.5 ? widget.color : widget.color.withOpacity(0.3),
+                size: 32,
+              ),
+            ),
+          );
+        } else {
+          // General floating bounce
+          illustration = SizedBox(
+            height: 60,
+            child: Center(
+              child: Transform.translate(
+                offset: Offset(0, offset),
+                child: Icon(widget.icon, color: widget.color, size: 32),
+              ),
+            ),
+          );
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          height: 70,
+          decoration: BoxDecoration(
+            color: widget.color.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: PlayfulColors.border.withOpacity(0.2), width: 1.5),
+          ),
+          child: illustration,
+        );
+      },
     );
   }
 }
