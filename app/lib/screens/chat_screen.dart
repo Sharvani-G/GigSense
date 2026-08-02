@@ -756,6 +756,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         children: [
                           SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
                             child: Row(
                               children: [
                                 QuickReplyChip(
@@ -771,6 +772,11 @@ class _ChatScreenState extends State<ChatScreen> {
                                 QuickReplyChip(
                                   text: StringsProvider.instance.t('chip_complain'),
                                   onTap: () => _sendMessage(StringsProvider.instance.t('chip_complain')),
+                                ),
+                                const SizedBox(width: 8),
+                                QuickReplyChip(
+                                  text: StringsProvider.instance.t('chip_deductions'),
+                                  onTap: () => _sendMessage(StringsProvider.instance.t('chip_deductions')),
                                 ),
                               ],
                             ),

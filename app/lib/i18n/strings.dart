@@ -110,9 +110,10 @@ class AppStrings {
           'I\'m having trouble responding right now — try again in a moment.',
 
       // Quick-reply chips
-      'chip_pay_fair': 'Is my pay fair?',
+      'chip_pay_fair': 'Is this fair pay?',
       'chip_rights': 'What are my rights?',
-      'chip_complain': 'How do I complain?',
+      'chip_complain': 'Draft a complaint',
+      'chip_deductions': 'What does the law say about deductions?',
 
       // Settings / Language picker
       'settings_title': 'SETTINGS',
@@ -240,9 +241,10 @@ class AppStrings {
       'chat_error_reply': 'मुझे अभी जवाब देने में परेशानी हो रही है — एक पल में फिर कोशिश करें।',
 
       // Quick-reply chips
-      'chip_pay_fair': 'क्या मेरा वेतन उचित है?',
+      'chip_pay_fair': 'क्या यह उचित वेतन है?',
       'chip_rights': 'मेरे अधिकार क्या हैं?',
-      'chip_complain': 'मैं शिकायत कैसे करूं?',
+      'chip_complain': 'एक शिकायत का मसौदा तैयार करें',
+      'chip_deductions': 'कटौतियों के बारे में कानून क्या कहता है?',
 
       // Settings / Language picker
       'settings_title': 'सेटिंग्स',
@@ -370,9 +372,10 @@ class AppStrings {
       'chat_error_reply': 'ಈಗ ಉತ್ತರಿಸಲು ಸಮಸ್ಯೆ ಆಗುತ್ತಿದೆ — ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
 
       // Quick-reply chips
-      'chip_pay_fair': 'ನನ್ನ ವೇತನ ನ್ಯಾಯಯುತವೇ?',
+      'chip_pay_fair': 'ಇದು ನ್ಯಾಯಯುತ ವೇತನವೇ?',
       'chip_rights': 'ನನ್ನ ಹಕ್ಕುಗಳೇನು?',
-      'chip_complain': 'ನಾನು ಹೇಗೆ ದೂರು ಸಲ್ಲಿಸಲಿ?',
+      'chip_complain': 'ದೂರು ಪತ್ರದ ಕರಡು ತಯಾರಿಸಿ',
+      'chip_deductions': 'ಕಡิตಗಳ ಬಗ್ಗೆ ಕಾನೂನು ಏನು ಹೇಳುತ್ತದೆ?',
 
       // Settings / Language picker
       'settings_title': 'ಸೆಟ್ಟಿಂಗ್‌ಗಳು',
@@ -498,9 +501,10 @@ class AppStrings {
       'chat_error_reply': 'பதில் அளிப்பதில் சிக்கல் உள்ளது - ஒரு கணம் கழித்து மீண்டும் முயற்சிக்கவும்.',
 
       // Quick-reply chips
-      'chip_pay_fair': 'எனது ஊதியம் நியாயமானதா?',
+      'chip_pay_fair': 'இது நியாயமான ஊதியமா?',
       'chip_rights': 'எனது உரிமைகள் என்ன?',
-      'chip_complain': 'நான் எப்படி புகார் செய்வது?',
+      'chip_complain': 'ஒரு புகாரை வரைவு செய்க',
+      'chip_deductions': 'பிடித்தங்கள் பற்றி சட்டம் என்ன சொல்கிறது?',
 
       // Settings / Language picker
       'settings_title': 'அமைப்புகள்',
@@ -627,9 +631,10 @@ class AppStrings {
       'chat_error_reply': 'సమాధానం ఇవ్వడంలో సమస్య ఉంది - కాసేపటి తర్వాత మళ్ళీ ప్రయత్నించండి.',
 
       // Quick-reply chips
-      'chip_pay_fair': 'నా వేతనం సరైనదేనా?',
+      'chip_pay_fair': 'ఇది సరైన వేతనమేనా?',
       'chip_rights': 'నా హక్కులు ఏమిటి?',
-      'chip_complain': 'నేను ఎలా ఫిర్యాదు చేయాలి?',
+      'chip_complain': 'ఫిర్యాదు ముసాయిదా చేయండి',
+      'chip_deductions': 'మినహాయింపులపై చట్టం ఏం చెబుతోంది?',
 
       // Settings / Language picker
       'settings_title': 'సెట్టింగులు',
@@ -722,9 +727,10 @@ class AppStrings {
       'chat_disclaimer': 'പൊതുവായ മാർഗ്ഗനിർദ്ദേശം, നിയമോപദേശമല്ല.',
       'chat_error_loading': 'സന്ദേശങ്ങൾ ലോഡുചെയ്യുന്നതിൽ പിശക്.',
       'chat_error_reply': 'മറുപടി നൽകുന്നതിൽ പ്രശ്നമുണ്ട് - അല്പസമയം കഴിഞ്ഞ് വീണ്ടും ശ്രമിക്കുക.',
-      'chip_pay_fair': 'എന്റെ വേതനം ന്യായമാണോ?',
+      'chip_pay_fair': 'ഇത് ന്യായമായ വേതനമാണോ?',
       'chip_rights': 'എന്റെ അവകാശങ്ങൾ എന്തൊക്കെയാണ്?',
-      'chip_complain': 'ഞാൻ എങ്ങനെ പരാതിപ്പെടും?',
+      'chip_complain': 'ഒരു പരാതി തയ്യാറാക്കുക',
+      'chip_deductions': 'കുറവുകളെക്കുറിച്ച് നിയമം എന്താണ് പറയുന്നത്?',
       'settings_title': 'സെറ്റിംഗ്സ്',
       'settings_language': 'ഭാഷ',
       'lang_en': 'English',
