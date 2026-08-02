@@ -1543,11 +1543,11 @@ class _SOSSettingsBottomSheetContent extends StatefulWidget {
 class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetContent> {
   late TextEditingController _templateController;
   
-  bool _smsEnabled = true;
-  bool _whatsappEnabled = false;
-  bool _callEnabled = false;
+  bool _whatsappEnabled = true;
+  bool _autoSmsEnabled = false;
+  bool _manualSmsEnabled = false;
   
-  String _primaryChannel = 'sms';
+  String _primaryChannel = 'whatsapp';
   bool _liveLocationEnabled = true;
   int _liveDuration = 30; // 15, 30, 60
   bool _isSaving = false;
@@ -1557,11 +1557,21 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
     super.initState();
     final settings = widget.initialSettings ?? {};
     final channels = settings['channels'] as Map<String, dynamic>? ?? {};
-    _smsEnabled = channels['sms'] ?? true;
-    _whatsappEnabled = channels['whatsapp'] ?? false;
-    _callEnabled = channels['call'] ?? false;
     
-    _primaryChannel = settings['primaryChannel'] ?? 'sms';
+    final isAndroid = Platform.isAndroid;
+    _whatsappEnabled = channels['whatsapp'] ?? true;
+    
+    if (isAndroid) {
+      _autoSmsEnabled = channels['autoSms'] ?? (channels['sms'] ?? true);
+      _manualSmsEnabled = channels['manualSms'] ?? false;
+      _primaryChannel = settings['primaryChannel'] ?? 'autoSms';
+      if (_primaryChannel == 'sms') _primaryChannel = 'autoSms';
+    } else {
+      _autoSmsEnabled = false;
+      _manualSmsEnabled = channels['manualSms'] ?? (channels['sms'] ?? true);
+      _primaryChannel = settings['primaryChannel'] ?? 'manualSms';
+      if (_primaryChannel == 'sms') _primaryChannel = 'manualSms';
+    }
     
     final locationMode = settings['locationMode'] ?? 'live';
     _liveLocationEnabled = locationMode == 'live';
@@ -1586,22 +1596,28 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
   }
 
   Future<void> _saveSettings() async {
-    if (!_smsEnabled && !_whatsappEnabled && !_callEnabled) {
+    if (!_whatsappEnabled && !_autoSmsEnabled && !_manualSmsEnabled) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please enable at least one channel.")),
       );
       return;
     }
     
-    if (_primaryChannel == 'sms' && !_smsEnabled) _primaryChannel = _whatsappEnabled ? 'whatsapp' : 'call';
-    if (_primaryChannel == 'whatsapp' && !_whatsappEnabled) _primaryChannel = _smsEnabled ? 'sms' : 'call';
-    if (_primaryChannel == 'call' && !_callEnabled) _primaryChannel = _smsEnabled ? 'sms' : 'whatsapp';
+    if (_primaryChannel == 'autoSms' && !_autoSmsEnabled) {
+      _primaryChannel = _whatsappEnabled ? 'whatsapp' : 'manualSms';
+    }
+    if (_primaryChannel == 'manualSms' && !_manualSmsEnabled) {
+      _primaryChannel = _whatsappEnabled ? 'whatsapp' : 'autoSms';
+    }
+    if (_primaryChannel == 'whatsapp' && !_whatsappEnabled) {
+      _primaryChannel = _autoSmsEnabled ? 'autoSms' : 'manualSms';
+    }
 
     final settings = {
       'channels': {
-        'sms': _smsEnabled,
         'whatsapp': _whatsappEnabled,
-        'call': _callEnabled,
+        'autoSms': _autoSmsEnabled,
+        'manualSms': _manualSmsEnabled,
       },
       'primaryChannel': _primaryChannel,
       'locationMode': _liveLocationEnabled ? 'live' : 'none',
@@ -1629,9 +1645,9 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
 
     final currentSettings = {
       'channels': {
-        'sms': _smsEnabled,
         'whatsapp': _whatsappEnabled,
-        'call': _callEnabled,
+        'autoSms': _autoSmsEnabled,
+        'manualSms': _manualSmsEnabled,
       },
       'primaryChannel': _primaryChannel,
       'locationMode': _liveLocationEnabled ? 'live' : 'none',
@@ -1713,29 +1729,38 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
             const SizedBox(height: 8),
             
             CheckboxListTile(
-              title: Text(
-                Platform.isAndroid ? "Automatic SMS Alert (Silent)" : "SMS Alert (Requires tap)",
-                style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13),
-              ),
-              subtitle: Text(
-                Platform.isAndroid
-                    ? "Sends SMS programmatically in background. Requires SMS permission."
-                    : "Opens Messages app pre-filled, requiring your manual send tap.",
-                style: GoogleFonts.plusJakartaSans(fontSize: 11, color: PlayfulColors.mutedForeground),
-              ),
-              value: _smsEnabled,
+              title: Text("WhatsApp Alert", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: Text("Opens WhatsApp pre-filled. Requires manual send tap.", style: GoogleFonts.plusJakartaSans(fontSize: 11, color: PlayfulColors.mutedForeground)),
+              value: _whatsappEnabled,
               activeColor: PlayfulColors.accent,
-              onChanged: (val) async {
-                final messenger = ScaffoldMessenger.of(context);
-                if (val == true) {
-                  if (Platform.isAndroid) {
+              onChanged: (val) {
+                setState(() {
+                  _whatsappEnabled = val ?? false;
+                });
+              },
+            ),
+            if (Platform.isAndroid)
+              CheckboxListTile(
+                title: Text(
+                  "Automatic SMS Alert (Silent)",
+                  style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                subtitle: Text(
+                  "Sends SMS programmatically in background. Requires SMS permission.",
+                  style: GoogleFonts.plusJakartaSans(fontSize: 11, color: PlayfulColors.mutedForeground),
+                ),
+                value: _autoSmsEnabled,
+                activeColor: PlayfulColors.accent,
+                onChanged: (val) async {
+                  final messenger = ScaffoldMessenger.of(context);
+                  if (val == true) {
                     var status = await Permission.sms.status;
                     if (!status.isGranted) {
                       status = await Permission.sms.request();
                     }
                     if (status.isGranted) {
                       setState(() {
-                        _smsEnabled = true;
+                        _autoSmsEnabled = true;
                       });
                     } else {
                       messenger.showSnackBar(
@@ -1745,47 +1770,24 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
                         ),
                       );
                       setState(() {
-                        _smsEnabled = false;
+                        _autoSmsEnabled = false;
                       });
                     }
                   } else {
                     setState(() {
-                      _smsEnabled = true;
+                      _autoSmsEnabled = false;
                     });
                   }
-                } else {
-                  setState(() {
-                    _smsEnabled = false;
-                    if (_primaryChannel == 'sms') {
-                      _primaryChannel = 'whatsapp';
-                    }
-                  });
-                }
-              },
-            ),
+                },
+              ),
             CheckboxListTile(
-              title: Text("WhatsApp Alert", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13)),
-              value: _whatsappEnabled,
+              title: Text("Manual SMS Alert", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13)),
+              subtitle: Text("Opens Messages app pre-filled. Requires manual send tap.", style: GoogleFonts.plusJakartaSans(fontSize: 11, color: PlayfulColors.mutedForeground)),
+              value: _manualSmsEnabled,
               activeColor: PlayfulColors.accent,
               onChanged: (val) {
                 setState(() {
-                  _whatsappEnabled = val ?? false;
-                  if (!_whatsappEnabled && _primaryChannel == 'whatsapp') {
-                    _primaryChannel = 'sms';
-                  }
-                });
-              },
-            ),
-            CheckboxListTile(
-              title: Text("Phone Call Shortcut", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13)),
-              value: _callEnabled,
-              activeColor: PlayfulColors.accent,
-              onChanged: (val) {
-                setState(() {
-                  _callEnabled = val ?? false;
-                  if (!_callEnabled && _primaryChannel == 'call') {
-                    _primaryChannel = 'sms';
-                  }
+                  _manualSmsEnabled = val ?? false;
                 });
               },
             ),
@@ -1804,11 +1806,21 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
             const SizedBox(height: 8),
             Row(
               children: [
-                if (_smsEnabled)
+                if (_autoSmsEnabled && Platform.isAndroid)
                   Expanded(
                     child: RadioListTile<String>(
-                      title: Text("SMS", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 12)),
-                      value: 'sms',
+                      title: Text("Auto SMS", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 11)),
+                      value: 'autoSms',
+                      groupValue: _primaryChannel,
+                      activeColor: PlayfulColors.accent,
+                      onChanged: (val) => setState(() => _primaryChannel = val!),
+                    ),
+                  ),
+                if (_manualSmsEnabled)
+                  Expanded(
+                    child: RadioListTile<String>(
+                      title: Text("Manual SMS", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 11)),
+                      value: 'manualSms',
                       groupValue: _primaryChannel,
                       activeColor: PlayfulColors.accent,
                       onChanged: (val) => setState(() => _primaryChannel = val!),
@@ -1817,18 +1829,8 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
                 if (_whatsappEnabled)
                   Expanded(
                     child: RadioListTile<String>(
-                      title: Text("WhatsApp", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 12)),
+                      title: Text("WhatsApp", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 11)),
                       value: 'whatsapp',
-                      groupValue: _primaryChannel,
-                      activeColor: PlayfulColors.accent,
-                      onChanged: (val) => setState(() => _primaryChannel = val!),
-                    ),
-                  ),
-                if (_callEnabled)
-                  Expanded(
-                    child: RadioListTile<String>(
-                      title: Text("Call", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 12)),
-                      value: 'call',
                       groupValue: _primaryChannel,
                       activeColor: PlayfulColors.accent,
                       onChanged: (val) => setState(() => _primaryChannel = val!),

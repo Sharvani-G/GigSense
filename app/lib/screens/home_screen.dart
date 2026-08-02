@@ -1586,13 +1586,20 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     String workerName,
   ) {
     final channels = settings['channels'] as Map<String, dynamic>? ?? {
-      'sms': true,
-      'whatsapp': false,
-      'call': false,
+      'whatsapp': true,
+      'autoSms': Platform.isAndroid,
+      'manualSms': !Platform.isAndroid,
     };
-    final bool smsEnabled = channels['sms'] ?? false;
     final bool whatsappEnabled = channels['whatsapp'] ?? false;
-    final bool callEnabled = channels['call'] ?? false;
+    final bool autoSmsEnabled = Platform.isAndroid && (channels['autoSms'] ?? false);
+    final bool manualSmsEnabled = channels['manualSms'] ?? false;
+    
+    // Legacy support
+    final bool legacySmsEnabled = channels['sms'] ?? false;
+    final bool smsIsAuto = Platform.isAndroid;
+    final bool hasAutoSms = autoSmsEnabled || (legacySmsEnabled && smsIsAuto);
+    final bool hasManualSms = manualSmsEnabled || (legacySmsEnabled && !smsIsAuto);
+    final bool legacyCallEnabled = channels['call'] ?? false;
 
     showDialog(
       context: context,
@@ -1655,15 +1662,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             const SizedBox(height: 20),
             
             // Channel Buttons
-            if (smsEnabled && whatsappEnabled) ...[
+            if (whatsappEnabled && (hasAutoSms || hasManualSms)) ...[
               PlayfulButton(
                 backgroundColor: const Color(0xFFE11D48), // Rose
                 height: 52,
                 onPressed: () {
                   Navigator.pop(ctx);
                   _triggerSOSWithChannels(contact, settings, workerName, {
-                    'sms': true,
                     'whatsapp': true,
+                    'autoSms': hasAutoSms,
+                    'manualSms': hasManualSms,
                     'call': false,
                   });
                 },
@@ -1688,15 +1696,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               const SizedBox(height: 10),
             ],
             
-            if (smsEnabled) ...[
+            if (hasAutoSms) ...[
               PlayfulButton(
                 backgroundColor: const Color(0xFF0EA5E9), // Sky Blue
                 height: 48,
                 onPressed: () {
                   Navigator.pop(ctx);
                   _triggerSOSWithChannels(contact, settings, workerName, {
-                    'sms': true,
                     'whatsapp': false,
+                    'autoSms': true,
+                    'manualSms': false,
                     'call': false,
                   });
                 },
@@ -1705,13 +1714,43 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        Platform.isAndroid ? "SEND AUTOMATIC SMS" : "SEND SMS ALERT",
+                        "SEND AUTOMATIC SMS",
                         style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
                       ),
                       Text(
-                        Platform.isAndroid 
-                            ? "Silent background send (no tap needed)" 
-                            : "Opens Messages app pre-filled (requires tap)",
+                        "Silent background send (no tap needed)",
+                        style: GoogleFonts.plusJakartaSans(color: Colors.white.withOpacity(0.8), fontSize: 9),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+            
+            if (hasManualSms) ...[
+              PlayfulButton(
+                backgroundColor: const Color(0xFF0EA5E9), // Sky Blue
+                height: 48,
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _triggerSOSWithChannels(contact, settings, workerName, {
+                    'whatsapp': false,
+                    'autoSms': false,
+                    'manualSms': true,
+                    'call': false,
+                  });
+                },
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "SEND SMS ALERT",
+                        style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
+                      ),
+                      Text(
+                        "Opens Messages app pre-filled (requires tap)",
                         style: GoogleFonts.plusJakartaSans(color: Colors.white.withOpacity(0.8), fontSize: 9),
                       ),
                     ],
@@ -1728,8 +1767,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 onPressed: () {
                   Navigator.pop(ctx);
                   _triggerSOSWithChannels(contact, settings, workerName, {
-                    'sms': false,
                     'whatsapp': true,
+                    'autoSms': false,
+                    'manualSms': false,
                     'call': false,
                   });
                 },
@@ -1752,15 +1792,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               const SizedBox(height: 10),
             ],
             
-            if (callEnabled) ...[
+            if (legacyCallEnabled) ...[
               PlayfulButton(
                 backgroundColor: const Color(0xFFF59E0B), // Amber
                 height: 48,
                 onPressed: () {
                   Navigator.pop(ctx);
                   _triggerSOSWithChannels(contact, settings, workerName, {
-                    'sms': false,
                     'whatsapp': false,
+                    'autoSms': false,
+                    'manualSms': false,
                     'call': true,
                   });
                 },

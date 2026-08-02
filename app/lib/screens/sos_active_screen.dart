@@ -75,19 +75,29 @@ class SOSManager {
 
     // 4. Launch all configured channels
     final Map<String, dynamic> channels = settings['channels'] as Map<String, dynamic>? ?? {
-      'sms': true,
-      'whatsapp': false,
-      'call': false,
+      'whatsapp': true,
+      'autoSms': Platform.isAndroid,
+      'manualSms': !Platform.isAndroid,
     };
 
     bool launchedAny = false;
-    if (channels['sms'] == true) {
+    if (channels['autoSms'] == true) {
       launchedAny = true;
-      launchChannel('sms', workerName, isTest, context: context);
+      launchChannel('autoSms', workerName, isTest, context: context);
+    }
+    if (channels['manualSms'] == true) {
+      launchedAny = true;
+      launchChannel('manualSms', workerName, isTest, context: context);
     }
     if (channels['whatsapp'] == true) {
       launchedAny = true;
       launchChannel('whatsapp', workerName, isTest, context: context);
+    }
+
+    // Keep legacy channels support for safety
+    if (channels['sms'] == true) {
+      launchedAny = true;
+      launchChannel('sms', workerName, isTest, context: context);
     }
     if (channels['call'] == true) {
       launchedAny = true;
@@ -95,7 +105,7 @@ class SOSManager {
     }
 
     if (!launchedAny) {
-      final String primaryChan = settings['primaryChannel'] ?? 'sms';
+      final String primaryChan = settings['primaryChannel'] ?? (Platform.isAndroid ? 'autoSms' : 'manualSms');
       launchChannel(primaryChan, workerName, isTest, context: context);
     }
 
@@ -177,11 +187,9 @@ class SOSManager {
 
     final String phone = activeContact?['phone']?.toString() ?? '';
 
-    if (channel == 'sms') {
-      final String smsPhone = phone.replaceAll(RegExp(r'\s+'), '');
+    if (channel == 'autoSms' || (channel == 'sms' && Platform.isAndroid)) {
       if (Platform.isAndroid) {
-        // Automatic background SMS on Android (Dangerous permission tier)
-        // Note: permission is requested proactively in Settings screen setup
+        final String smsPhone = phone.replaceAll(RegExp(r'\s+'), '');
         final bool isPermissionGranted = await Permission.sms.isGranted;
         if (isPermissionGranted) {
           try {
@@ -202,13 +210,15 @@ class SOSManager {
           debugPrint("Automatic SMS skipped because SEND_SMS permission is not granted.");
         }
       } else {
-        // iOS or fallback manual composer flow (Apple does not allow programmatic SMS)
-        final Uri uri = Uri.parse("sms:$smsPhone?body=${Uri.encodeComponent(message)}");
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri);
-        } else {
-          await Clipboard.setData(ClipboardData(text: message));
-        }
+        debugPrint("Automatic SMS is not supported on this platform.");
+      }
+    } else if (channel == 'manualSms' || (channel == 'sms' && !Platform.isAndroid)) {
+      final String smsPhone = phone.replaceAll(RegExp(r'\s+'), '');
+      final Uri uri = Uri.parse("sms:$smsPhone?body=${Uri.encodeComponent(message)}");
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        await Clipboard.setData(ClipboardData(text: message));
       }
     } else if (channel == 'whatsapp') {
       final cleanDigits = phone.replaceAll(RegExp(r'[^0-9]'), '');
