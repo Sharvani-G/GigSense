@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import 'playful_widgets.dart';
 import '../i18n/strings.dart';
 import '../main.dart' show showLanguagePicker;
@@ -27,6 +29,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _name = "THERE";
   String _workerType = "other_gig_worker";
   String _phoneNumber = "";
+  String _profilePhotoBase64 = "";
   String _langCode = "en";
   Map<String, dynamic>? _savingsGoal;
   List<Map<String, dynamic>> _emergencyContacts = [];
@@ -50,6 +53,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _name = "Guest User";
           _workerType = "other_gig_worker";
           _phoneNumber = "";
+          _profilePhotoBase64 = "";
           _langCode = StringsProvider.instance.lang;
           _isLoading = false;
         });
@@ -65,6 +69,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _name = data['name'] ?? "THERE";
           _workerType = data['workerType'] ?? "other_gig_worker";
           _phoneNumber = data['phoneNumber'] ?? "";
+          _profilePhotoBase64 = data['profilePhotoBase64'] ?? "";
           _langCode = data['preferredLanguage'] ?? StringsProvider.instance.lang;
           _savingsGoal = data['savingsGoal'] as Map<String, dynamic>?;
           _emergencyContacts = List<Map<String, dynamic>>.from((data['emergencyContacts'] as List?)?.map((e) => Map<String,dynamic>.from(e)) ?? []);
@@ -167,7 +172,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     shape: BoxShape.circle,
                                     border: Border.all(color: PlayfulColors.border, width: 2),
                                   ),
-                                  child: const Icon(Icons.person_outline, color: PlayfulColors.accent, size: 24),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(9999),
+                                    child: _profilePhotoBase64.isNotEmpty
+                                        ? Image.memory(
+                                            base64Decode(_profilePhotoBase64),
+                                            fit: BoxFit.cover,
+                                            width: 48,
+                                            height: 48,
+                                          )
+                                        : const Icon(Icons.person_outline, color: PlayfulColors.accent, size: 24),
+                                  ),
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
@@ -1010,7 +1025,7 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
 }
 
 // ---------------------------------------------------------------------------
-// EditProfileScreen — sub-screen to update name and worker type
+// EditProfileScreen — sub-screen to update full user profile properties
 // ---------------------------------------------------------------------------
 class EditProfileScreen extends StatefulWidget {
   final String initialName;
@@ -1031,24 +1046,96 @@ class EditProfileScreen extends StatefulWidget {
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
-  String? _selectedWorkerType;
-  bool _isLoading = false;
+  final _bioController = TextEditingController();
+  final _expYearsController = TextEditingController();
+  final _expMonthsController = TextEditingController();
+
+  // Emergency contact inline add text controllers
+  final _emContactNameController = TextEditingController();
+  final _emContactPhoneController = TextEditingController();
+
+  List<String> _selectedWorkerTypes = [];
+  List<String> _workingPlatforms = [];
+  String _profilePhotoBase64 = '';
+  List<Map<String, dynamic>> _emergencyContacts = [];
+
+  bool _isLoading = true;
+  bool _isSaving = false;
+
+  final Map<String, String> _allPlatformsMap = {
+    'uber': 'Uber',
+    'rapido': 'Rapido',
+    'ola': 'Ola',
+    'indrive': 'InDrive',
+    'zomato': 'Zomato',
+    'swiggy': 'Swiggy',
+    'dunzo': 'Dunzo',
+    'blinkit': 'Blinkit',
+    'zepto': 'Zepto',
+    'bigbasket': 'BigBasket',
+    'amazon_flex': 'Amazon Flex',
+    'urban_company': 'Urban Company',
+    'porter': 'Porter',
+    'housejoy': 'Housejoy',
+    'other': 'Other',
+  };
 
   @override
   void initState() {
     super.initState();
-    _nameController.text = widget.initialName;
-    _phoneController.text = widget.initialPhoneNumber;
-    _selectedWorkerType = widget.initialWorkerType;
-    _nameController.addListener(() => setState(() {}));
-    _phoneController.addListener(() => setState(() {}));
+    _fetchUserProfile();
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _bioController.dispose();
+    _expYearsController.dispose();
+    _expMonthsController.dispose();
+    _emContactNameController.dispose();
+    _emContactPhoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchUserProfile() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists && mounted) {
+        final data = doc.data()!;
+        _nameController.text = data['name'] ?? widget.initialName;
+        _phoneController.text = data['phoneNumber'] ?? widget.initialPhoneNumber;
+        _bioController.text = data['bio'] ?? "";
+        _expYearsController.text = (data['experienceYears'] ?? 0).toString();
+        _expMonthsController.text = (data['experienceMonths'] ?? 0).toString();
+
+        final wts = data['workerTypes'];
+        if (wts is List) {
+          _selectedWorkerTypes = List<String>.from(wts);
+        } else {
+          final wt = data['workerType'] ?? widget.initialWorkerType;
+          _selectedWorkerTypes = [wt];
+        }
+
+        final wps = data['workingPlatforms'];
+        if (wps is List) {
+          _workingPlatforms = List<String>.from(wps);
+        }
+
+        _profilePhotoBase64 = data['profilePhotoBase64'] ?? "";
+        _emergencyContacts = List<Map<String, dynamic>>.from(
+            (data['emergencyContacts'] as List?)?.map((e) => Map<String, dynamic>.from(e)) ?? []);
+      }
+      if (mounted) setState(() => _isLoading = false);
+    } catch (e) {
+      debugPrint("Error loading profile details: $e");
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   String normalizeIndianPhoneNumber(String input) {
@@ -1060,28 +1147,104 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return '';
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 200,
+        maxHeight: 200,
+        imageQuality: 70,
+      );
+      if (image != null) {
+        final bytes = await image.readAsBytes();
+        setState(() {
+          _profilePhotoBase64 = base64Encode(bytes);
+        });
+      }
+    } catch (e) {
+      debugPrint("Error picking image: $e");
+    }
+  }
+
+  void _addEmergencyContact() {
+    final name = _emContactNameController.text.trim();
+    final phone = _emContactPhoneController.text.trim();
+    final normalized = normalizeIndianPhoneNumber(phone);
+
+    if (name.isEmpty || normalized.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Enter a valid name and 10-digit mobile number."),
+          backgroundColor: PlayfulColors.secondary,
+        ),
+      );
+      return;
+    }
+
+    if (_emergencyContacts.length >= 5) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Maximum of 5 emergency contacts allowed."),
+          backgroundColor: PlayfulColors.secondary,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _emergencyContacts.add({'name': name, 'phone': normalized});
+      _emContactNameController.clear();
+      _emContactPhoneController.clear();
+    });
+  }
+
+  void _removeEmergencyContact(int index) {
+    setState(() {
+      _emergencyContacts.removeAt(index);
+    });
+  }
+
   Future<void> _saveProfile() async {
     final name = _nameController.text.trim();
     final phone = _phoneController.text.trim();
     final normalizedPhone = normalizeIndianPhoneNumber(phone);
+    final bio = _bioController.text.trim();
+    final expYears = int.tryParse(_expYearsController.text.trim()) ?? 0;
+    final expMonths = int.tryParse(_expMonthsController.text.trim()) ?? 0;
 
-    if (name.isEmpty || _selectedWorkerType == null || normalizedPhone.isEmpty) return;
+    if (name.isEmpty || normalizedPhone.isEmpty || _selectedWorkerTypes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Name, phone, and at least one worker type are required."),
+          backgroundColor: PlayfulColors.secondary,
+        ),
+      );
+      return;
+    }
 
-    setState(() => _isLoading = true);
+    setState(() => _isSaving = true);
 
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid != null) {
         await FirebaseFirestore.instance.collection('users').doc(uid).update({
           'name': name,
-          'workerType': _selectedWorkerType,
           'phoneNumber': normalizedPhone,
+          'workerType': _selectedWorkerTypes.first, // Backward compatibility
+          'workerTypes': _selectedWorkerTypes,
+          'workingPlatforms': _workingPlatforms,
+          'bio': bio,
+          'experienceYears': expYears,
+          'experienceMonths': expMonths,
+          'profilePhotoBase64': _profilePhotoBase64,
+          'emergencyContacts': _emergencyContacts,
         });
       }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       debugPrint("Error saving profile: $e");
-      setState(() => _isLoading = false);
+      setState(() => _isSaving = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(StringsProvider.instance.t('logjob_offline_note')),
@@ -1096,8 +1259,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     final s = StringsProvider.instance;
     final phoneVal = normalizeIndianPhoneNumber(_phoneController.text);
     final bool canSave = _nameController.text.trim().isNotEmpty &&
-        _selectedWorkerType != null &&
+        _selectedWorkerTypes.isNotEmpty &&
         phoneVal.isNotEmpty &&
+        !_isSaving &&
         !_isLoading;
 
     return Scaffold(
@@ -1115,71 +1279,385 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ),
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Name Input
-              PlayfulInput(
-                labelText: s.t('your_name_label'),
-                hintText: s.t('your_name_hint'),
-                controller: _nameController,
-              ),
-              const SizedBox(height: 20),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: PlayfulColors.accent))
+            : SingleChildScrollView(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Profile Photo Picker Section
+                    Center(
+                      child: GestureDetector(
+                        onTap: _pickImage,
+                        child: Stack(
+                          children: [
+                            Container(
+                              width: 96,
+                              height: 96,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: PlayfulColors.border, width: 3.0),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: PlayfulColors.border,
+                                    offset: Offset(4, 4),
+                                    blurRadius: 0,
+                                  ),
+                                ],
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(9999),
+                                child: _profilePhotoBase64.isNotEmpty
+                                    ? Image.memory(
+                                        base64Decode(_profilePhotoBase64),
+                                        fit: BoxFit.cover,
+                                        width: 96,
+                                        height: 96,
+                                      )
+                                    : const Icon(Icons.person, size: 48, color: PlayfulColors.mutedForeground),
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: PlayfulColors.accent,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 2.0),
+                                ),
+                                child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
 
-              // Phone Input
-              PlayfulInput(
-                labelText: "MOBILE NUMBER (10-DIGIT)",
-                hintText: "e.g., 9876543210",
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 32),
+                    // Name Input
+                    PlayfulInput(
+                      labelText: s.t('your_name_label'),
+                      hintText: s.t('your_name_hint'),
+                      controller: _nameController,
+                    ),
+                    const SizedBox(height: 20),
 
-              // Worker Type Selector Label
-              Text(
-                s.t('worker_type_label'),
-                style: GoogleFonts.plusJakartaSans(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12,
-                  letterSpacing: 1.5,
-                  color: PlayfulColors.foreground,
+                    // Phone Input
+                    PlayfulInput(
+                      labelText: "MOBILE NUMBER (10-DIGIT)",
+                      hintText: "e.g., 9876543210",
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Bio input
+                    PlayfulInput(
+                      labelText: "SHORT BIO / NOTE",
+                      hintText: "e.g. Full-time Swiggy rider, Indiranagar area",
+                      controller: _bioController,
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Experience inline Row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: PlayfulInput(
+                            labelText: "YEARS ACTIVE",
+                            hintText: "Years",
+                            controller: _expYearsController,
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: PlayfulInput(
+                            labelText: "MONTHS ACTIVE",
+                            hintText: "Months",
+                            controller: _expMonthsController,
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+
+                    // Worker Type Selector (Multi-select)
+                    Text(
+                      s.t('worker_type_label') + " (MULTI-SELECT)",
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                        letterSpacing: 1.5,
+                        color: PlayfulColors.foreground,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    _EditStickerCard(
+                      label: s.t('worker_delivery'),
+                      isSelected: _selectedWorkerTypes.contains("delivery_rider"),
+                      onTap: () {
+                        setState(() {
+                          if (_selectedWorkerTypes.contains("delivery_rider")) {
+                            if (_selectedWorkerTypes.length > 1) {
+                              _selectedWorkerTypes.remove("delivery_rider");
+                            }
+                          } else {
+                            _selectedWorkerTypes.add("delivery_rider");
+                          }
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    _EditStickerCard(
+                      label: s.t('worker_cab'),
+                      isSelected: _selectedWorkerTypes.contains("cab_driver"),
+                      onTap: () {
+                        setState(() {
+                          if (_selectedWorkerTypes.contains("cab_driver")) {
+                            if (_selectedWorkerTypes.length > 1) {
+                              _selectedWorkerTypes.remove("cab_driver");
+                            }
+                          } else {
+                            _selectedWorkerTypes.add("cab_driver");
+                          }
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    _EditStickerCard(
+                      label: s.t('worker_other'),
+                      isSelected: _selectedWorkerTypes.contains("other_gig_worker"),
+                      onTap: () {
+                        setState(() {
+                          if (_selectedWorkerTypes.contains("other_gig_worker")) {
+                            if (_selectedWorkerTypes.length > 1) {
+                              _selectedWorkerTypes.remove("other_gig_worker");
+                            }
+                          } else {
+                            _selectedWorkerTypes.add("other_gig_worker");
+                          }
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 32),
+
+                    // Working Platforms Multi-select
+                    Text(
+                      "WHICH PLATFORMS DO YOU GIG ON?",
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                        letterSpacing: 1.5,
+                        color: PlayfulColors.foreground,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _allPlatformsMap.entries.map((entry) {
+                        final bool isSelected = _workingPlatforms.contains(entry.key);
+                        return ChoiceChip(
+                          label: Text(
+                            entry.value,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: isSelected ? Colors.white : PlayfulColors.foreground,
+                            ),
+                          ),
+                          selected: isSelected,
+                          selectedColor: PlayfulColors.accent,
+                          backgroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: const BorderSide(color: PlayfulColors.border, width: 1.5),
+                          ),
+                          onSelected: (bool selected) {
+                            setState(() {
+                              if (selected) {
+                                _workingPlatforms.add(entry.key);
+                              } else {
+                                _workingPlatforms.remove(entry.key);
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 32),
+
+                    // Emergency Contact Management
+                    Text(
+                      "EMERGENCY CONTACTS (MAX 5)",
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                        letterSpacing: 1.5,
+                        color: PlayfulColors.foreground,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Contacts List Cards
+                    if (_emergencyContacts.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: PlayfulColors.muted.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: PlayfulColors.border, width: 1.5),
+                        ),
+                        child: Text(
+                          "No emergency contacts added yet.",
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 12,
+                            color: PlayfulColors.mutedForeground,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      )
+                    else
+                      Column(
+                        children: _emergencyContacts.asMap().entries.map((entry) {
+                          final idx = entry.key;
+                          final contact = entry.value;
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: PlayfulColors.border, width: 2.0),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: PlayfulColors.border,
+                                  offset: Offset(2, 2),
+                                  blurRadius: 0,
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.contact_phone, color: PlayfulColors.accent, size: 20),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        contact['name'] ?? "",
+                                        style: GoogleFonts.outfit(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: PlayfulColors.foreground,
+                                        ),
+                                      ),
+                                      Text(
+                                        contact['phone'] ?? "",
+                                        style: GoogleFonts.shareTechMono(
+                                          fontSize: 12,
+                                          color: PlayfulColors.mutedForeground,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, color: PlayfulColors.secondary, size: 20),
+                                  onPressed: () => _removeEmergencyContact(idx),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    const SizedBox(height: 16),
+
+                    // Add Contact inline Form
+                    if (_emergencyContacts.length < 5)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: PlayfulColors.border, width: 2.0),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              "ADD EMERGENCY CONTACT",
+                              style: GoogleFonts.outfit(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 11,
+                                color: PlayfulColors.foreground,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _emContactNameController,
+                              style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.bold),
+                              decoration: InputDecoration(
+                                labelText: "Contact Name",
+                                labelStyle: GoogleFonts.plusJakartaSans(fontSize: 12, color: PlayfulColors.mutedForeground),
+                                border: const OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _emContactPhoneController,
+                              keyboardType: TextInputType.phone,
+                              style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.bold),
+                              decoration: InputDecoration(
+                                labelText: "Mobile Number",
+                                labelStyle: GoogleFonts.plusJakartaSans(fontSize: 12, color: PlayfulColors.mutedForeground),
+                                border: const OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            PlayfulButton(
+                              onPressed: _addEmergencyContact,
+                              height: 36,
+                              backgroundColor: PlayfulColors.tertiary,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.add, size: 16, color: PlayfulColors.foreground),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    "ADD TO LIST",
+                                    style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: PlayfulColors.foreground),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    const SizedBox(height: 48),
+
+                    // Action button
+                    if (_isSaving)
+                      const Center(child: CircularProgressIndicator(color: PlayfulColors.accent))
+                    else
+                      PlayfulButton(
+                        onPressed: canSave ? _saveProfile : null,
+                        child: Text(s.t('btn_save')),
+                      ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
-
-              // 3 Options matching onboarding
-              _EditStickerCard(
-                label: s.t('worker_delivery'),
-                isSelected: _selectedWorkerType == "delivery_rider",
-                onTap: () => setState(() => _selectedWorkerType = "delivery_rider"),
-              ),
-              const SizedBox(height: 16),
-              _EditStickerCard(
-                label: s.t('worker_cab'),
-                isSelected: _selectedWorkerType == "cab_driver",
-                onTap: () => setState(() => _selectedWorkerType = "cab_driver"),
-              ),
-              const SizedBox(height: 16),
-              _EditStickerCard(
-                label: s.t('worker_other'),
-                isSelected: _selectedWorkerType == "other_gig_worker",
-                onTap: () => setState(() => _selectedWorkerType = "other_gig_worker"),
-              ),
-              const SizedBox(height: 48),
-
-              // Action button
-              if (_isLoading)
-                const Center(child: CircularProgressIndicator(color: PlayfulColors.accent))
-              else
-                PlayfulButton(
-                  onPressed: canSave ? _saveProfile : null,
-                  child: Text(s.t('btn_save')),
-                ),
-            ],
-          ),
-        ),
       ),
     );
   }

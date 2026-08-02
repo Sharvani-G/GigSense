@@ -215,7 +215,32 @@ async def chat_endpoint(request: ChatRequest):
     profile = get_user_profile(request.user_id)
     lang_code = profile.get('preferredLanguage', 'en')
     worker_type = profile.get('workerType', 'other_gig_worker')
-    worker_type_desc = WORKER_TYPE_DESCRIPTIONS.get(worker_type, 'gig worker')
+    worker_types = profile.get('workerTypes')
+    if not isinstance(worker_types, list):
+        worker_types = [worker_type]
+    
+    working_platforms = profile.get('workingPlatforms')
+    if not isinstance(working_platforms, list):
+        working_platforms = []
+        
+    experience_years = profile.get('experienceYears', 0)
+    experience_months = profile.get('experienceMonths', 0)
+    bio = profile.get('bio', '')
+    
+    worker_type_descs = [WORKER_TYPE_DESCRIPTIONS.get(wt, 'gig worker') for wt in worker_types]
+    worker_type_desc = " and ".join(worker_type_descs)
+    
+    extra_details = []
+    if working_platforms:
+        extra_details.append(f"works on: {', '.join(working_platforms)}")
+    if experience_years > 0 or experience_months > 0:
+        extra_details.append(f"experience: {experience_years} years, {experience_months} months")
+    if bio:
+        extra_details.append(f"bio/notes: {bio}")
+        
+    if extra_details:
+        worker_type_desc += " (" + "; ".join(extra_details) + ")"
+        
     language_name = LANGUAGE_NAMES.get(lang_code, 'English')
 
     system_prompt = get_chat_system_prompt(
@@ -541,7 +566,32 @@ async def weekly_insight(user_id: str):
         profile = get_user_profile(user_id)
         lang_code = profile.get('preferredLanguage', 'en')
         worker_type = profile.get('workerType', 'other_gig_worker')
-        worker_type_desc = WORKER_TYPE_DESCRIPTIONS.get(worker_type, 'gig worker')
+        worker_types = profile.get('workerTypes')
+        if not isinstance(worker_types, list):
+            worker_types = [worker_type]
+        
+        working_platforms = profile.get('workingPlatforms')
+        if not isinstance(working_platforms, list):
+            working_platforms = []
+            
+        experience_years = profile.get('experienceYears', 0)
+        experience_months = profile.get('experienceMonths', 0)
+        bio = profile.get('bio', '')
+        
+        worker_type_descs = [WORKER_TYPE_DESCRIPTIONS.get(wt, 'gig worker') for wt in worker_types]
+        worker_type_desc = " and ".join(worker_type_descs)
+        
+        extra_details = []
+        if working_platforms:
+            extra_details.append(f"works on: {', '.join(working_platforms)}")
+        if experience_years > 0 or experience_months > 0:
+            extra_details.append(f"experience: {experience_years} years, {experience_months} months")
+        if bio:
+            extra_details.append(f"bio/notes: {bio}")
+            
+        if extra_details:
+            worker_type_desc += " (" + "; ".join(extra_details) + ")"
+            
         language_name = LANGUAGE_NAMES.get(lang_code, 'English')
 
         forecast = compute_weekly_forecast(user_id)

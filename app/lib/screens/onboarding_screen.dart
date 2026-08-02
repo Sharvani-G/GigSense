@@ -131,6 +131,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         'name': name,
         'phoneNumber': normalizedPhone,
         'workerType': _selectedWorkerType,
+        'workerTypes': [_selectedWorkerType],
+        'workingPlatforms': <String>[],
+        'bio': '',
+        'experienceYears': 0,
+        'experienceMonths': 0,
+        'profilePhotoBase64': '',
         'preferredLanguage': 'en',
         'createdAt': FieldValue.serverTimestamp(),
       });
