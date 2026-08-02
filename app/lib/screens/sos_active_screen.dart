@@ -41,10 +41,18 @@ class SOSManager {
       if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
         bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
         if (serviceEnabled) {
-          final Position position = await Geolocator.getCurrentPosition(
-            locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-          ).timeout(const Duration(seconds: 5));
-          locationLink = "https://www.google.com/maps?q=${position.latitude},${position.longitude}";
+          try {
+            final Position position = await Geolocator.getCurrentPosition(
+              locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+            ).timeout(const Duration(seconds: 5));
+            locationLink = "https://maps.google.com/?q=${position.latitude},${position.longitude}";
+          } catch (e) {
+            debugPrint("getCurrentPosition failed/timed out: $e. Trying last known location.");
+            final Position? lastKnown = await Geolocator.getLastKnownPosition();
+            if (lastKnown != null) {
+              locationLink = "https://maps.google.com/?q=${lastKnown.latitude},${lastKnown.longitude} (Approximate)";
+            }
+          }
         }
       }
     } catch (e) {
@@ -104,11 +112,13 @@ class SOSManager {
     final s = StringsProvider.instance;
     final user = FirebaseAuth.instance.currentUser;
     Map<String, dynamic>? userSettings;
+    String workerPhone = "";
     if (user != null) {
       try {
         final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
         if (doc.exists) {
           userSettings = doc.data()?['sosSettings'] as Map<String, dynamic>?;
+          workerPhone = doc.data()?['phoneNumber'] as String? ?? "";
         }
       } catch (e) {
         debugPrint("Error loading user settings: $e");
@@ -129,47 +139,95 @@ class SOSManager {
         .replaceAll("{link}", link)
         .replaceAll("{time}", timeStr);
 
+    if (workerPhone.isNotEmpty) {
+      if (message.contains("{phone}")) {
+        message = message.replaceAll("{phone}", workerPhone);
+      } else {
+        message += " Phone: $workerPhone";
+      }
+    }
+
     if (isTest) {
       message = "[TEST MODE - IGNORE] $message";
     }
 
-    final String phone = activeContact?['phone']?.toString() ?? '';
+    final String rawPhone = activeContact?['phone']?.toString() ?? '';
+    // Normalize target emergency phone number
+    String cleanPhone = rawPhone.replaceAll(RegExp(r'[^\d]'), '');
+    if (cleanPhone.length == 10) {
+      cleanPhone = "+91$cleanPhone";
+    } else if (cleanPhone.length == 12 && cleanPhone.startsWith('91')) {
+      cleanPhone = "+$cleanPhone";
+    } else {
+      cleanPhone = rawPhone.replaceAll(RegExp(r'\s+'), '');
+    }
 
     if (channel == 'autoSms' || (channel == 'sms' && Platform.isAndroid)) {
       if (Platform.isAndroid) {
-        final String smsPhone = phone.replaceAll(RegExp(r'\s+'), '');
         final bool isPermissionGranted = await Permission.sms.isGranted;
         if (isPermissionGranted) {
           try {
             final bool success = await _smsChannel.invokeMethod('sendSMS', {
-              'phone': smsPhone,
+              'phone': cleanPhone,
               'message': message,
             });
             if (success) {
-              debugPrint("Automatic silent SMS sent to $smsPhone");
+              debugPrint("Automatic silent SMS sent to $cleanPhone");
+              if (context != null && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text("Automatic emergency SMS sent to $cleanPhone"),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
               return;
             } else {
-              debugPrint("Automatic silent SMS returned success=false");
+              throw Exception("Native SMS sending failed");
             }
           } catch (e) {
             debugPrint("Failed to send background SMS programmatically: $e");
+            if (context != null && context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text("Automatic SMS failed: $e. Triggering manual backup..."),
+                  backgroundColor: const Color(0xFFE11D48),
+                ),
+              );
+            }
+            await launchChannel('manualSms', workerName, isTest, context: context);
           }
         } else {
           debugPrint("Automatic SMS skipped because SEND_SMS permission is not granted.");
+          if (context != null && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text("SMS permission not granted — enable it in Settings. Launching manual SMS fallback..."),
+                backgroundColor: Color(0xFFE11D48),
+              ),
+            );
+          }
+          await launchChannel('manualSms', workerName, isTest, context: context);
         }
       } else {
         debugPrint("Automatic SMS is not supported on this platform.");
+        await launchChannel('manualSms', workerName, isTest, context: context);
       }
     } else if (channel == 'manualSms' || (channel == 'sms' && !Platform.isAndroid)) {
-      final String smsPhone = phone.replaceAll(RegExp(r'\s+'), '');
-      final Uri uri = Uri.parse("sms:$smsPhone?body=${Uri.encodeComponent(message)}");
+      final String separator = Platform.isAndroid ? '?' : '&';
+      final Uri uri = Uri.parse("sms:$cleanPhone${separator}body=${Uri.encodeComponent(message)}");
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri);
       } else {
         await Clipboard.setData(ClipboardData(text: message));
+        if (context != null && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("SMS composer not available. Alert text copied to clipboard.")),
+          );
+        }
       }
     } else if (channel == 'whatsapp') {
-      final cleanDigits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+      final cleanDigits = cleanPhone.replaceAll(RegExp(r'[^0-9]'), '');
       String sanitizedNumber = cleanDigits;
       if (cleanDigits.length == 10) {
         sanitizedNumber = '91$cleanDigits';
@@ -198,8 +256,7 @@ class SOSManager {
         }
       }
     } else if (channel == 'call') {
-      final String callPhone = phone.replaceAll(RegExp(r'\s+'), '');
-      final Uri uri = Uri.parse("tel:$callPhone");
+      final Uri uri = Uri.parse("tel:$cleanPhone");
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri);
       }
@@ -278,6 +335,7 @@ class SOSActiveScreen extends StatefulWidget {
 
 class _SOSActiveScreenState extends State<SOSActiveScreen> {
   String _workerName = "Worker";
+  bool _isPopped = false;
 
   @override
   void initState() {
@@ -286,7 +344,8 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
     SOSManager.instance.onTick = () {
       if (mounted) {
         setState(() {});
-        if (!SOSManager.instance.isActive) {
+        if (!SOSManager.instance.isActive && !_isPopped) {
+          _isPopped = true;
           Navigator.pop(context);
         }
       }
@@ -499,9 +558,12 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
                 // Stop Sharing Button
                 PlayfulButton(
                   onPressed: () async {
-                    await SOSManager.instance.stopSOS();
-                    if (context.mounted) {
-                      Navigator.pop(context);
+                    if (!_isPopped) {
+                      _isPopped = true;
+                      await SOSManager.instance.stopSOS();
+                      if (context.mounted) {
+                        Navigator.pop(context);
+                      }
                     }
                   },
                   backgroundColor: PlayfulColors.accent,

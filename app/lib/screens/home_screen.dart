@@ -54,6 +54,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   // User profile personalization
   String _userName = "THERE";
   bool _userFetched = false;
+  bool _isPhoneSheetOpen = false;
   StreamSubscription<DocumentSnapshot>? _userSubscription;
 
   // Savings Goal variables
@@ -112,6 +113,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               _userFetched = true;
             });
             _calculateSavingsProgress();
+
+            // Trigger non-dismissible phone input sheet if missing
+            final phone = data['phoneNumber'] as String?;
+            if ((phone == null || phone.isEmpty) && !_isPhoneSheetOpen && mounted) {
+              _isPhoneSheetOpen = true;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _showRequiredPhoneSheet();
+              });
+            }
           }
         });
       }
@@ -141,6 +151,141 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _userSubscription?.cancel();
     _insightAnimationController.dispose();
     super.dispose();
+  }
+
+  void _showRequiredPhoneSheet() {
+    final controller = TextEditingController();
+    bool loading = false;
+    String error = "";
+
+    String normalizeIndianPhoneNumber(String input) {
+      String cleaned = input.replaceAll(RegExp(r'\s+|-|\(|\)'), '');
+      final match = RegExp(r'^(?:\+91|91)?([6-9]\d{9})$').firstMatch(cleaned);
+      if (match != null) {
+        return '+91${match.group(1)}';
+      }
+      return '';
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return PopScope(
+          canPop: false, // Prevent dismissal via physical back button
+          child: StatefulBuilder(
+            builder: (context, setStateSheet) {
+              controller.addListener(() {
+                if (mounted) setStateSheet(() {});
+              });
+              final phoneVal = normalizeIndianPhoneNumber(controller.text);
+              final bool canSubmit = phoneVal.isNotEmpty && !loading;
+
+              Future<void> submit() async {
+                if (!canSubmit) return;
+                setStateSheet(() {
+                  loading = true;
+                  error = "";
+                });
+
+                try {
+                  final uid = FirebaseAuth.instance.currentUser?.uid;
+                  if (uid != null) {
+                    await FirebaseFirestore.instance.collection('users').doc(uid).update({
+                      'phoneNumber': phoneVal,
+                    });
+                  }
+                  if (context.mounted) {
+                    Navigator.pop(context); // Close sheet
+                  }
+                  _isPhoneSheetOpen = false;
+                } catch (e) {
+                  setStateSheet(() {
+                    loading = false;
+                    error = "Failed to update phone number. Try again.";
+                  });
+                }
+              }
+
+              return Container(
+                decoration: const BoxDecoration(
+                  color: PlayfulColors.background,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(32),
+                    topRight: Radius.circular(32),
+                  ),
+                  border: Border(
+                    top: BorderSide(color: PlayfulColors.border, width: 4),
+                  ),
+                ),
+                padding: EdgeInsets.only(
+                  top: 24,
+                  left: 24,
+                  right: 24,
+                  bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      "MOBILE NUMBER REQUIRED",
+                      style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 20,
+                        color: PlayfulColors.foreground,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "To ensure your safety alerts function correctly, please provide your 10-digit Indian mobile number.",
+                      style: GoogleFonts.plusJakartaSans(
+                        fontSize: 13,
+                        color: PlayfulColors.mutedForeground,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    PlayfulInput(
+                      labelText: "MOBILE NUMBER",
+                      hintText: "e.g., 9876543210",
+                      controller: controller,
+                      keyboardType: TextInputType.phone,
+                    ),
+                    if (error.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        error,
+                        style: GoogleFonts.plusJakartaSans(
+                          color: PlayfulColors.secondary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    if (loading)
+                      const Center(
+                        child: CircularProgressIndicator(color: PlayfulColors.accent),
+                      )
+                    else
+                      PlayfulButton(
+                        onPressed: canSubmit ? submit : null,
+                        child: const Text("SAVE AND CONTINUE"),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
   }
 
   // Parses various timestamp/date types safely

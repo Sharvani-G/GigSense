@@ -81,6 +81,7 @@ class _PlayfulStickerCard extends StatelessWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
   String? _selectedWorkerType;
   bool _isLoading = false;
 
@@ -88,6 +89,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void initState() {
     super.initState();
     _nameController.addListener(_updateState);
+    _phoneController.addListener(_updateState);
   }
 
   void _updateState() {
@@ -97,12 +99,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _phoneController.dispose();
     super.dispose();
+  }
+
+  String normalizeIndianPhoneNumber(String input) {
+    String cleaned = input.replaceAll(RegExp(r'\s+|-|\(|\)'), '');
+    final match = RegExp(r'^(?:\+91|91)?([6-9]\d{9})$').firstMatch(cleaned);
+    if (match != null) {
+      return '+91${match.group(1)}';
+    }
+    return '';
   }
 
   Future<void> _submitOnboarding() async {
     final name = _nameController.text.trim();
-    if (name.isEmpty || _selectedWorkerType == null) return;
+    final phone = _phoneController.text.trim();
+    final normalizedPhone = normalizeIndianPhoneNumber(phone);
+
+    if (name.isEmpty || _selectedWorkerType == null || normalizedPhone.isEmpty) return;
 
     setState(() {
       _isLoading = true;
@@ -114,6 +129,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
       await FirebaseFirestore.instance.collection('users').doc(uid).set({
         'name': name,
+        'phoneNumber': normalizedPhone,
         'workerType': _selectedWorkerType,
         'preferredLanguage': 'en',
         'createdAt': FieldValue.serverTimestamp(),
@@ -151,7 +167,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     final s = StringsProvider.instance;
     final name = _nameController.text.trim();
-    final bool canSubmit = name.isNotEmpty && _selectedWorkerType != null && !_isLoading;
+    final phone = _phoneController.text.trim();
+    final bool canSubmit = name.isNotEmpty &&
+        _selectedWorkerType != null &&
+        normalizeIndianPhoneNumber(phone).isNotEmpty &&
+        !_isLoading;
 
     return Scaffold(
       backgroundColor: PlayfulColors.background,
@@ -178,6 +198,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 labelText: s.t('your_name_label'),
                 hintText: s.t('your_name_hint'),
                 controller: _nameController,
+              ),
+              const SizedBox(height: 20),
+
+              // Phone Input
+              PlayfulInput(
+                labelText: "MOBILE NUMBER (10-DIGIT)",
+                hintText: "e.g., 9876543210",
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
               ),
               const SizedBox(height: 36),
 

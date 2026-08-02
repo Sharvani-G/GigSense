@@ -15,23 +15,32 @@ class MainActivity : FlutterActivity() {
             if (call.method == "sendSMS") {
                 val phoneNumber = call.argument<String>("phone")
                 val message = call.argument<String>("message")
+                android.util.Log.d("GigSenseSMS", "Attempting silent SMS to $phoneNumber")
                 if (phoneNumber != null && message != null) {
                     try {
-                        val smsManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                            this.getSystemService(SmsManager::class.java)
-                        } else {
-                            @Suppress("DEPRECATION")
-                            SmsManager.getDefault()
+                        var smsManager: SmsManager? = null
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            smsManager = this.getSystemService(SmsManager::class.java)
                         }
-                        
+                        if (smsManager == null) {
+                            @Suppress("DEPRECATION")
+                            smsManager = SmsManager.getDefault()
+                        }
+
+                        if (smsManager == null) {
+                            throw Exception("SmsManager is not available on this device")
+                        }
+
                         val parts = smsManager.divideMessage(message)
                         if (parts.size > 1) {
                             smsManager.sendMultipartTextMessage(phoneNumber, null, parts, null, null)
                         } else {
                             smsManager.sendTextMessage(phoneNumber, null, message, null, null)
                         }
+                        android.util.Log.d("GigSenseSMS", "Silent SMS successfully fired")
                         result.success(true)
                     } catch (e: Exception) {
+                        android.util.Log.e("GigSenseSMS", "Silent SMS failure: " + e.message, e)
                         result.error("SMS_FAILED", e.message, null)
                     }
                 } else {

@@ -26,6 +26,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isLoading = true;
   String _name = "THERE";
   String _workerType = "other_gig_worker";
+  String _phoneNumber = "";
   String _langCode = "en";
   Map<String, dynamic>? _savingsGoal;
   List<Map<String, dynamic>> _emergencyContacts = [];
@@ -48,6 +49,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         setState(() {
           _name = "Guest User";
           _workerType = "other_gig_worker";
+          _phoneNumber = "";
           _langCode = StringsProvider.instance.lang;
           _isLoading = false;
         });
@@ -62,6 +64,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         setState(() {
           _name = data['name'] ?? "THERE";
           _workerType = data['workerType'] ?? "other_gig_worker";
+          _phoneNumber = data['phoneNumber'] ?? "";
           _langCode = data['preferredLanguage'] ?? StringsProvider.instance.lang;
           _savingsGoal = data['savingsGoal'] as Map<String, dynamic>?;
           _emergencyContacts = List<Map<String, dynamic>>.from((data['emergencyContacts'] as List?)?.map((e) => Map<String,dynamic>.from(e)) ?? []);
@@ -224,6 +227,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                         builder: (_) => EditProfileScreen(
                                           initialName: _name,
                                           initialWorkerType: _workerType,
+                                          initialPhoneNumber: _phoneNumber,
                                         ),
                                       ),
                                     );
@@ -1011,11 +1015,13 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
 class EditProfileScreen extends StatefulWidget {
   final String initialName;
   final String initialWorkerType;
+  final String initialPhoneNumber;
 
   const EditProfileScreen({
     super.key,
     required this.initialName,
     required this.initialWorkerType,
+    required this.initialPhoneNumber,
   });
 
   @override
@@ -1024,6 +1030,7 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
   String? _selectedWorkerType;
   bool _isLoading = false;
 
@@ -1031,19 +1038,34 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void initState() {
     super.initState();
     _nameController.text = widget.initialName;
+    _phoneController.text = widget.initialPhoneNumber;
     _selectedWorkerType = widget.initialWorkerType;
     _nameController.addListener(() => setState(() {}));
+    _phoneController.addListener(() => setState(() {}));
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _phoneController.dispose();
     super.dispose();
+  }
+
+  String normalizeIndianPhoneNumber(String input) {
+    String cleaned = input.replaceAll(RegExp(r'\s+|-|\(|\)'), '');
+    final match = RegExp(r'^(?:\+91|91)?([6-9]\d{9})$').firstMatch(cleaned);
+    if (match != null) {
+      return '+91${match.group(1)}';
+    }
+    return '';
   }
 
   Future<void> _saveProfile() async {
     final name = _nameController.text.trim();
-    if (name.isEmpty || _selectedWorkerType == null) return;
+    final phone = _phoneController.text.trim();
+    final normalizedPhone = normalizeIndianPhoneNumber(phone);
+
+    if (name.isEmpty || _selectedWorkerType == null || normalizedPhone.isEmpty) return;
 
     setState(() => _isLoading = true);
 
@@ -1053,6 +1075,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         await FirebaseFirestore.instance.collection('users').doc(uid).update({
           'name': name,
           'workerType': _selectedWorkerType,
+          'phoneNumber': normalizedPhone,
         });
       }
       if (mounted) Navigator.pop(context, true);
@@ -1071,8 +1094,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final s = StringsProvider.instance;
+    final phoneVal = normalizeIndianPhoneNumber(_phoneController.text);
     final bool canSave = _nameController.text.trim().isNotEmpty &&
         _selectedWorkerType != null &&
+        phoneVal.isNotEmpty &&
         !_isLoading;
 
     return Scaffold(
@@ -1100,6 +1125,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 labelText: s.t('your_name_label'),
                 hintText: s.t('your_name_hint'),
                 controller: _nameController,
+              ),
+              const SizedBox(height: 20),
+
+              // Phone Input
+              PlayfulInput(
+                labelText: "MOBILE NUMBER (10-DIGIT)",
+                hintText: "e.g., 9876543210",
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
               ),
               const SizedBox(height: 32),
 
