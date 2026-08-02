@@ -83,6 +83,17 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
     }
   }
 
+  String _getTimeOfDayBucket(DateTime dt) {
+    final hour = dt.hour;
+    if (hour >= 6 && hour < 12) {
+      return 'morning';
+    } else if (hour >= 16 && hour < 21) {
+      return 'evening';
+    } else {
+      return 'latenight';
+    }
+  }
+
   Future<void> _logJob(double platformExpected, double genericExpected) async {
     setState(() {
       _isSaving = true;
@@ -128,6 +139,27 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
     try {
       await FirebaseFirestore.instance.collection('jobs').add(jobData);
       debugPrint("Successfully saved OCR job to Firestore.");
+
+      // Write public anonymized report for the map
+      final String rawLocality = (widget.ocrData['area_hint'] ?? widget.ocrData['locality'] ?? '').toString().trim();
+      if (rawLocality.isNotEmpty) {
+        final anonymizedData = {
+          'isSeedData': false,
+          'platform': platform.toLowerCase(),
+          'locality': rawLocality.toLowerCase(),
+          'timeOfDay': _getTimeOfDayBucket(DateTime.now()),
+          'fareActual': fare,
+          'fareExpected': double.parse(platformExpected.toStringAsFixed(2)),
+          'distanceKm': distance,
+          'durationMin': duration,
+          'reportedAt': FieldValue.serverTimestamp(),
+        };
+        FirebaseFirestore.instance
+            .collection('mapFairnessReports')
+            .add(anonymizedData)
+            .then((_) => debugPrint("Successfully saved anonymous OCR report to mapFairnessReports"))
+            .catchError((err) => debugPrint("Failed to save anonymous OCR report: $err"));
+      }
 
       String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
       if (!kIsWeb && Platform.isAndroid && (baseUrl.contains("127.0.0.1") || baseUrl.contains("localhost"))) {

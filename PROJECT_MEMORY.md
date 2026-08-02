@@ -98,7 +98,7 @@ The navigation handles flow transitions from the `LoginScreen` or `OnboardingScr
      * `role` (String: `user`, `assistant`)
      * `content` (String)
      * `timestamp` (Timestamp)
-4. **`benchmarks` (`/benchmarks/{platformId}`):**
+ 4. **`benchmarks` (`/benchmarks/{platformId}`):**
    * `displayName` (String)
    * `ratePerKm` (Double)
    * `ratePerMin` (Double)
@@ -106,6 +106,16 @@ The navigation handles flow transitions from the `LoginScreen` or `OnboardingScr
    * `sampleSize` (Integer)
    * `seedRate` (Map containing `rate_per_km` and `rate_per_min`)
    * `communityRate` (Map or Null)
+ 5. **`mapFairnessReports` (`/mapFairnessReports/{reportId}`):**
+   * `isSeedData` (Boolean)
+   * `platform` (String, e.g. `zomato`, `uber`)
+   * `locality` (String, e.g. `koramangala`, `indiranagar`)
+   * `timeOfDay` (String: `morning`, `evening`, `latenight`)
+   * `fareActual` (Double)
+   * `fareExpected` (Double)
+   * `distanceKm` (Double)
+   * `durationMin` (Double)
+   * `reportedAt` (Timestamp/ServerTimestamp)
 
 ---
 
@@ -152,17 +162,20 @@ The navigation handles flow transitions from the `LoginScreen` or `OnboardingScr
 ---
 
 ## Recent Changes
-1. Replaced circular locality map markers with realistic boundary polygons and implemented point-in-polygon checks to trigger detail sheets on user location centering.
-2. Swapped walkthrough text widgets for `PlayfulMarkdownText` to support bold tags.
-3. Upgraded input placeholder styling colors in `PlayfulInput` to pass WCAG 4.5:1 contrast thresholds.
-4. Upgraded `PlayfulToggle`, `PlayfulUnitInput`, and `PlayfulMicButton` background elements to pass WCAG color contrast criteria.
-5. Corrected emergency contact and permission modal button styles.
-6. Added runtime exception handling in STT uploads to alert users when whisper output is empty.
-7. Implemented automatic loopback IP converter (`127.0.0.1` -> `10.0.2.2`) inside mobile endpoints on Android.
-8. Declared `NSMicrophoneUsageDescription` and `NSSpeechRecognitionUsageDescription` keys inside iOS `Info.plist`.
-9. Imported missing localization elements in `settings_screen.dart` and `fairness_map_screen.dart`.
-10. Added a new `ocr_result_screen.dart` to display clean receipt calculations comparing payout against community stats.
-11. Added `seed_jobs.py` for populating dummy databases.
+1. Decoupled the public Fairness Map collection by introducing `mapFairnessReports`, separating map metrics data entirely from user identity fields.
+2. Configured manual, voice, and OCR logging screens to double-write to both `jobs` (private logs) and `mapFairnessReports` (anonymized logs).
+3. Created an idempotent, repeatable database seeding script (`seed_map_reports.py`) to generate 150 skewed map coordinates report signals.
+4. Replaced circular locality map markers with realistic boundary polygons and implemented point-in-polygon checks to trigger detail sheets on user location centering.
+5. Swapped walkthrough text widgets for `PlayfulMarkdownText` to support bold tags.
+6. Upgraded input placeholder styling colors in `PlayfulInput` to pass WCAG 4.5:1 contrast thresholds.
+7. Upgraded `PlayfulToggle`, `PlayfulUnitInput`, and `PlayfulMicButton` background elements to pass WCAG color contrast criteria.
+8. Corrected emergency contact and permission modal button styles.
+9. Added runtime exception handling in STT uploads to alert users when whisper output is empty.
+10. Implemented automatic loopback IP converter (`127.0.0.1` -> `10.0.2.2`) inside mobile endpoints on Android.
+11. Declared `NSMicrophoneUsageDescription` and `NSSpeechRecognitionUsageDescription` keys inside iOS `Info.plist`.
+12. Imported missing localization elements in `settings_screen.dart` and `fairness_map_screen.dart`.
+13. Added a new `ocr_result_screen.dart` to display clean receipt calculations comparing payout against community stats.
+14. Added `seed_jobs.py` for populating dummy databases.
 
 ---
 

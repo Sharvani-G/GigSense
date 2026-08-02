@@ -162,7 +162,12 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
 
     for (var doc in docs) {
       final data = doc.data() as Map<String, dynamic>;
-      final area = _getMatchedZone(data['area_hint']);
+      
+      // Try to resolve locality from new schema field 'locality', fall back to 'area_hint'
+      String? area = data['locality']?.toString().toLowerCase().trim();
+      if (area == null || !_zoneCoordinates.containsKey(area)) {
+        area = _getMatchedZone(data['area_hint']);
+      }
       if (area == null) continue;
 
       // Filter by platform
@@ -171,23 +176,32 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
 
       // Filter by time of day
       if (_timeFilter != 'all') {
-        final ts = data['created_at'] ?? data['job_timestamp'];
-        if (ts != null) {
-          DateTime? dt;
-          if (ts is Timestamp) {
-            dt = ts.toDate();
-          } else if (ts is String) {
-            dt = DateTime.tryParse(ts);
+        final String? tod = data['timeOfDay']?.toString().toLowerCase().trim();
+        if (tod != null) {
+          String mappedTod = tod;
+          if (tod == 'late-night' || tod == 'latenight') {
+            mappedTod = 'latenight';
           }
-          if (dt != null) {
-            final hour = dt.hour;
-            final isMorning = hour >= 6 && hour < 12;
-            final isEvening = hour >= 16 && hour < 21;
-            final isLateNight = hour >= 21 || hour < 6;
+          if (_timeFilter != mappedTod) continue;
+        } else {
+          final ts = data['reportedAt'] ?? data['created_at'] ?? data['job_timestamp'];
+          if (ts != null) {
+            DateTime? dt;
+            if (ts is Timestamp) {
+              dt = ts.toDate();
+            } else if (ts is String) {
+              dt = DateTime.tryParse(ts);
+            }
+            if (dt != null) {
+              final hour = dt.hour;
+              final isMorning = hour >= 6 && hour < 12;
+              final isEvening = hour >= 16 && hour < 21;
+              final isLateNight = hour >= 21 || hour < 6;
 
-            if (_timeFilter == 'morning' && !isMorning) continue;
-            if (_timeFilter == 'evening' && !isEvening) continue;
-            if (_timeFilter == 'latenight' && !isLateNight) continue;
+              if (_timeFilter == 'morning' && !isMorning) continue;
+              if (_timeFilter == 'evening' && !isEvening) continue;
+              if (_timeFilter == 'latenight' && !isLateNight) continue;
+            }
           }
         }
       }
@@ -224,8 +238,9 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
       double totalPct = 0.0;
       int pctCount = 0;
       for (var j in jobs) {
-        final fare = (j['fare'] as num?)?.toDouble() ?? 0.0;
-        final expected = (j['expected_fare'] as num?)?.toDouble() ?? 0.0;
+        // Read actual and expected fares from new schema or fall back
+        final fare = (j['fareActual'] ?? j['fare'] as num?)?.toDouble() ?? 0.0;
+        final expected = (j['fareExpected'] ?? j['expected_fare'] as num?)?.toDouble() ?? 0.0;
         if (expected > 0.0) {
           totalPct += (fare / expected) * 100;
           pctCount++;
@@ -762,7 +777,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
       ),
       body: SafeArea(
         child: StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance.collection('jobs').snapshots(),
+          stream: FirebaseFirestore.instance.collection('mapFairnessReports').snapshots(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator(color: PlayfulColors.accent));
