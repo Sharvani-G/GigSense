@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -72,9 +73,31 @@ class SOSManager {
       }
     });
 
-    // 4. Launch primary intent
-    final String primaryChan = settings['primaryChannel'] ?? 'sms';
-    await launchChannel(primaryChan, workerName, isTest, context: context);
+    // 4. Launch all configured channels
+    final Map<String, dynamic> channels = settings['channels'] as Map<String, dynamic>? ?? {
+      'sms': true,
+      'whatsapp': false,
+      'call': false,
+    };
+
+    bool launchedAny = false;
+    if (channels['sms'] == true) {
+      launchedAny = true;
+      launchChannel('sms', workerName, isTest, context: context);
+    }
+    if (channels['whatsapp'] == true) {
+      launchedAny = true;
+      launchChannel('whatsapp', workerName, isTest, context: context);
+    }
+    if (channels['call'] == true) {
+      launchedAny = true;
+      launchChannel('call', workerName, isTest, context: context);
+    }
+
+    if (!launchedAny) {
+      final String primaryChan = settings['primaryChannel'] ?? 'sms';
+      launchChannel(primaryChan, workerName, isTest, context: context);
+    }
 
     // 5. Navigate to SOS Active Screen
     if (context.mounted) {
@@ -156,31 +179,36 @@ class SOSManager {
 
     if (channel == 'sms') {
       final String smsPhone = phone.replaceAll(RegExp(r'\s+'), '');
-      bool isPermissionGranted = await Permission.sms.isGranted;
-      if (!isPermissionGranted) {
-        final status = await Permission.sms.request();
-        isPermissionGranted = status.isGranted;
-      }
-
-      if (isPermissionGranted) {
-        try {
-          final bool success = await _smsChannel.invokeMethod('sendSMS', {
-            'phone': smsPhone,
-            'message': message,
-          });
-          if (success) {
-            return;
+      if (Platform.isAndroid) {
+        // Automatic background SMS on Android (Dangerous permission tier)
+        // Note: permission is requested proactively in Settings screen setup
+        final bool isPermissionGranted = await Permission.sms.isGranted;
+        if (isPermissionGranted) {
+          try {
+            final bool success = await _smsChannel.invokeMethod('sendSMS', {
+              'phone': smsPhone,
+              'message': message,
+            });
+            if (success) {
+              debugPrint("Automatic silent SMS sent to $smsPhone");
+              return;
+            } else {
+              debugPrint("Automatic silent SMS returned success=false");
+            }
+          } catch (e) {
+            debugPrint("Failed to send background SMS programmatically: $e");
           }
-        } catch (e) {
-          debugPrint("Failed to send background SMS, falling back to url_launcher: $e");
+        } else {
+          debugPrint("Automatic SMS skipped because SEND_SMS permission is not granted.");
         }
-      }
-
-      final Uri uri = Uri.parse("sms:$smsPhone?body=${Uri.encodeComponent(message)}");
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
       } else {
-        await Clipboard.setData(ClipboardData(text: message));
+        // iOS or fallback manual composer flow (Apple does not allow programmatic SMS)
+        final Uri uri = Uri.parse("sms:$smsPhone?body=${Uri.encodeComponent(message)}");
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri);
+        } else {
+          await Clipboard.setData(ClipboardData(text: message));
+        }
       }
     } else if (channel == 'whatsapp') {
       final cleanDigits = phone.replaceAll(RegExp(r'[^0-9]'), '');

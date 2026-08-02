@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -1711,16 +1713,54 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
             const SizedBox(height: 8),
             
             CheckboxListTile(
-              title: Text("SMS Text Alert", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13)),
+              title: Text(
+                Platform.isAndroid ? "Automatic SMS Alert (Silent)" : "SMS Alert (Requires tap)",
+                style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              subtitle: Text(
+                Platform.isAndroid
+                    ? "Sends SMS programmatically in background. Requires SMS permission."
+                    : "Opens Messages app pre-filled, requiring your manual send tap.",
+                style: GoogleFonts.plusJakartaSans(fontSize: 11, color: PlayfulColors.mutedForeground),
+              ),
               value: _smsEnabled,
               activeColor: PlayfulColors.accent,
-              onChanged: (val) {
-                setState(() {
-                  _smsEnabled = val ?? true;
-                  if (!_smsEnabled && _primaryChannel == 'sms') {
-                    _primaryChannel = 'whatsapp';
+              onChanged: (val) async {
+                final messenger = ScaffoldMessenger.of(context);
+                if (val == true) {
+                  if (Platform.isAndroid) {
+                    var status = await Permission.sms.status;
+                    if (!status.isGranted) {
+                      status = await Permission.sms.request();
+                    }
+                    if (status.isGranted) {
+                      setState(() {
+                        _smsEnabled = true;
+                      });
+                    } else {
+                      messenger.showSnackBar(
+                        const SnackBar(
+                          content: Text("SMS permission is required to enable Automatic SMS alerts."),
+                          backgroundColor: Color(0xFFE11D48),
+                        ),
+                      );
+                      setState(() {
+                        _smsEnabled = false;
+                      });
+                    }
+                  } else {
+                    setState(() {
+                      _smsEnabled = true;
+                    });
                   }
-                });
+                } else {
+                  setState(() {
+                    _smsEnabled = false;
+                    if (_primaryChannel == 'sms') {
+                      _primaryChannel = 'whatsapp';
+                    }
+                  });
+                }
               },
             ),
             CheckboxListTile(

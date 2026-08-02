@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -1497,16 +1498,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     
     // Check if trusted contact exists
     Map<String, dynamic>? trustedContact;
+    Map<String, dynamic> sosSettings = {
+      'channels': {'sms': true, 'whatsapp': false, 'call': false},
+      'primaryChannel': 'sms',
+      'locationMode': 'live',
+      'liveLocationDurationMinutes': 30,
+      'messageTemplate': null,
+    };
+    String workerName = "Worker";
+
     try {
       final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      if (doc.exists) {
-        final contacts = doc.data()?['emergencyContacts'] as List<dynamic>?;
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        workerName = data['name'] ?? "Worker";
+        final contacts = data['emergencyContacts'] as List<dynamic>?;
         if (contacts != null && contacts.isNotEmpty) {
           trustedContact = Map<String, dynamic>.from(contacts.first);
         }
+        if (data['sosSettings'] != null) {
+          sosSettings = Map<String, dynamic>.from(data['sosSettings']);
+        }
       }
     } catch (e) {
-      debugPrint("Error fetching trusted contact: $e");
+      debugPrint("Error fetching trusted contact/settings: $e");
     }
 
     if (!mounted) return;
@@ -1562,7 +1577,244 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       return;
     }
 
-    await _triggerSOSWithContact(trustedContact);
+    _showSOSConfirmDialog(trustedContact, sosSettings, workerName);
+  }
+
+  void _showSOSConfirmDialog(
+    Map<String, dynamic> contact,
+    Map<String, dynamic> settings,
+    String workerName,
+  ) {
+    final channels = settings['channels'] as Map<String, dynamic>? ?? {
+      'sms': true,
+      'whatsapp': false,
+      'call': false,
+    };
+    final bool smsEnabled = channels['sms'] ?? false;
+    final bool whatsappEnabled = channels['whatsapp'] ?? false;
+    final bool callEnabled = channels['call'] ?? false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: PlayfulColors.border, width: 3),
+        ),
+        title: Column(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Color(0xFFE11D48), size: 48),
+            const SizedBox(height: 12),
+            Text(
+              "TRIGGER EMERGENCY SOS",
+              textAlign: TextAlign.center,
+              style: GoogleFonts.outfit(
+                fontWeight: FontWeight.w900,
+                fontSize: 20,
+                letterSpacing: 1.0,
+                color: PlayfulColors.foreground,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              "Select a channel to alert your trusted contact:",
+              textAlign: TextAlign.center,
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 13,
+                color: PlayfulColors.mutedForeground,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: PlayfulColors.background,
+                border: Border.all(color: PlayfulColors.border, width: 1.5),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    contact['name'] ?? "Trusted Contact",
+                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    contact['phone'] ?? "",
+                    style: GoogleFonts.shareTechMono(fontSize: 14, color: PlayfulColors.mutedForeground),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            
+            // Channel Buttons
+            if (smsEnabled && whatsappEnabled) ...[
+              PlayfulButton(
+                backgroundColor: const Color(0xFFE11D48), // Rose
+                height: 52,
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _triggerSOSWithChannels(contact, settings, workerName, {
+                    'sms': true,
+                    'whatsapp': true,
+                    'call': false,
+                  });
+                },
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "TRIGGER FULL SOS",
+                        style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
+                      ),
+                      Text(
+                        Platform.isAndroid 
+                            ? "Auto background SMS + WhatsApp" 
+                            : "Manual SMS + WhatsApp Alert",
+                        style: GoogleFonts.plusJakartaSans(color: Colors.white.withOpacity(0.8), fontSize: 9),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+            
+            if (smsEnabled) ...[
+              PlayfulButton(
+                backgroundColor: const Color(0xFF0EA5E9), // Sky Blue
+                height: 48,
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _triggerSOSWithChannels(contact, settings, workerName, {
+                    'sms': true,
+                    'whatsapp': false,
+                    'call': false,
+                  });
+                },
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        Platform.isAndroid ? "SEND AUTOMATIC SMS" : "SEND SMS ALERT",
+                        style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
+                      ),
+                      Text(
+                        Platform.isAndroid 
+                            ? "Silent background send (no tap needed)" 
+                            : "Opens Messages app pre-filled (requires tap)",
+                        style: GoogleFonts.plusJakartaSans(color: Colors.white.withOpacity(0.8), fontSize: 9),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+            
+            if (whatsappEnabled) ...[
+              PlayfulButton(
+                backgroundColor: const Color(0xFF22C55E), // WhatsApp Green
+                height: 48,
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _triggerSOSWithChannels(contact, settings, workerName, {
+                    'sms': false,
+                    'whatsapp': true,
+                    'call': false,
+                  });
+                },
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "SEND WHATSAPP ALERT",
+                        style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
+                      ),
+                      Text(
+                        "Opens WhatsApp (requires send tap)",
+                        style: GoogleFonts.plusJakartaSans(color: Colors.white.withOpacity(0.8), fontSize: 9),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+            
+            if (callEnabled) ...[
+              PlayfulButton(
+                backgroundColor: const Color(0xFFF59E0B), // Amber
+                height: 48,
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _triggerSOSWithChannels(contact, settings, workerName, {
+                    'sms': false,
+                    'whatsapp': false,
+                    'call': true,
+                  });
+                },
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "MAKE EMERGENCY CALL",
+                        style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
+                      ),
+                      Text(
+                        "Opens Phone dialer immediately",
+                        style: GoogleFonts.plusJakartaSans(color: Colors.white.withOpacity(0.8), fontSize: 9),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+          ],
+        ),
+        actions: [
+          Center(
+            child: TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(
+                "CANCEL",
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.bold,
+                  color: PlayfulColors.mutedForeground,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _triggerSOSWithChannels(
+    Map<String, dynamic> contact,
+    Map<String, dynamic> baseSettings,
+    String workerName,
+    Map<String, dynamic> selectedChannels,
+  ) async {
+    final customSettings = Map<String, dynamic>.from(baseSettings);
+    customSettings['channels'] = selectedChannels;
+    
+    if (mounted) {
+      await SOSManager.instance.startSOS(contact, customSettings, workerName, context);
+    }
   }
 
   Future<void> _triggerSOSWithContact(Map<String, dynamic> contact) async {
