@@ -68,6 +68,10 @@
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>GigShield needs your location to include it in your SOS message to emergency contacts.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>GigSense needs camera access to take a profile photo or scan payslips.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>GigSense needs library access to let you pick a profile photo or select payslip screenshots.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>whatsapp</string>
