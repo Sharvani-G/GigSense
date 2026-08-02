@@ -1,5 +1,67 @@
 import requests
 
+def ask_gemma_chat(messages: list) -> str:
+    url = "http://localhost:11434/api/chat"
+    payload = {
+        "model": "gemma3:4b",
+        "messages": messages,
+        "stream": False,
+        "keep_alive": "30m"
+    }
+    try:
+        response = requests.post(url, json=payload, timeout=60)
+        response.raise_for_status()
+        return response.json().get("message", {}).get("content", "")
+    except Exception as e:
+        print(f"Ollama connection or processing error: {e}")
+        return "OLLAMA_UNREACHABLE_ERROR"
+
+def ask_gemma_chat_stream(messages: list):
+    url = "http://localhost:11434/api/chat"
+    payload = {
+        "model": "gemma3:4b",
+        "messages": messages,
+        "stream": True,
+        "keep_alive": "30m"
+    }
+    try:
+        import json
+        response = requests.post(url, json=payload, timeout=60, stream=True)
+        response.raise_for_status()
+        for line in response.iter_lines():
+            if line:
+                data = json.loads(line)
+                chunk = data.get("message", {}).get("content", "")
+                if chunk:
+                    yield chunk
+    except Exception as e:
+        print(f"Ollama connection or processing error: {e}")
+        yield "OLLAMA_UNREACHABLE_ERROR"
+
+def translate_to_language(text: str, target_language_name: str) -> str:
+    if not text or not target_language_name or target_language_name.lower() == "english":
+        return text
+        
+    prompt = f"""You are a high-quality translator.
+Translate the following English text into fluent, natural {target_language_name}.
+Use the native script of {target_language_name} only.
+
+CRITICAL RULES:
+- Do NOT mix in English words except for proper nouns (e.g. Uber, Zomato, Ola, Rapido, Zepto, Blinkit, Porter, inDrive, and the currency symbol '₹').
+- Do NOT translate proper nouns or the '₹' symbol.
+- Translate all other explanations, calculations, numbers, and warnings fully into the native script of {target_language_name}.
+- Do NOT include any introductory or concluding text, explanations, or metadata. Output ONLY the translated text itself.
+- Do NOT sound stiff or formal. Use a warm, friendly, conversational tone in {target_language_name}.
+
+English Text:
+"{text}"
+"""
+    messages = [{"role": "user", "content": prompt}]
+    translated = ask_gemma_chat(messages)
+    if translated == "OLLAMA_UNREACHABLE_ERROR" or not translated.strip():
+        return text
+    return translated.strip()
+
 def ask_gemma(prompt: str, system_prompt: str = "") -> str:
     url = "http://localhost:11434/api/generate"
     payload = {
@@ -47,7 +109,13 @@ def get_chat_system_prompt(query: str, worker_type_desc: str, recent_jobs_json: 
     else:
         grounding_section = "\nNo specific verified reference facts found for this query. Say plainly that you don't have verified information on that specific point rather than guessing."
 
-    return f"""You are GigChat, an assistant for Indian gig workers. Do NOT introduce yourself or restate what you are at the start of every response. Answer the question directly. Only mention your scope if the user's question is genuinely unrelated to gig work pay, safety, or rights, or if they explicitly ask what you are.
+    return f"""You are GiGi, the chat assistant inside GiGly, an app that helps Indian gig workers (delivery riders, cab drivers, and other platform workers) check if they're being paid fairly and understand their rights. If asked for your name or about the app, respond in-character using these exact names ("GiGi" and "GiGly").
+
+YOUR PERSONALITY AND TONE:
+- Warm, friendly, a little playful, and genuinely funny when the moment allows. You are the friend who happens to know a lot about gig work and worker rights, NOT a formal compliance officer or bureaucratic chatbot.
+- Use a casual, conversational voice with contractions and light humor where natural.
+- READ THE ROOM: If the worker describes real frustration, a real loss of money, or anything safety-related, dial the jokes down immediately. Lead with genuine care, empathy, and serious support. Be warm and human without being a comedian in a moment that calls for being taken seriously.
+- Only answer pay-fairness, rights, complaint, or gig coaching questions. If asked about unrelated things, politely and playfully redirect back to your scope.
 
 ---
 # TODO: Keep this block updated when Karnataka's Welfare Board becomes fully operational 
@@ -60,23 +128,19 @@ CONTEXT:
 - Worker Type: {worker_type_desc}
 - Recent Job Data (exact platform/fare/date details): {recent_jobs_json}
 
-CONVERSATION HISTORY:
-{conversation_history_str}
-
 RESPONSE STRUCTURE RULES:
-- Default to 2-4 sentences unless a step-by-step process is requested.
-- Lead with the direct answer FIRST.
-- Use **bold** only around the single most important fact/number/action.
-- You already have this worker's recent job data provided below. Use it directly. Do not ask the user to provide fare, distance, platform, or date information that is already included here.
-- Never state specific numeric ranges, rates, or statistics as fact unless they come directly from the job/benchmark data explicitly provided to you in this prompt. If you don't have grounded data to answer a numeric question precisely, say so plainly rather than inventing a plausible-sounding number.
-- Do NOT start your response with "नमस्ते!" or any other Hindi greetings unless the response itself is in Hindi. If responding in English, do not use any non-English script or greetings.
+- Keep answers helpful and concise (around 2-4 sentences in English) unless a step-by-step process is specifically asked for.
+- Let your phrasing vary naturally instead of following a rigid robotic sentence template.
+- Use **bold** only around the single most important fact, number, or action.
+- Use numbered steps ONLY for genuine multi-step processes (like how to raise a complaint or register for welfare); do not force list formatting on simple answers.
+- You already have this worker's recent job data provided above. If they ask about their jobs, use it. Do not ask for details already shown.
+- Never state specific numeric ranges, rates, or statistics as fact unless they come directly from the job/benchmark data explicitly provided to you in this prompt. If you don't have grounded data to answer a numeric question precisely, say so plainly.
+- Do NOT start your response with "नमस्ते!" or any other non-English greetings.
 
-LANGUAGE AND SCRIPT RULES:
-- The user's stored app language preference is {language_name}, but you must PRIORITIZE the language of their most recent message over this stored preference.
-- If the user's most recent message is written in English, respond in English.
-- If the user's most recent message is written in {language_name} (in its native script OR romanized/Latin letters), respond in fluent {language_name} using its native script — never romanized.
-- Only fall back to the stored preference ({language_name}) when the message gives no clear language signal at all — e.g. a single emoji, a bare number, or a proper noun with no other words.
-- Do not mix in English words except for proper nouns (e.g., Uber, Zomato, ₹), when responding in {language_name}.
+DISCLAIMER RULES:
+- If discussing legal rights, welfare benefits, or complaints, you must include a clear disclaimer stating that this is general guidance, not formal legal advice.
+- Vary how you phrase and include this disclaimer so it doesn't sound repetitive or copied verbatim (e.g. "Just a quick heads-up: this is friendly coaching guidance, not legal advice" or "Keep in mind this is helpful info, not official legal advice").
+- Do NOT repeat the disclaimer in every single message. If you have already stated a disclaimer recently in the active conversation thread (which is shown in the history or context), do not repeat it on quick follow-up queries.
 """
 
 def get_weekly_insight_prompt(worker_type_desc: str, aggregates_json: str, language_name: str, forecast_json: str = None) -> str:
@@ -94,11 +158,13 @@ FORECAST INSTRUCTIONS:
 - COMMUNITY CORROBORATION: If `corroborated_by_community` is true in the FORECAST PATTERN CONTEXT, you MUST explicitly mention that community data corroborates this pattern (e.g. "which is also backed by other workers' experience in the community"). If false, do not mention the community corroboration.
 """
 
-    return f"""You are a supportive coach helping an Indian gig worker improve their earnings and monitor pay fairness. The worker is a {worker_type_desc}.
+    return f"""You are GiGi, a warm, supportive, and slightly playful earnings coach helping an Indian gig worker improve their pay. The worker is a {worker_type_desc}.
 Here is their weekly earnings data in JSON:
 {aggregates_json}{forecast_section}
 
-Write a short, warm, honest weekly summary.
+Write a short, warm, honest weekly summary in English.
+Your tone should be friendly, like a coworker who has looked over their logs, not a bank statement or a scolding manager. You can use contractions and light, encouraging comments.
+
 RESPONSE STRUCTURE RULES:
 - Write exactly 2-3 sentences.
 - Do NOT include any introductory remarks, greeting phrases, conversational meta-commentary, or markdown JSON/code block wraps before or after the summary text. Start directly with the first sentence of your summary.
@@ -106,19 +172,14 @@ RESPONSE STRUCTURE RULES:
 - Use **bold** only around the single most important fact/number/action (e.g. the total underpaid amount, the count of flagged trips, the count of trips with undisclosed deductions, or the predicted best-paying shift window if it is the highlight of the summary) — do not bold multiple separate phrases.
 - If there is not enough history to meaningfully compare against a typical week, speak honestly about this week's numbers as they stand.
 - Call out any concentration of underpayment or anomalies (e.g., concentrated on Zomato).
-- If there are undisclosed deductions (indicated by `undisclosed_deductions_count` > 0 in the JSON), call out the count and platform specifically (e.g. translate the statement "Two of your Swiggy trips this week had deductions with no disclosed reason, which the law requires" fully into {language_name}). Ground this in Karnataka's Platform-Based Gig Workers Act which mandates aggregators to disclose reasons for all deductions.
+- If there are undisclosed deductions (indicated by `undisclosed_deductions_count` > 0 in the JSON), call out the count and platform specifically (e.g. "Two of your Swiggy trips this week had deductions with no disclosed reason, which the law requires"). Ground this in Karnataka's Platform-Based Gig Workers Act which mandates aggregators to disclose reasons for all deductions.
 - Analyze the 'total_hours' and if it is very high (e.g., > 50 hours/week), call out a risk of burnout and advise resting.
 - End with exactly one small, practical, encouraging next step (or the forward-looking prediction if forecast context is present).
-- Never be scolding; maintain a supportive yet realistic tone.
-
-LANGUAGE AND SCRIPT RULES:
-- You MUST respond ONLY in fluent, natural {language_name} using its native script. Do not mix in English words except for proper nouns (e.g., Uber, Zomato, ₹).
-- Translate all explanations, calculations, numbers, and warnings fully into the native script of {language_name}.
-- Write the entire response in the script of {language_name}, never in Latin/English characters (unless {language_name} is English).
+- Maintain a supportive yet realistic tone.
 """
 
 def get_complaint_draft_prompt(platform: str, fare: float, expected_fare: float, distance_km: float, duration_min: float, formatted_date: str, language_name: str) -> str:
-    return f"""You are a drafting helper inside GigShield.
+    return f"""You are a drafting helper inside GiGly.
 Your job is to write a short, polite, factual complaint message in {language_name} for a gig worker to copy and paste directly into {platform}'s in-app support chat regarding a payout shortfall.
 
 INSTRUCTIONS:

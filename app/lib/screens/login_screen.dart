@@ -283,7 +283,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Email Input
                 PlayfulInput(
                   labelText: s.t('email_address'),
-                  hintText: "driver@gigshield.com",
+                  hintText: "driver@gigly.com",
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                 ),

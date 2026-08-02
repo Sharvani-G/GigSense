@@ -1,4 +1,4 @@
-# GigShield — Workflow & User Flow Specification
+# GiGly — Workflow & User Flow Specification
 
 ---
 
@@ -77,7 +77,7 @@ This is deliberately minimal — three tabs, no hidden hamburger menu, no settin
 5. Small persistent disclaimer text under the input: "General guidance, not legal advice."
 
 **States**:
-- **Empty (first open)**: a short friendly intro message from GigShield itself (not from Gemma — a static first message is fine and expected for a fresh chat), e.g. "Hey — ask me anything about your pay, your rights, or how to raise a complaint. I'll look at your recent jobs if it's relevant."
+- **Empty (first open)**: a short friendly intro message from GiGly itself (not from Gemma — a static first message is fine and expected for a fresh chat), e.g. "Hey — ask me anything about your pay, your rights, or how to raise a complaint. I'll look at your recent jobs if it's relevant."
 - **Waiting for response**: three bouncing dots (typing indicator) in a reply-shaped bubble
 - **Response received**: bubble renders normally, quick-reply chips reappear
 - **Error (Gemma unreachable)**: a plain-styled system message in the chat itself, e.g. "I'm having trouble responding right now — try again in a moment," rather than a modal/alert popup that interrupts the flow

@@ -15,14 +15,14 @@ import json
 import datetime
 from ocr import extract_job_data
 from stt import transcribe_audio
-from llm import ask_gemma, ask_gemma_stream, get_chat_system_prompt, get_weekly_insight_prompt, get_complaint_draft_prompt
+from llm import ask_gemma, ask_gemma_stream, get_chat_system_prompt, get_weekly_insight_prompt, get_complaint_draft_prompt, ask_gemma_chat, ask_gemma_chat_stream, translate_to_language
 from schemas import JobScanResponse, ChatRequest, ChatResponse, ComplaintRequest, DraftRequest, FatigueRequest, SOSRequest, RouteSafetyRequest, RouteSafetyResponse, VoiceParseRequest
 from firebase_client import db
 from firebase_admin import firestore
 
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI(title="GigShield API")
+app = FastAPI(title="GiGly API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -183,10 +183,10 @@ def get_user_profile(user_id: str) -> dict:
         doc = db.collection('users').document(user_id).get()
         if doc.exists:
             data = doc.to_dict()
-            return {
-                'preferredLanguage': data.get('preferredLanguage', 'en') or 'en',
-                'workerType': data.get('workerType', 'other_gig_worker') or 'other_gig_worker'
-            }
+            res = dict(data)
+            res['preferredLanguage'] = data.get('preferredLanguage', 'en') or 'en'
+            res['workerType'] = data.get('workerType', 'other_gig_worker') or 'other_gig_worker'
+            return res
     except Exception as e:
         print(f"Error fetching user profile: {e}")
     return {'preferredLanguage': 'en', 'workerType': 'other_gig_worker'}
@@ -271,6 +271,7 @@ async def chat_endpoint(request: ChatRequest):
     )
 
     async def event_generator():
+        nonlocal language_name
         full_response = ""
         if request.message.startswith("[IMAGE NO FARE]:"):
             has_previous_irrelevant = any(msg.get("role") == "user" and msg.get("content", "").startswith("[IMAGE NO FARE]:") for msg in history)
@@ -287,15 +288,62 @@ async def chat_endpoint(request: ChatRequest):
                 yield json.dumps({"chunk": chunk}) + "\n"
                 await asyncio.sleep(0.02)
         else:
-            for chunk in ask_gemma_stream(request.message, system_prompt):
-                if chunk == "OLLAMA_UNREACHABLE_ERROR":
-                    yield json.dumps({"error": "Assistant is temporarily unavailable — please try again in a moment."}) + "\n"
-                    return
-                full_response += chunk
-                yield json.dumps({"chunk": chunk}) + "\n"
-                await asyncio.sleep(0.001)
-
+            # Construct message history list for Ollama's Chat API
+            chat_messages = []
             
+            # System instruction
+            chat_messages.append({
+                "role": "system",
+                "content": system_prompt
+            })
+            
+            # Append preceding conversation history
+            for msg in history:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                chat_messages.append({
+                    "role": "user" if role == "user" else "assistant",
+                    "content": content
+                })
+                
+            # Append current user query
+            chat_messages.append({
+                "role": "user",
+                "content": request.message
+            })
+
+            is_english = language_name.lower() == "english"
+            
+            if is_english:
+                # Stream directly
+                for chunk in ask_gemma_chat_stream(chat_messages):
+                    if chunk == "OLLAMA_UNREACHABLE_ERROR":
+                        yield json.dumps({"error": "Assistant is temporarily unavailable — please try again in a moment."}) + "\n"
+                        return
+                    full_response += chunk
+                    yield json.dumps({"chunk": chunk}) + "\n"
+                    await asyncio.sleep(0.001)
+            else:
+                # Generate full English response first
+                english_response = ""
+                for chunk in ask_gemma_chat_stream(chat_messages):
+                    if chunk == "OLLAMA_UNREACHABLE_ERROR":
+                        yield json.dumps({"error": "Assistant is temporarily unavailable — please try again in a moment."}) + "\n"
+                        return
+                    english_response += chunk
+                    await asyncio.sleep(0.001)
+                
+                # Perform the second stage translation to target language
+                translated_response = translate_to_language(english_response, language_name)
+                full_response = translated_response
+                
+                # Stream the translation chunks to the client
+                words = translated_response.split(" ")
+                for i, word in enumerate(words):
+                    chunk = word + (" " if i < len(words) - 1 else "")
+                    yield json.dumps({"chunk": chunk}) + "\n"
+                    await asyncio.sleep(0.01)
+
         # Save user message and assistant reply to Firestore server-side
         if messages_ref is not None and full_response:
             try:
@@ -617,58 +665,114 @@ async def weekly_insight(user_id: str):
     }
 
     if aggregates["total_jobs"] == 0:
-        insight_text = placeholders.get(lang_code, placeholders['en'])
+        return {
+            "insight_text": placeholders.get(lang_code, placeholders['en']),
+            "stats_used": None
+        }
+
+    # Cache checking logic
+    cached_text = profile.get("cachedInsightText")
+    cached_gen_at = profile.get("cachedInsightGeneratedAt")
+    cached_week_start = profile.get("cachedInsightWeekStart")
+    
+    now = datetime.datetime.now(datetime.timezone.utc)
+    monday = now - datetime.timedelta(days=now.weekday())
+    monday_start = datetime.datetime(monday.year, monday.month, monday.day, 0, 0, 0, tzinfo=datetime.timezone.utc)
+    
+    should_regenerate = True
+    if cached_text and cached_gen_at and cached_week_start:
+        # Check if week has shifted
+        if isinstance(cached_week_start, str):
+            try:
+                cached_week_dt = datetime.datetime.fromisoformat(cached_week_start.replace("Z", "+00:00"))
+            except:
+                cached_week_dt = monday_start
+        else:
+            cached_week_dt = cached_week_start
+            
+        if cached_week_dt >= monday_start:
+            # Same week. Now check for any new job logged since cached_gen_at
+            should_regenerate = False
+            try:
+                if isinstance(cached_gen_at, str):
+                    cached_gen_dt = datetime.datetime.fromisoformat(cached_gen_at.replace("Z", "+00:00"))
+                else:
+                    cached_gen_dt = cached_gen_at
+                
+                recent_jobs = db.collection("jobs").where("user_id", "==", user_id).order_by("created_at", direction=firestore.Query.DESCENDING).limit(1).get()
+                if recent_jobs:
+                    latest_job = recent_jobs[0].to_dict()
+                    job_ts = latest_job.get("created_at") or latest_job.get("job_timestamp")
+                    if job_ts:
+                        if isinstance(job_ts, datetime.datetime):
+                            job_dt = job_ts
+                        elif isinstance(job_ts, str):
+                            job_dt = datetime.datetime.fromisoformat(job_ts.replace("Z", "+00:00"))
+                        else:
+                            job_dt = job_ts
+                        
+                        if job_dt and job_dt > cached_gen_dt:
+                            should_regenerate = True
+            except Exception as e:
+                print(f"Error checking recent jobs for insight regeneration: {e}")
+
+    if not should_regenerate:
+        print(f"Serving cached weekly insight for user {user_id}")
+        return {
+            "insight_text": cached_text,
+            "stats_used": aggregates
+        }
+
+    # Otherwise, generate new insight
+    worker_type = profile.get('workerType', 'other_gig_worker')
+    worker_types = profile.get('workerTypes')
+    if not isinstance(worker_types, list):
+        worker_types = [worker_type]
+    
+    working_platforms = profile.get('workingPlatforms')
+    if not isinstance(working_platforms, list):
+        working_platforms = []
+        
+    experience_years = profile.get('experienceYears', 0)
+    experience_months = profile.get('experienceMonths', 0)
+    bio = profile.get('bio', '')
+    
+    worker_type_descs = [WORKER_TYPE_DESCRIPTIONS.get(wt, 'gig worker') for wt in worker_types]
+    worker_type_desc = " and ".join(worker_type_descs)
+    
+    extra_details = []
+    if working_platforms:
+        extra_details.append(f"works on: {', '.join(working_platforms)}")
+    if experience_years > 0 or experience_months > 0:
+        extra_details.append(f"experience: {experience_years} years, {experience_months} months")
+    if bio:
+        extra_details.append(f"bio/notes: {bio}")
+        
+    if extra_details:
+        worker_type_desc += " (" + "; ".join(extra_details) + ")"
+        
+    language_name = LANGUAGE_NAMES.get(lang_code, 'English')
+
+    forecast = compute_weekly_forecast(user_id)
+
+    prompt = get_weekly_insight_prompt(
+        worker_type_desc=worker_type_desc,
+        aggregates_json=json.dumps(aggregates),
+        language_name="English",
+        forecast_json=json.dumps(forecast) if forecast else None
+    )
+
+    insight_text = ask_gemma(prompt)
+    
+    if insight_text == "OLLAMA_UNREACHABLE_ERROR":
+        insight_text = errors.get(lang_code, errors['en'])
     else:
-        worker_type = profile.get('workerType', 'other_gig_worker')
-        worker_types = profile.get('workerTypes')
-        if not isinstance(worker_types, list):
-            worker_types = [worker_type]
+        if language_name.lower() != "english":
+            insight_text = translate_to_language(insight_text, language_name)
         
-        working_platforms = profile.get('workingPlatforms')
-        if not isinstance(working_platforms, list):
-            working_platforms = []
-            
-        experience_years = profile.get('experienceYears', 0)
-        experience_months = profile.get('experienceMonths', 0)
-        bio = profile.get('bio', '')
-        
-        worker_type_descs = [WORKER_TYPE_DESCRIPTIONS.get(wt, 'gig worker') for wt in worker_types]
-        worker_type_desc = " and ".join(worker_type_descs)
-        
-        extra_details = []
-        if working_platforms:
-            extra_details.append(f"works on: {', '.join(working_platforms)}")
-        if experience_years > 0 or experience_months > 0:
-            extra_details.append(f"experience: {experience_years} years, {experience_months} months")
-        if bio:
-            extra_details.append(f"bio/notes: {bio}")
-            
-        if extra_details:
-            worker_type_desc += " (" + "; ".join(extra_details) + ")"
-            
-        language_name = LANGUAGE_NAMES.get(lang_code, 'English')
-
-        forecast = compute_weekly_forecast(user_id)
-
-        prompt = get_weekly_insight_prompt(
-            worker_type_desc=worker_type_desc,
-            aggregates_json=json.dumps(aggregates),
-            language_name=language_name,
-            forecast_json=json.dumps(forecast) if forecast else None
-        )
-
-        insight_text = ask_gemma(prompt)
-        
-        if insight_text == "OLLAMA_UNREACHABLE_ERROR":
-            insight_text = errors.get(lang_code, errors['en'])
-            
     # Write to Firestore user cache document
     if db is not None and user_id and user_id != 'anonymous_user':
         try:
-            now = datetime.datetime.now(datetime.timezone.utc)
-            monday = now - datetime.timedelta(days=now.weekday())
-            monday_start = datetime.datetime(monday.year, monday.month, monday.day, 0, 0, 0, tzinfo=datetime.timezone.utc)
-            
             db.collection("users").document(user_id).set({
                 "cachedInsightText": insight_text,
                 "cachedInsightWeekStart": monday_start,
@@ -680,7 +784,7 @@ async def weekly_insight(user_id: str):
 
     return {
         "insight_text": insight_text,
-        "stats_used": aggregates if aggregates["total_jobs"] > 0 else None
+        "stats_used": aggregates
     }
 
 @app.post("/jobs/draft-complaint")
@@ -1125,11 +1229,18 @@ async def fatigue_nudge_endpoint(request: FatigueRequest):
     lang_code = profile.get('preferredLanguage', 'en')
     language_name = LANGUAGE_NAMES.get(lang_code, 'English')
     
-    prompt = (
-        f"This gig worker has logged over {request.total_hours:.1f} hours of work in the last 24 hours. "
-        f"Write one short, warm sentence in fluent, natural {language_name} using its native script gently checking in and suggesting they consider a break. "
-        f"Do not mix in English words or script (except for numbers). Respond ONLY in {language_name} script."
-    )
+    if lang_code == 'en':
+        prompt = (
+            f"This gig worker has logged over {request.total_hours:.1f} hours of work in the last 24 hours. "
+            f"Write one short, warm sentence in fluent, natural English gently checking in and suggesting they consider a break. "
+            f"Respond ONLY in English."
+        )
+    else:
+        prompt = (
+            f"This gig worker has logged over {request.total_hours:.1f} hours of work in the last 24 hours. "
+            f"Write one short, warm sentence in fluent, natural {language_name} using its native script gently checking in and suggesting they consider a break. "
+            f"Do not mix in English words or script (except for numbers). Respond ONLY in {language_name} script."
+        )
     
     msg = ask_gemma(prompt)
     if msg == "OLLAMA_UNREACHABLE_ERROR":
@@ -1200,13 +1311,25 @@ import re
 def regex_parse_transcript(transcript: str):
     transcript_lower = transcript.lower()
     
-    # 1. Platform
+    # 1. Platform (fuzzy matching)
+    import difflib
     platform = None
-    platforms = ["zomato", "swiggy", "uber", "ola", "rapido", "zepto", "blinkit", "porter"]
+    platforms = ["zomato", "swiggy", "uber", "ola", "rapido", "zepto", "blinkit", "porter", "indrive"]
+    
+    # Try exact match / contains first
     for p in platforms:
         if p in transcript_lower:
             platform = p.capitalize()
             break
+            
+    if not platform:
+        words = transcript_lower.split()
+        for word in words:
+            clean_word = "".join(c for c in word if c.isalpha())
+            matches = difflib.get_close_matches(clean_word, platforms, n=1, cutoff=0.6)
+            if matches:
+                platform = matches[0].capitalize()
+                break
             
     # 2. Fare (Rupees)
     fare = None
@@ -1246,7 +1369,7 @@ def regex_parse_transcript(transcript: str):
 
 @app.post("/jobs/voice-parse")
 async def voice_parse_job(req: VoiceParseRequest):
-    print(f"[VOICE LOG] Parsing transcript: '{req.transcript}' in language '{req.language_name}'")
+    print(f"[VOICE LOG] Parsing transcript: '{req.transcript}' in language '{req.language_name}', target field: {req.target_field}")
     
     # 1. Run regex parser as baseline/fallback
     regex_data = regex_parse_transcript(req.transcript)
@@ -1280,6 +1403,35 @@ async def voice_parse_job(req: VoiceParseRequest):
     distance_km = parsed_json.get("distance_km") or regex_data.get("distance_km")
     duration_min = parsed_json.get("duration_min") or regex_data.get("duration_min")
     
+    # 4. Clarification-specific fallback: extract any number for numeric fields if they couldn't be parsed
+    if req.target_field:
+        if req.target_field == "fare" and not fare:
+            num_match = re.search(r'(\d+(?:\.\d+)?)', req.transcript)
+            if num_match:
+                fare = float(num_match.group(1))
+        elif req.target_field == "distance_km" and not distance_km:
+            num_match = re.search(r'(\d+(?:\.\d+)?)', req.transcript)
+            if num_match:
+                distance_km = float(num_match.group(1))
+        elif req.target_field == "duration_min" and not duration_min:
+            num_match = re.search(r'(\d+(?:\.\d+)?)', req.transcript)
+            if num_match:
+                duration_min = float(num_match.group(1))
+        elif req.target_field == "platform" and not platform:
+            import difflib
+            platforms = ["zomato", "swiggy", "uber", "ola", "rapido", "zepto", "blinkit", "porter", "indrive"]
+            candidate = req.transcript.lower().strip()
+            matches = difflib.get_close_matches(candidate, platforms, n=1, cutoff=0.5)
+            if matches:
+                platform = matches[0].capitalize()
+            else:
+                for word in candidate.split():
+                    clean_word = "".join(c for c in word if c.isalpha())
+                    word_matches = difflib.get_close_matches(clean_word, platforms, n=1, cutoff=0.6)
+                    if word_matches:
+                        platform = word_matches[0].capitalize()
+                        break
+
     # Standardize platform casing
     if platform and isinstance(platform, str):
         platform = platform.strip().capitalize()
@@ -1290,6 +1442,18 @@ async def voice_parse_job(req: VoiceParseRequest):
         "distance_km": distance_km,
         "duration_min": duration_min
     }
+    
+    # If a specific target field is requested, restrict returning other fields to avoid pollution
+    if req.target_field:
+        restricted_result = {
+            "platform": platform if req.target_field == "platform" else None,
+            "fare": fare if req.target_field == "fare" else None,
+            "distance_km": distance_km if req.target_field == "distance_km" else None,
+            "duration_min": duration_min if req.target_field == "duration_min" else None
+        }
+        print(f"[VOICE LOG] Restricted merged output for {req.target_field}: {restricted_result}")
+        return restricted_result
+
     print(f"[VOICE LOG] Final merged output: {result}")
     return result
 

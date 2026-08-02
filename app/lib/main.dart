@@ -14,6 +14,7 @@ import 'screens/login_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/playful_widgets.dart';
+import 'screens/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -101,11 +102,11 @@ Future<void> main() async {
     debugPrint('Firebase initialization failed: $e');
   }
 
-  runApp(const GigShieldApp());
+  runApp(const GiGlyApp());
 }
 
-class GigShieldApp extends StatelessWidget {
-  const GigShieldApp({super.key});
+class GiGlyApp extends StatelessWidget {
+  const GiGlyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -115,7 +116,7 @@ class GigShieldApp extends StatelessWidget {
       listenable: StringsProvider.instance,
       builder: (context, _) {
         return MaterialApp(
-          title: 'GigShield',
+          title: 'GiGly',
           theme: ThemeData(
             colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF8B5CF6)),
             useMaterial3: true,
@@ -142,7 +143,7 @@ class GigShieldApp extends StatelessWidget {
               child: child!,
             );
           },
-          home: const AuthGateway(),
+          home: const GiGlySplash(),
         );
       },
     );

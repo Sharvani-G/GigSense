@@ -49,4 +49,5 @@ class RouteSafetyResponse(BaseModel):
 class VoiceParseRequest(BaseModel):
     transcript: str
     language_name: str
+    target_field: Optional[str] = None
 

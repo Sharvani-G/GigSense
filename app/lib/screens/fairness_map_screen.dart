@@ -351,7 +351,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
       _mapController.move(_userLocation!, 13.5);
 
       // Query jobs to check against local stats
-      final jobsSnapshot = await FirebaseFirestore.instance.collection('jobs').get();
+      final jobsSnapshot = await FirebaseFirestore.instance.collection('mapFairnessReports').get();
       final statsList = _computeZoneStats(jobsSnapshot.docs);
 
       ZoneStats? matchedZone;
@@ -430,7 +430,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
     _zoneCoordinates.forEach((zone, coords) {
       if (zone.contains(query)) {
         list.add(SearchSuggestion(
-          displayName: "${zone[0].toUpperCase() + zone.substring(1)} (GigShield Zone)",
+          displayName: "${zone[0].toUpperCase() + zone.substring(1)} (GiGly Zone)",
           latitude: coords.latitude,
           longitude: coords.longitude,
           isLocalZone: true,
@@ -468,7 +468,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
 
       final response = await http.get(
         url,
-        headers: {'User-Agent': 'com.gigshield.app', 'ngrok-skip-browser-warning': 'true'},
+        headers: {'User-Agent': 'com.gigly.app', 'ngrok-skip-browser-warning': 'true'},
       );
 
       if (response.statusCode == 200) {
@@ -479,7 +479,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
         _zoneCoordinates.forEach((zone, coords) {
           if (zone.contains(query.toLowerCase().trim())) {
             list.add(SearchSuggestion(
-              displayName: "${zone[0].toUpperCase() + zone.substring(1)} (GigShield Zone)",
+              displayName: "${zone[0].toUpperCase() + zone.substring(1)} (GiGly Zone)",
               latitude: coords.latitude,
               longitude: coords.longitude,
               isLocalZone: true,
@@ -630,6 +630,33 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                   ),
                 ),
               ),
+              if (stats.confidenceTier == "Estimated") ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB), // Soft warm amber
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: PlayfulColors.tertiary, width: 1.5),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, size: 14, color: Color(0xFFD97706)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "Estimated — limited local data available yet",
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: PlayfulColors.foreground,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 20),
               PlayfulButton(
@@ -1103,7 +1130,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
               children: [
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.gigshield.app',
+                  userAgentPackageName: 'com.gigly.app',
                 ),
                 PolygonLayer(polygons: polygons),
                 MarkerLayer(markers: markers),

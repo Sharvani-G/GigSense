@@ -638,23 +638,14 @@ class _ChatScreenState extends State<ChatScreen> {
                     },
                   ),
                   const SizedBox(width: 8),
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: PlayfulColors.accent,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: PlayfulColors.border, width: 2),
-                    ),
-                    child: const Icon(Icons.chat_bubble_outline, color: Colors.white),
-                  ),
+                  GiGiAvatar(size: 40, isStreaming: _isLoading),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "GIGCHAT",
+                          "GIGI",
                           style: GoogleFonts.outfit(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
@@ -720,6 +711,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       }
 
                       final isSpeaking = _speakingMessageId == message.id;
+                      final isStreaming = index == _localMessages.length - 1 && !message.isUser && _isLoading;
                       final String messageLocale = detectLanguageLocale(message.text, StringsProvider.instance.lang);
                       final bool isLangAvailable = _availableLanguages[messageLocale] ?? true;
 
@@ -728,6 +720,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         message: message,
                         messageId: message.id,
                         isSpeaking: isSpeaking,
+                        isStreaming: isStreaming,
                         onSpeakTap: _isTtsAvailable && !message.isUser && isLangAvailable
                             ? () => _speakMessage(message.id, message.text)
                             : null,
@@ -797,6 +790,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   Row(
                     children: [
                       PlayfulMicButton(
+                        size: 38,
                         onSpeechResult: (text) {
                           setState(() {
                             _inputController.text = text;
@@ -805,6 +799,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       const SizedBox(width: 8),
                       PlayfulImagePickerButton(
+                        size: 38,
                         onLoadingChanged: (loading) {
                           setState(() {
                             _isLoading = loading;
@@ -993,6 +988,7 @@ class _MessageBubble extends StatefulWidget {
   final ChatMessage message;
   final String? messageId;
   final bool isSpeaking;
+  final bool isStreaming;
   final VoidCallback? onSpeakTap;
 
   const _MessageBubble({
@@ -1000,6 +996,7 @@ class _MessageBubble extends StatefulWidget {
     required this.message,
     this.messageId,
     this.isSpeaking = false,
+    this.isStreaming = false,
     this.onSpeakTap,
   });
 
@@ -1097,16 +1094,7 @@ class _MessageBubbleState extends State<_MessageBubble> with SingleTickerProvide
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: PlayfulColors.accent,
-                shape: BoxShape.circle,
-                border: Border.all(color: PlayfulColors.border, width: 2),
-              ),
-              child: const Icon(Icons.shield_outlined, color: Colors.white, size: 16),
-            ),
+            GiGiAvatar(size: 32, isStreaming: widget.isStreaming),
             const SizedBox(width: 8),
             Expanded(
               child: Container(
@@ -1189,16 +1177,7 @@ class _TypingIndicatorBubble extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: PlayfulColors.accent,
-                shape: BoxShape.circle,
-                border: Border.all(color: PlayfulColors.border, width: 2),
-              ),
-              child: const Icon(Icons.shield_outlined, color: Colors.white, size: 16),
-            ),
+            GiGiAvatar(size: 32, isStreaming: true),
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -1416,11 +1395,13 @@ class _PlayfulSendButtonState extends State<PlayfulSendButton> {
 class PlayfulImagePickerButton extends StatefulWidget {
   final ValueChanged<String> onImageScanned;
   final ValueChanged<bool> onLoadingChanged;
+  final double size;
 
   const PlayfulImagePickerButton({
     super.key,
     required this.onImageScanned,
     required this.onLoadingChanged,
+    this.size = 44,
   });
 
   @override
@@ -1573,8 +1554,8 @@ class _PlayfulImagePickerButtonState extends State<PlayfulImagePickerButton> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 60),
         transform: Matrix4.translationValues(translateOffset.dx, translateOffset.dy, 0),
-        width: 44,
-        height: 44,
+        width: widget.size,
+        height: widget.size,
         decoration: BoxDecoration(
           color: Colors.white,
           shape: BoxShape.circle,
@@ -1587,10 +1568,10 @@ class _PlayfulImagePickerButtonState extends State<PlayfulImagePickerButton> {
             ),
           ],
         ),
-        child: const Icon(
+        child: Icon(
           Icons.image_outlined,
           color: PlayfulColors.foreground,
-          size: 20,
+          size: widget.size >= 44 ? 20 : 16,
         ),
       ),
     );

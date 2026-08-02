@@ -45,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _flaggedCount = 0;
   List<MapEntry<String, double>> _chartData = [];
   List<PlatformBreakdown> _platformsBreakdown = [];
+  int _selectedWeekOffset = 0;
 
   // Fatigue nudge variables
   bool _showFatigueNudge = false;
@@ -332,12 +333,18 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           .toList();
 
       final now = DateTime.now();
-      final sevenDaysAgo = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 7));
+      // Find the Monday of the current week (weekday: 1 is Mon, 7 is Sun)
+      final currentMonday = now.subtract(Duration(days: now.weekday - 1));
+      final targetMonday = currentMonday.add(Duration(days: _selectedWeekOffset * 7));
+      final weekStart = DateTime(targetMonday.year, targetMonday.month, targetMonday.day);
+      final weekEnd = weekStart.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
 
-      // Filter jobs logged in the last 7 days
+      // Filter jobs logged in the target week
       final List<Map<String, dynamic>> weeklyJobs = allJobs.where((job) {
-        final jobDate = _parseTimestamp(job['job_timestamp']);
-        return jobDate != null && jobDate.isAfter(sevenDaysAgo);
+        final jobDate = _parseTimestamp(job['job_timestamp'] ?? job['created_at']);
+        return jobDate != null && 
+            jobDate.isAfter(weekStart.subtract(const Duration(seconds: 1))) && 
+            jobDate.isBefore(weekEnd.add(const Duration(seconds: 1)));
       }).toList();
 
       // Aggregate calculations
@@ -353,15 +360,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         }
       }
 
-      // Generate daily earnings chart data (last 7 days)
+      // Generate daily earnings chart data (Monday to Sunday)
       final List<MapEntry<String, double>> chartData = [];
-      for (int i = 6; i >= 0; i--) {
-        final day = DateTime(now.year, now.month, now.day).subtract(Duration(days: i));
+      for (int i = 0; i < 7; i++) {
+        final day = weekStart.add(Duration(days: i));
         final dayLabel = _getWeekdayLabel(day);
         
         double dayEarnings = 0.0;
-        for (var job in weeklyJobs) {
-          final jobDate = _parseTimestamp(job['job_timestamp']);
+        for (var job in allJobs) {
+          final jobDate = _parseTimestamp(job['job_timestamp'] ?? job['created_at']);
           if (jobDate != null &&
               jobDate.year == day.year &&
               jobDate.month == day.month &&
@@ -604,6 +611,30 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       setState(() {
         _isFatigueLoading = false;
       });
+      // Save notification to Firestore
+      try {
+        final todayStr = "${DateTime.now().year}-${DateTime.now().month.toString().padLeft(2, '0')}-${DateTime.now().day.toString().padLeft(2, '0')}";
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .collection('notifications')
+            .add({
+          'title': 'Fatigue Check-in',
+          'message': _fatigueMessage,
+          'timestamp': FieldValue.serverTimestamp(),
+          'read': false,
+          'type': 'fatigue_nudge',
+        });
+        if (userId != 'anonymous_user') {
+          await FirebaseFirestore.instance.collection('users').doc(userId).set({
+            'lastFatigueNudgeDate': todayStr,
+          }, SetOptions(merge: true));
+        } else {
+          _anonymousLastNudgeDate = todayStr;
+        }
+      } catch (e) {
+        debugPrint("Error writing fatigue notification: $e");
+      }
     }
   }
 
@@ -630,6 +661,200 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _anonymousLastNudgeDate = todayStr;
       }
     }
+  }
+
+  void _showNotificationsSheet(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final userId = user?.uid ?? 'anonymous_user';
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          maxChildSize: 0.9,
+          minChildSize: 0.4,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              padding: const EdgeInsets.all(24),
+              decoration: const BoxDecoration(
+                color: Color(0xFFFFFDF5),
+                border: Border(
+                  top: BorderSide(color: PlayfulColors.border, width: 4),
+                ),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(24),
+                  topRight: Radius.circular(24),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "ALERTS & NOTIFICATIONS",
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: PlayfulColors.foreground,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          // Mark all as read
+                          final qSnapshot = await FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(userId)
+                              .collection('notifications')
+                              .where('read', isEqualTo: false)
+                              .get();
+                          final batch = FirebaseFirestore.instance.batch();
+                          for (var doc in qSnapshot.docs) {
+                            batch.update(doc.reference, {'read': true});
+                          }
+                          await batch.commit();
+                        },
+                        child: Text(
+                          "Mark all as read",
+                          style: GoogleFonts.plusJakartaSans(
+                            color: PlayfulColors.accent,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Divider(color: PlayfulColors.border, thickness: 2),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('users')
+                          .doc(userId)
+                          .collection('notifications')
+                          .orderBy('timestamp', descending: true)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator(color: PlayfulColors.accent));
+                        }
+                        final docs = snapshot.data?.docs ?? [];
+                        if (docs.isEmpty) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.notifications_none, size: 48, color: PlayfulColors.mutedForeground),
+                                const SizedBox(height: 12),
+                                Text(
+                                  "You're all caught up! No notifications yet.",
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: PlayfulColors.mutedForeground,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                        
+                        return ListView.builder(
+                          controller: scrollController,
+                          itemCount: docs.length,
+                          itemBuilder: (context, index) {
+                            final data = docs[index].data() as Map<String, dynamic>;
+                            final isRead = data['read'] ?? false;
+                            final title = data['title'] ?? 'Alert';
+                            final message = data['message'] ?? '';
+                            final ts = data['timestamp'];
+                            DateTime? dt;
+                            if (ts is Timestamp) {
+                              dt = ts.toDate();
+                            }
+                            
+                            return GestureDetector(
+                              onTap: () {
+                                if (!isRead) {
+                                  docs[index].reference.update({'read': true});
+                                }
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: isRead ? Colors.white : const Color(0xFFFFFBEB),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: isRead ? PlayfulColors.border : PlayfulColors.tertiary,
+                                    width: 2.0,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: isRead ? PlayfulColors.border : PlayfulColors.tertiary,
+                                      offset: const Offset(2, 2),
+                                      blurRadius: 0,
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          title.toUpperCase(),
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w900,
+                                            color: PlayfulColors.foreground,
+                                          ),
+                                        ),
+                                        if (dt != null)
+                                          Text(
+                                            "${dt.day}/${dt.month} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}",
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 10,
+                                              color: PlayfulColors.mutedForeground,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      message,
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: PlayfulColors.foreground,
+                                        height: 1.3,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   void _calculateSavingsProgress() {
@@ -696,13 +921,17 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _fetchWeeklyInsight(String userId) async {
+    setState(() {
+      _isInsightLoading = true;
+    });
     try {
       String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
       if (!kIsWeb && Platform.isAndroid && (baseUrl.contains("127.0.0.1") || baseUrl.contains("localhost"))) {
         baseUrl = baseUrl.replaceAll("127.0.0.1", "10.0.2.2").replaceAll("localhost", "10.0.2.2");
       }
       final Uri url = Uri.parse('$baseUrl/weekly-insight?user_id=$userId');
-      final response = await http.get(url, headers: {'ngrok-skip-browser-warning': 'true'});
+      final response = await http.get(url, headers: {'ngrok-skip-browser-warning': 'true'})
+          .timeout(const Duration(seconds: 15));
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -717,6 +946,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     } catch (e) {
       debugPrint("Error fetching weekly insight: $e");
       setState(() {
+        _insightText = "Insight is taking longer than expected — tap to retry";
         _isInsightLoading = false;
       });
       _insightAnimationController.forward(from: 0.0);
@@ -727,13 +957,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     // Current week date range text
     final now = DateTime.now();
-    final start = now.subtract(Duration(days: now.weekday - 1));
+    final currentMonday = now.subtract(Duration(days: now.weekday - 1));
+    final targetMonday = currentMonday.add(Duration(days: _selectedWeekOffset * 7));
+    final start = DateTime(targetMonday.year, targetMonday.month, targetMonday.day);
     final end = start.add(const Duration(days: 6));
-    const months = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    // Note: Month index formatting
-    final startMonth = months[(start.month + 4) % 12];
-    final endMonth = months[(end.month + 4) % 12];
-    final dateRange = "This week · ${start.day} $startMonth – ${end.day} $endMonth";
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final startMonth = months[start.month - 1];
+    final endMonth = months[end.month - 1];
+    final String dateRange;
+    if (_selectedWeekOffset == 0) {
+      dateRange = "This week · ${start.day} $startMonth – ${end.day} $endMonth";
+    } else if (_selectedWeekOffset == -1) {
+      dateRange = "Last week · ${start.day} $startMonth – ${end.day} $endMonth";
+    } else {
+      dateRange = "${start.day} $startMonth – ${end.day} $endMonth";
+    }
 
     return Scaffold(
       backgroundColor: PlayfulColors.background,
@@ -742,6 +980,55 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         elevation: 0,
         automaticallyImplyLeading: false,
         actions: [
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('users')
+                .doc(FirebaseAuth.instance.currentUser?.uid ?? 'anonymous_user')
+                .collection('notifications')
+                .where('read', isEqualTo: false)
+                .snapshots(),
+            builder: (context, snapshot) {
+              final unreadCount = snapshot.data?.docs.length ?? 0;
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      unreadCount > 0 ? Icons.notifications_active_outlined : Icons.notifications_none_outlined,
+                      color: PlayfulColors.foreground,
+                    ),
+                    tooltip: 'Notifications',
+                    onPressed: () => _showNotificationsSheet(context),
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      right: 6,
+                      top: 6,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: PlayfulColors.secondary,
+                          shape: BoxShape.circle,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 16,
+                          minHeight: 16,
+                        ),
+                        child: Text(
+                          '$unreadCount',
+                          style: GoogleFonts.plusJakartaSans(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.language, color: PlayfulColors.foreground),
             tooltip: 'Language',
@@ -854,13 +1141,66 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        dateRange,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: PlayfulColors.mutedForeground,
-                        ),
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedWeekOffset--;
+                              });
+                              _fetchAndProcessJobs();
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: PlayfulColors.border, width: 1.5),
+                              ),
+                              child: const Icon(
+                                Icons.chevron_left,
+                                color: PlayfulColors.foreground,
+                                size: 18,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            dateRange,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: PlayfulColors.mutedForeground,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          GestureDetector(
+                            onTap: _selectedWeekOffset >= 0
+                                ? null
+                                : () {
+                                    setState(() {
+                                      _selectedWeekOffset++;
+                                    });
+                                    _fetchAndProcessJobs();
+                                  },
+                            child: Opacity(
+                              opacity: _selectedWeekOffset >= 0 ? 0.3 : 1.0,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: PlayfulColors.border, width: 1.5),
+                                ),
+                                child: const Icon(
+                                  Icons.chevron_right,
+                                  color: PlayfulColors.foreground,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 24),
 
@@ -942,65 +1282,75 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ],
 
                       // AI Weekly Insight Pop-in Card
-                      ScaleTransition(
-                        scale: _insightScaleAnimation,
-                        child: Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: _insightText.toLowerCase().contains("burnout") || _insightText.toLowerCase().contains("rest") 
-                                ? const Color(0xFFFEF2F2) // very light red
-                                : PlayfulColors.tertiary.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
+                      GestureDetector(
+                        onTap: () {
+                          if (_insightText == "Insight is taking longer than expected — tap to retry" && !_isInsightLoading) {
+                            final user = FirebaseAuth.instance.currentUser;
+                            if (user != null) {
+                              _fetchWeeklyInsight(user.uid);
+                            }
+                          }
+                        },
+                        child: ScaleTransition(
+                          scale: _insightScaleAnimation,
+                          child: Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
                               color: _insightText.toLowerCase().contains("burnout") || _insightText.toLowerCase().contains("rest") 
-                                  ? const Color(0xFFEF4444) // red border
-                                  : PlayfulColors.border,
-                              width: 2.0
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: PlayfulColors.tertiary,
-                                      borderRadius: BorderRadius.circular(9999),
-                                      border: Border.all(color: PlayfulColors.border, width: 2),
-                                    ),
-                                    child: Text(
-                                      StringsProvider.instance.t('ai_insight'),
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w900,
-                                        color: PlayfulColors.foreground,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                  ? const Color(0xFFFEF2F2) // very light red
+                                  : PlayfulColors.tertiary.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: _insightText.toLowerCase().contains("burnout") || _insightText.toLowerCase().contains("rest") 
+                                    ? const Color(0xFFEF4444) // red border
+                                    : PlayfulColors.border,
+                                width: 2.0
                               ),
-                              const SizedBox(height: 12),
-                              _isInsightLoading
-                                  ? const SizedBox(
-                                      height: 48,
-                                      child: Center(
-                                        child: CircularProgressIndicator(
-                                          color: PlayfulColors.accent,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: PlayfulColors.tertiary,
+                                        borderRadius: BorderRadius.circular(9999),
+                                        border: Border.all(color: PlayfulColors.border, width: 2),
+                                      ),
+                                      child: Text(
+                                        StringsProvider.instance.t('ai_insight'),
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w900,
+                                          color: PlayfulColors.foreground,
                                         ),
                                       ),
-                                    )
-                                  : PlayfulMarkdownText(
-                                      text: _insightText,
-                                      style: GoogleFonts.plusJakartaSans(
-                                        color: PlayfulColors.foreground,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14,
-                                      ),
                                     ),
-                            ],
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                _isInsightLoading
+                                    ? const SizedBox(
+                                        height: 48,
+                                        child: Center(
+                                          child: CircularProgressIndicator(
+                                            color: PlayfulColors.accent,
+                                          ),
+                                        ),
+                                      )
+                                    : PlayfulMarkdownText(
+                                        text: _insightText,
+                                        style: GoogleFonts.plusJakartaSans(
+                                          color: PlayfulColors.foreground,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -1008,11 +1358,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       _buildFairnessMapCard(context),
                       const SizedBox(height: 32),
 
-                      // Loader, Empty or Render View
+                      // Loader or Render View
                       if (_isLoading)
                         _buildLoadingState()
-                      else if (_jobs.isEmpty)
-                        _buildEmptyState()
                       else
                         _buildMainDashboard(),
                       const SizedBox(height: 140),
@@ -1310,6 +1658,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     () {
                       final periodLength = _savingsGoal!['period'] == 'weekly' ? 7 : 30;
                       final daysElapsed = periodLength - _savingsDaysRemaining;
+                      if (daysElapsed < 3 || _jobs.length < 3) {
+                        return "Pacing: More logged trips needed to calculate a reliable pacing forecast.";
+                      }
                       if (daysElapsed <= 0) {
                         return "Pacing details will appear after the first day of the goal period.";
                       }
@@ -1442,47 +1793,60 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         ),
         const SizedBox(height: 16),
-        Builder(
-          builder: (context) {
-            final assignedColors = _assignPlatformColors();
-            return Wrap(
-              spacing: 8.0,
-              runSpacing: 8.0,
-              children: List.generate(_platformsBreakdown.length, (index) {
-                final pb = _platformsBreakdown[index];
-                final Color bg = assignedColors[pb.name.toLowerCase().trim()] ?? PlayfulColors.accent;
-                final Color textCol = _getPlatformTextColor(bg);
-                final String nameCapitalized = pb.name.isNotEmpty
-                    ? pb.name[0].toUpperCase() + pb.name.substring(1)
-                    : '';
+        _platformsBreakdown.isEmpty
+            ? Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  "No platform earnings logged for this week.",
+                  style: GoogleFonts.plusJakartaSans(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: PlayfulColors.mutedForeground,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              )
+            : Builder(
+                builder: (context) {
+                  final assignedColors = _assignPlatformColors();
+                  return Wrap(
+                    spacing: 8.0,
+                    runSpacing: 8.0,
+                    children: List.generate(_platformsBreakdown.length, (index) {
+                      final pb = _platformsBreakdown[index];
+                      final Color bg = assignedColors[pb.name.toLowerCase().trim()] ?? PlayfulColors.accent;
+                      final Color textCol = _getPlatformTextColor(bg);
+                      final String nameCapitalized = pb.name.isNotEmpty
+                          ? pb.name[0].toUpperCase() + pb.name.substring(1)
+                          : '';
 
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: bg,
-                    borderRadius: BorderRadius.circular(9999),
-                    border: Border.all(color: PlayfulColors.border, width: 2.0),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: PlayfulColors.border,
-                        offset: Offset(2, 2),
-                        blurRadius: 0,
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    "$nameCapitalized · ₹${formatIndianCurrency(pb.total)} · ${pb.count} jobs (Trust: ${pb.trustScore}%)",
-                    style: GoogleFonts.outfit(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: textCol,
-                    ),
-                  ),
-                );
-              }),
-            );
-          },
-        ),
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: bg,
+                          borderRadius: BorderRadius.circular(9999),
+                          border: Border.all(color: PlayfulColors.border, width: 2.0),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: PlayfulColors.border,
+                              offset: Offset(2, 2),
+                              blurRadius: 0,
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          "$nameCapitalized · ₹${formatIndianCurrency(pb.total)} · ${pb.count} ${pb.count == 1 ? 'job' : 'jobs'} (Trust: ${pb.trustScore}%)",
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: textCol,
+                          ),
+                        ),
+                      );
+                    }),
+                  );
+                },
+              ),
         const SizedBox(height: 180),
       ],
     );

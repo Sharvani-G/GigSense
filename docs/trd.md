@@ -1,4 +1,4 @@
-GigShield — Technical Requirements Document (TRD)
+GiGly — Technical Requirements Document (TRD)
 1. Stack Decision & Rationale
 Layer	Choice	Rationale
 Data persistence	Supabase (Postgres)	Relational fit for jobs ↔ benchmarks lookups; hosted, zero server-maintenance; has a first-class Flutter SDK (supabase_flutter) so simple CRUD (insert job, read jobs, read dashboard aggregates) can be called directly from Flutter, without round-tripping through your own backend for every read/write

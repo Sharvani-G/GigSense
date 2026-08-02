@@ -1,4 +1,4 @@
-# GigShield — Data & Database Specification (Supabase / Postgres)
+# GiGly — Data & Database Specification (Supabase / Postgres)
 
 ---
 

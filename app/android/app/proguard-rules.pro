@@ -1,4 +1,4 @@
-# Proguard rules for GigSense
+# Proguard rules for GiGly
 
 # Keep Firebase classes
 -keep class com.google.firebase.** { *; }

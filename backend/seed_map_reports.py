@@ -22,7 +22,7 @@ if not firebase_admin._apps:
     firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-localities = ['Koramangala', 'Indiranagar', 'HSR Layout', 'Electronic City', 'Jayanagar']
+localities = ['Koramangala', 'Indiranagar', 'HSR Layout', 'Electronic City', 'Jayanagar', 'Whitefield', 'Yelahanka', 'Malleshwaram']
 platforms = ['zomato', 'swiggy', 'uber', 'ola']
 time_of_days = ['morning', 'evening', 'latenight']
 
@@ -35,10 +35,13 @@ platform_rates = {
 
 locality_skews = {
     'Koramangala': (1.02, 1.15),      # Fair (Green)
+    'Malleshwaram': (1.00, 1.12),      # Fair (Green)
     'Electronic City': (0.65, 0.78),  # Underpaid (Pink)
+    'Yelahanka': (0.60, 0.75),        # Underpaid (Pink)
     'Indiranagar': (0.86, 0.94),      # Mixed (Amber)
     'HSR Layout': (0.88, 0.96),       # Mixed (Amber)
     'Jayanagar': (0.90, 0.98),        # Mixed (Amber)
+    'Whitefield': (0.87, 0.95),       # Mixed (Amber)
 }
 
 print("Querying and deleting existing seed documents in 'mapFairnessReports' for idempotency...")
@@ -59,14 +62,14 @@ if deleted_count > 0:
 else:
     print("No old seed documents found.")
 
-print("Generating 150 realistic anonymized map reports...")
+print("Generating 200 realistic anonymized map reports...")
 combinations = []
 for loc in localities:
     for plat in platforms:
         for tod in time_of_days:
             combinations.append((loc, plat, tod))
 
-while len(combinations) < 150:
+while len(combinations) < 200:
     combinations.append(random.choice(combinations))
 
 batch = db.batch()

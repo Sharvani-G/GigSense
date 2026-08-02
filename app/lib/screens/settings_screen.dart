@@ -15,7 +15,7 @@ import '../main.dart' show showLanguagePicker;
 import 'sos_active_screen.dart';
 
 // ---------------------------------------------------------------------------
-// SettingsScreen — The 4th tab of GigShield
+// SettingsScreen — The 4th tab of GiGly
 // Displays profile summary card, list of settings options, and sign out
 // ---------------------------------------------------------------------------
 class SettingsScreen extends StatefulWidget {
@@ -316,7 +316,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 // About row
                                 _buildSettingsRow(
                                   icon: Icons.info_outline_rounded,
-                                  label: s.t('about_gigshield'),
+                                  label: s.t('about_gigly'),
                                   onTap: () {
                                     Navigator.push(
                                       context,
@@ -1866,7 +1866,7 @@ class _EditStickerCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// AboutScreen — sub-screen presenting information about GigShield
+// AboutScreen — sub-screen presenting information about GiGly
 // ---------------------------------------------------------------------------
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
@@ -1924,7 +1924,7 @@ class AboutScreen extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          s.t('about_gigshield'),
+          s.t('about_gigly'),
           style: GoogleFonts.outfit(fontWeight: FontWeight.w900, color: PlayfulColors.foreground),
         ),
       ),

@@ -227,7 +227,7 @@ class _BatchConfirmScreenState extends State<BatchConfirmScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Successfully logged ${_rows.length} jobs!")),
+        SnackBar(content: Text("Successfully logged ${_rows.length} ${_rows.length == 1 ? 'job' : 'jobs'}!")),
       );
       Navigator.pop(context);
     } catch (e) {

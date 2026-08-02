@@ -1,12 +1,12 @@
-# GigSense (GigShield)
+# GiGly (GiGly)
 Submission for the Synaptrix Hackathon
 
-[![Direct Download](https://img.shields.io/badge/Download-APK-green?style=for-the-badge&logo=android)](https://github.com/Sharvani-G/GigSense/releases/download/v1.0.0/gigSense_v1.0.0.apk)
+[![Direct Download](https://img.shields.io/badge/Download-APK-green?style=for-the-badge&logo=android)](https://github.com/Sharvani-G/GiGly/releases/download/v1.0.0/gigSense_v1.0.0.apk)
 
-📲 **[Download the GigSense v1.0.0 APK Directly Here](https://github.com/Sharvani-G/GigSense/releases/download/v1.0.0/gigSense_v1.0.0.apk)**
+📲 **[Download the GiGly v1.0.0 APK Directly Here](https://github.com/Sharvani-G/GiGly/releases/download/v1.0.0/gigSense_v1.0.0.apk)**
 
 ## Problem Statement Chosen
-**Domain:** GigShield
+**Domain:** GiGly
 **Problem Statement:** Let the worker log each job manually, or scan a screenshot of their delivery/ride app using OCR to auto-extract the earnings data. Check if it's fair compared to benchmarks, provide an AI chatbot, and build a unified multi-platform dashboard with weekly insights to protect gig workers from underpayment.
 
 ## Team
@@ -15,13 +15,13 @@ Submission for the Synaptrix Hackathon
 * **Sharvani G**
 
 ## Our Solution
-GigSense is a mobile-first safety and earnings companion app designed specifically for gig workers in India (Ola, Uber, Swiggy, Zomato, Rapido). It aggregates job metrics, runs automated fairness checks using regional platform rate benchmarks, and includes an interactive AI Chatbot (GigChat) along with weekly analytics. The entire interface utilizes a striking, custom "Playful Geometric" design system featuring vibrant colors, bold offset borders, rounded pill tabs, and custom micro-animations to make financial transparency and legal rights accessible to low-literacy users.
+GiGly is a mobile-first safety and earnings companion app designed specifically for gig workers in India (Ola, Uber, Swiggy, Zomato, Rapido). It aggregates job metrics, runs automated fairness checks using regional platform rate benchmarks, and includes an interactive AI Chatbot (GiGi) along with weekly analytics. The entire interface utilizes a striking, custom "Playful Geometric" design system featuring vibrant colors, bold offset borders, rounded pill tabs, and custom micro-animations to make financial transparency and legal rights accessible to low-literacy users.
 
 ## AI Component (Optional)
 * **What AI is used:** Google Gemini API (with local Ollama Gemma 3 4B fallback) and Tesseract OCR (with an custom heuristic receipt classifier).
 * **What it does in your app:** 
   * **Intelligent OCR Screenshot parsing:** Scans uploaded ride/delivery receipts, auto-extracts earnings, and utilizes a classifier to reject invalid/irrelevant images (like food receipt orders).
-  * **Context-Aware GigChat Assistant:** Grounded directly in the user's Firestore job logs to answer specific questions regarding pay shortfalls and Indian labor regulations.
+  * **Context-Aware GiGi Assistant:** Grounded directly in the user's Firestore job logs to answer specific questions regarding pay shortfalls and Indian labor regulations.
   * **Weekly Insights Generator:** Compiles custom, action-oriented financial performance suggestions based on cumulative weekly logs.
   * **Route Safety & Fatigue Checkers:** Dynamically advises safety precautions for night runs and drafts panic coordinates for trusted contacts.
 * **Why we chose this approach:** Integrating Gemini API with a local Ollama fallback enables secure, lightning-fast, and cost-efficient processing. Fact-grounding the LLM system prompt with static legal references prevents AI hallucinations on labor laws.
@@ -41,7 +41,7 @@ GigSense is a mobile-first safety and earnings companion app designed specifical
   * *How to use:* Tap the green **`+` (Add)** FAB at the bottom-right of the Home Screen. Fill out manually or tap **Scan Screenshot** at the top.
 * **Underpayment & Fairness Check:** Evaluates logged jobs against live Firestore benchmarks and flags deviations as possible underpayment.
   * *How to use:* If a logged trip has a low payout, you will see a red **⚠️ Possible Underpayment** warning card on the Home Screen. Tapping it opens the detailed fairness calculation view.
-* **AI Chatbot (GigChat):** Interactive chat grounded in user logs, featuring native script output and fact-restricted Indian legal references.
+* **AI Chatbot (GiGi):** Interactive chat grounded in user logs, featuring native script output and fact-restricted Indian legal references.
   * *Chat Attachment Scanner*: Embedded a camera/gallery attachment button next to the voice input. Scans photos and automatically structures them as formatted receipt prompts or raw context.
   * *How to use:* Tap the **Chat** option on the bottom navigation bar and ask questions. It automatically loads your trip history in the background.
 * **Weekly Dashboard:** Highlights total earnings, underpaid trips, total hours worked, and platform distribution via colorful charts.
@@ -53,7 +53,7 @@ GigSense is a mobile-first safety and earnings companion app designed specifical
   * *How to use:* Appears as a summary card under the header on the **Home Screen** dashboard.
 
 ### Bonus Features Attempted:
-* **Voice-to-Text Interaction (STT):** Integrates speech-to-text directly in GigChat, adjusting recognition models automatically based on user language preferences.
+* **Voice-to-Text Interaction (STT):** Integrates speech-to-text directly in GiGi, adjusting recognition models automatically based on user language preferences.
   * *How to use:* Inside the **Chat Screen**, press and hold the **Microphone icon** next to the input field, speak, and release to send.
 * **AI Route Safety Score:** Assesses risk levels and generates safety recommendations dynamically for late-night or evening trips.
   * *How to use:* Tap any logged trip on the dashboard to open the **Fairness Result Screen**. If it occurred between 9 PM – 6 AM, tap the **🌆 Evening trip** or **🌙 Late-night trip** badge to expand route safety tips.
@@ -85,7 +85,7 @@ GigSense is a mobile-first safety and earnings companion app designed specifical
 
 ### Clone the repo
 ```bash
-git clone https://github.com/Sharvani-G/GigSense.git
+git clone https://github.com/Sharvani-G/GiGly.git
 ```
 
 ### Install dependencies

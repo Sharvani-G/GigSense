@@ -130,6 +130,7 @@ class PlayfulInput extends StatefulWidget {
   final String? selectedDropdownValue;
   final String? prefixText;
   final bool isHighlighted;
+  final bool isErrorHighlighted;
   final bool obscureText;
   final bool readOnly;
   final VoidCallback? onTap;
@@ -147,6 +148,7 @@ class PlayfulInput extends StatefulWidget {
     this.selectedDropdownValue,
     this.prefixText,
     this.isHighlighted = false,
+    this.isErrorHighlighted = false,
     this.obscureText = false,
     this.readOnly = false,
     this.onTap,
@@ -223,7 +225,9 @@ class _PlayfulInputState extends State<PlayfulInput> with SingleTickerProviderSt
           animation: _pulseController,
           builder: (context, child) {
             Color borderColor = const Color(0xFFCBD5E1);
-            if (_isFocused) {
+            if (widget.isErrorHighlighted) {
+              borderColor = const Color(0xFFEF4444);
+            } else if (_isFocused) {
               borderColor = PlayfulColors.accent;
             } else if (_pulseController.isAnimating) {
               borderColor = _pulseAnimation.value ?? borderColor;
@@ -239,7 +243,13 @@ class _PlayfulInputState extends State<PlayfulInput> with SingleTickerProviderSt
                   width: 2.0,
                 ),
                 boxShadow: [
-                  if (_isFocused)
+                  if (widget.isErrorHighlighted)
+                    const BoxShadow(
+                      color: Color(0xFFEF4444),
+                      offset: Offset(4, 4),
+                      blurRadius: 0,
+                    )
+                  else if (_isFocused)
                     const BoxShadow(
                       color: PlayfulColors.accent,
                       offset: Offset(4, 4),
@@ -583,18 +593,21 @@ String getLanguageName(String langCode) {
 class PlayfulMicButton extends StatefulWidget {
   final ValueChanged<String> onSpeechResult;
   final bool textOnLeft;
+  final double size;
 
   const PlayfulMicButton({
     super.key,
     required this.onSpeechResult,
     this.textOnLeft = false,
+    this.size = 48,
   });
 
   @override
-  State<PlayfulMicButton> createState() => _PlayfulMicButtonState();
+  State<PlayfulMicButton> createState() => PlayfulMicButtonState();
 }
 
-class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerProviderStateMixin {
+class PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerProviderStateMixin {
+  StreamSubscription<rec.Amplitude>? _amplitudeSubscription;
   late final rec.AudioRecorder _audioRecorder;
   bool _isListening = false;
   bool _isProcessing = false;
@@ -632,6 +645,7 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
 
   void _handleSttError() {
     _timeoutTimer?.cancel();
+    _amplitudeSubscription?.cancel();
     _pulseController.stop();
     if (mounted) {
       setState(() {
@@ -691,7 +705,7 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
     );
   }
 
-  Future<void> _toggleListening() async {
+  Future<void> toggleListening() async {
     if (_isProcessing) return;
 
     final hasPerm = await _requestMicrophonePermission();
@@ -699,6 +713,7 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
 
     if (_isListening) {
       _timeoutTimer?.cancel();
+      _amplitudeSubscription?.cancel();
       _pulseController.stop();
       setState(() {
         _isListening = false;
@@ -730,9 +745,40 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
 
           _timeoutTimer = Timer(const Duration(seconds: 15), () {
             if (_isListening && mounted) {
-              _toggleListening();
+              toggleListening();
             }
           });
+
+          // Start amplitude tracking for natural pause detection (Part D)
+          int silenceTicks = 0;
+          bool hasSpoken = false;
+          const double silenceThreshold = -38.0; // standard ambient noise dB threshold
+          const int silenceMaxTicks = 18; // 1.8 seconds of silence
+
+          _amplitudeSubscription = _audioRecorder
+              .onAmplitudeChanged(const Duration(milliseconds: 100))
+              .listen((amp) {
+                if (amp.current >= silenceThreshold) {
+                  hasSpoken = true;
+                  silenceTicks = 0;
+                } else {
+                  if (hasSpoken) {
+                    silenceTicks++;
+                    if (silenceTicks >= silenceMaxTicks) {
+                      if (_isListening && mounted) {
+                        toggleListening();
+                      }
+                    }
+                  } else {
+                    silenceTicks++;
+                    if (silenceTicks >= 40) { // 4.0 seconds of no speech at all
+                      if (_isListening && mounted) {
+                        toggleListening();
+                      }
+                    }
+                  }
+                }
+              });
 
           String recordPath = 'audio.m4a';
           if (!kIsWeb) {
@@ -830,6 +876,7 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
   @override
   void dispose() {
     _timeoutTimer?.cancel();
+    _amplitudeSubscription?.cancel();
     _pulseController.dispose();
     _audioRecorder.dispose();
     super.dispose();
@@ -843,10 +890,10 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
         : PlayfulColors.accent;
 
     Widget buttonBody = GestureDetector(
-      onTap: _toggleListening,
+      onTap: toggleListening,
       child: Container(
-        width: 48,
-        height: 48,
+        width: widget.size,
+        height: widget.size,
         decoration: BoxDecoration(
           color: btnBg,
           shape: BoxShape.circle,
@@ -860,14 +907,14 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
           ],
         ),
         child: _isProcessing
-            ? const Padding(
-                padding: EdgeInsets.all(12.0),
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+            ? Padding(
+                padding: EdgeInsets.all(widget.size >= 48 ? 12.0 : 8.0),
+                child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
               )
             : Icon(
                 _isListening ? Icons.mic : Icons.mic_none,
                 color: btnBg == PlayfulColors.tertiary ? PlayfulColors.foreground : Colors.white,
-                size: 20,
+                size: widget.size >= 48 ? 20 : 16,
               ),
       ),
     );
@@ -898,29 +945,6 @@ class _PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPr
             ),
           ),
           const SizedBox(width: 8),
-        ],
-
-        if (!_isListening && !_isProcessing) ...[
-          GestureDetector(
-            onTap: _cycleLanguage,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: PlayfulColors.secondary,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: PlayfulColors.border, width: 1.5),
-              ),
-              child: Text(
-                _currentOverrideLang.toUpperCase(),
-                style: GoogleFonts.outfit(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                  color: PlayfulColors.foreground,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
         ],
 
         _isListening && !disableMotion
@@ -1457,6 +1481,7 @@ class PlayfulUnitInput extends StatelessWidget {
   final String hintText;
   final TextEditingController controller;
   final bool isHighlighted;
+  final bool isErrorHighlighted;
   final FormFieldValidator<String>? validator;
   final TextInputType keyboardType;
   final List<String> unitOptions;
@@ -1469,6 +1494,7 @@ class PlayfulUnitInput extends StatelessWidget {
     required this.hintText,
     required this.controller,
     required this.isHighlighted,
+    this.isErrorHighlighted = false,
     this.validator,
     this.keyboardType = TextInputType.text,
     required this.unitOptions,
@@ -1483,6 +1509,7 @@ class PlayfulUnitInput extends StatelessWidget {
       hintText: hintText,
       controller: controller,
       isHighlighted: isHighlighted,
+      isErrorHighlighted: isErrorHighlighted,
       keyboardType: keyboardType,
       validator: validator,
       suffixIcon: Padding(
@@ -1606,3 +1633,228 @@ void showPlayfulSnackBar(BuildContext context, String message, {bool isError = f
     ),
   );
 }
+
+enum GiGiState { idle, talking, happy }
+
+class GiGiAvatar extends StatefulWidget {
+  final double size;
+  final bool isStreaming;
+
+  const GiGiAvatar({
+    super.key,
+    this.size = 32,
+    this.isStreaming = false,
+  });
+
+  @override
+  State<GiGiAvatar> createState() => _GiGiAvatarState();
+}
+
+class _GiGiAvatarState extends State<GiGiAvatar> {
+  GiGiState _avatarState = GiGiState.idle;
+  Timer? _animationTimer;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateAnimation();
+  }
+
+  @override
+  void didUpdateWidget(covariant GiGiAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isStreaming != oldWidget.isStreaming) {
+      _updateAnimation();
+    }
+  }
+
+  void _updateAnimation() {
+    _animationTimer?.cancel();
+    
+    // Check motion reduction
+    final disableMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (disableMotion) {
+      setState(() {
+        _avatarState = GiGiState.idle;
+      });
+      return;
+    }
+
+    if (widget.isStreaming) {
+      _animationTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
+        if (mounted) {
+          setState(() {
+            _avatarState = _avatarState == GiGiState.idle ? GiGiState.talking : GiGiState.idle;
+          });
+        }
+      });
+    } else {
+      // If transitioning from talking to idle, show happy face briefly
+      if (_avatarState == GiGiState.talking) {
+        setState(() {
+          _avatarState = GiGiState.happy;
+        });
+        _animationTimer = Timer(const Duration(milliseconds: 1500), () {
+          if (mounted) {
+            setState(() {
+              _avatarState = GiGiState.idle;
+            });
+          }
+        });
+      } else {
+        setState(() {
+          _avatarState = GiGiState.idle;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _animationTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = widget.size;
+    
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: PlayfulColors.accent, // A circular head shape, accent #4F46E5 fill
+        shape: BoxShape.circle,
+        border: Border.all(color: PlayfulColors.border, width: 2),
+        boxShadow: const [
+          BoxShadow(
+            color: PlayfulColors.border,
+            offset: Offset(2, 2),
+            blurRadius: 0,
+          ),
+        ],
+      ),
+      child: Center(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Eyes and Cheek dots
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Left Eye
+                    Container(
+                      width: size * 0.12,
+                      height: size * 0.12,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    SizedBox(width: size * 0.2),
+                    // Right Eye
+                    Container(
+                      width: size * 0.12,
+                      height: size * 0.12,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: size * 0.08),
+                _buildMouth(size),
+              ],
+            ),
+            
+            // Cheek Dot Left (pink/secondary)
+            Positioned(
+              left: size * 0.12,
+              top: size * 0.42,
+              child: Container(
+                width: size * 0.08,
+                height: size * 0.08,
+                decoration: const BoxDecoration(
+                  color: PlayfulColors.secondary,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+            
+            // Cheek Dot Right (yellow/tertiary)
+            Positioned(
+              right: size * 0.12,
+              top: size * 0.42,
+              child: Container(
+                width: size * 0.08,
+                height: size * 0.08,
+                decoration: const BoxDecoration(
+                  color: PlayfulColors.tertiary,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMouth(double size) {
+    if (_avatarState == GiGiState.idle) {
+      return Container(
+        width: size * 0.2,
+        height: 2,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(1),
+        ),
+      );
+    } else if (_avatarState == GiGiState.talking) {
+      return Container(
+        width: size * 0.16,
+        height: size * 0.12,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(color: PlayfulColors.border, width: 1.5),
+        ),
+      );
+    } else {
+      return CustomPaint(
+        size: Size(size * 0.22, size * 0.08),
+        painter: _SmilePainter(),
+      );
+    }
+  }
+}
+
+class _SmilePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+      
+    final path = Path()
+      ..moveTo(0, 0)
+      ..quadraticBezierTo(size.width / 2, size.height * 2, size.width, 0);
+      
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+

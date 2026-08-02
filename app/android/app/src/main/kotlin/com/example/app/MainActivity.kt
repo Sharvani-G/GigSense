@@ -15,7 +15,7 @@ class MainActivity : FlutterActivity() {
             if (call.method == "sendSMS") {
                 val phoneNumber = call.argument<String>("phone")
                 val message = call.argument<String>("message")
-                android.util.Log.d("GigSenseSMS", "Attempting silent SMS to $phoneNumber")
+                android.util.Log.d("GiGlySMS", "Attempting silent SMS to $phoneNumber")
                 if (phoneNumber != null && message != null) {
                     try {
                         var smsManager: SmsManager? = null
@@ -37,10 +37,10 @@ class MainActivity : FlutterActivity() {
                         } else {
                             smsManager.sendTextMessage(phoneNumber, null, message, null, null)
                         }
-                        android.util.Log.d("GigSenseSMS", "Silent SMS successfully fired")
+                        android.util.Log.d("GiGlySMS", "Silent SMS successfully fired")
                         result.success(true)
                     } catch (e: Exception) {
-                        android.util.Log.e("GigSenseSMS", "Silent SMS failure: " + e.message, e)
+                        android.util.Log.e("GiGlySMS", "Silent SMS failure: " + e.message, e)
                         result.error("SMS_FAILED", e.message, null)
                     }
                 } else {

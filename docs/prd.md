@@ -1,7 +1,7 @@
-GigShield — Product Requirements Document (PRD)
+GiGly — Product Requirements Document (PRD)
 1. Executive Summary
 
-GigShield is an AI-powered companion app for gig workers — delivery riders, cab drivers, food-delivery couriers — that answers one question they have no easy way to answer today: "Was I actually paid fairly for that job?" It goes further than a spreadsheet or earnings tracker by combining a rule-based fairness check with an AI chatbot that explains rights and options in plain language, and a weekly AI-generated summary that reads like a coach's note rather than a bank statement.
+GiGly is an AI-powered companion app for gig workers — delivery riders, cab drivers, food-delivery couriers — that answers one question they have no easy way to answer today: "Was I actually paid fairly for that job?" It goes further than a spreadsheet or earnings tracker by combining a rule-based fairness check with an AI chatbot that explains rights and options in plain language, and a weekly AI-generated summary that reads like a coach's note rather than a bank statement.
 
 Built for an 8-hour hackathon (Synaptrix, BMSCE IEEE Computer Society × Protocol, 31st July 2026), under the "Gig Economy & Informal Sector Tech" track.
 
@@ -11,7 +11,7 @@ Delivery riders, cab drivers, and other gig workers rarely have tools built for 
 
 3. Why this matters (the human case, not just the brief)
 
-A gig worker today has no independent way to check whether a payout matches the distance and time it actually took. They have no unified view when they work across multiple platforms in the same week. And when something does feel wrong, they have nowhere to ask "is this normal?" without navigating opaque in-app support flows that are built to protect the platform, not the worker. GigShield's job is to sit on the worker's side of the relationship — this framing should shape every product decision, not just the pitch.
+A gig worker today has no independent way to check whether a payout matches the distance and time it actually took. They have no unified view when they work across multiple platforms in the same week. And when something does feel wrong, they have nowhere to ask "is this normal?" without navigating opaque in-app support flows that are built to protect the platform, not the worker. GiGly's job is to sit on the worker's side of the relationship — this framing should shape every product decision, not just the pitch.
 
 4. Target Users & Personas
 Persona 1 — Arjun, 27, food delivery rider

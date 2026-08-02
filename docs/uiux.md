@@ -1,10 +1,10 @@
-# GigShield — UI/UX Specification (Playful Geometric, applied)
+# GiGly — UI/UX Specification (Playful Geometric, applied)
 
-This document takes the "Playful Geometric" design system (attached separately as your source-of-truth token/component reference) and applies it screen-by-screen, decision-by-decision to GigShield specifically. Nothing here contradicts the base design system — it specifies exactly *how* GigShield's actual content (fairness badges, coaching insights, chat) should express that system, so the result reads as a deliberate, considered app rather than a generic template with the design system's tokens dropped in.
+This document takes the "Playful Geometric" design system (attached separately as your source-of-truth token/component reference) and applies it screen-by-screen, decision-by-decision to GiGly specifically. Nothing here contradicts the base design system — it specifies exactly *how* GiGly's actual content (fairness badges, coaching insights, chat) should express that system, so the result reads as a deliberate, considered app rather than a generic template with the design system's tokens dropped in.
 
 ---
 
-## 1. The Core Design Idea for GigShield
+## 1. The Core Design Idea for GiGly
 
 **"Someone's got your back."** Not a banking dashboard, not a corporate compliance tool. The Memphis-inflected, sticker-book energy of Playful Geometric is a genuinely good fit for this brief specifically: gig work is precarious and often faceless, and this app's entire pitch is warmth and support. Every screen should feel like it's smiling *with* the worker, never *at* them — this rules out anything that reads as judgmental (harsh reds for underpayment, alarm-style iconography) in favor of the design system's existing pink/amber/mint palette, which already leans supportive rather than punitive.
 
@@ -81,7 +81,7 @@ Deliberately **not** animated: navigation bar icons, dashboard chart load (shoul
 
 ---
 
-## 5. Accessibility Notes Specific to GigShield
+## 5. Accessibility Notes Specific to GiGly
 
 - Fairness state must **never** be communicated by color alone — the badge always includes both an icon (✅/⚠️) and explicit text ("Fair Pay" / "Possibly Underpaid"), per the base system's color-accessibility rule, and this matters more than usual here since correctly understanding this one signal is the app's entire value proposition.
 - All tap targets minimum 48px height, especially on the Log Job form and chat input, since this app is designed to be used one-handed, often outdoors, often between deliveries.

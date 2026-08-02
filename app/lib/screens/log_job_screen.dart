@@ -13,6 +13,7 @@ import 'fairness_result_screen.dart';
 import 'batch_confirm_screen.dart';
 import 'ocr_result_screen.dart';
 import '../i18n/strings.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 
 class LogJobScreen extends StatefulWidget {
   const LogJobScreen({super.key});
@@ -63,6 +64,23 @@ class _LogJobScreenState extends State<LogJobScreen> {
   bool _durationHighlighted = false;
   bool _platformHighlighted = false;
 
+  // New keys & state variables for voice clarification loop (Part D) and error highlights (Part E)
+  final GlobalKey<PlayfulMicButtonState> _micKey = GlobalKey<PlayfulMicButtonState>();
+  final FlutterTts _flutterTts = FlutterTts();
+  bool _isClarifyingVoiceLoop = false;
+  String? _voiceClarificationTargetField;
+  final Map<String, dynamic> _resolvedVoiceFields = {
+    'platform': null,
+    'fare': null,
+    'distance_km': null,
+    'duration_min': null,
+  };
+
+  bool _platformErrorHighlighted = false;
+  bool _fareErrorHighlighted = false;
+  bool _distanceErrorHighlighted = false;
+  bool _durationErrorHighlighted = false;
+
   final _searchController = TextEditingController();
   final _platformFieldController = TextEditingController();
   List<PlatformItem> _allPlatforms = [];
@@ -83,6 +101,44 @@ class _LogJobScreenState extends State<LogJobScreen> {
     _fareController.addListener(_checkFormValid);
     _distanceController.addListener(_checkFormValid);
     _durationController.addListener(_checkFormValid);
+
+    // Clear error highlights when user changes inputs
+    _fareController.addListener(() {
+      if (_fareController.text.isNotEmpty && _fareErrorHighlighted) {
+        setState(() {
+          _fareErrorHighlighted = false;
+        });
+      }
+    });
+    _distanceController.addListener(() {
+      if (_distanceController.text.isNotEmpty && _distanceErrorHighlighted) {
+        setState(() {
+          _distanceErrorHighlighted = false;
+        });
+      }
+    });
+    _durationController.addListener(() {
+      if (_durationController.text.isNotEmpty && _durationErrorHighlighted) {
+        setState(() {
+          _durationErrorHighlighted = false;
+        });
+      }
+    });
+    _platformFieldController.addListener(() {
+      if (_platformFieldController.text.isNotEmpty && _platformErrorHighlighted) {
+        setState(() {
+          _platformErrorHighlighted = false;
+        });
+      }
+    });
+
+    _flutterTts.setCompletionHandler(() {
+      if (mounted && _isClarifyingVoiceLoop && _voiceClarificationTargetField != null) {
+        // Automatically start the mic after TTS speaking is completed
+        _micKey.currentState?.toggleListening();
+      }
+    });
+
     _initializeData();
   }
 
@@ -93,6 +149,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
 
   @override
   void dispose() {
+    _flutterTts.stop();
     _fareController.dispose();
     _distanceController.dispose();
     _durationController.dispose();
@@ -613,22 +670,27 @@ class _LogJobScreenState extends State<LogJobScreen> {
           _selectedPlatform = matched.id;
           _platformFieldController.text = matched.displayName;
           _platformHighlighted = true;
+          _platformErrorHighlighted = false;
         } else {
           _selectedPlatform = "other";
           _platformFieldController.text = "Other";
+          _platformErrorHighlighted = true;
         }
       } else {
         _selectedPlatform = "other";
         _platformFieldController.text = "Other";
+        _platformErrorHighlighted = true;
       }
 
       if (fare != null) {
         _fareController.text = fare.toString();
         _fareHighlighted = true;
         _fareOcrNote = null;
+        _fareErrorHighlighted = false;
       } else {
         _fareController.clear();
         _fareOcrNote = StringsProvider.instance.t('ocr_no_fare');
+        _fareErrorHighlighted = true;
       }
 
       if (distance != null) {
@@ -637,9 +699,11 @@ class _LogJobScreenState extends State<LogJobScreen> {
         else _distanceUnit = 'km';
         _distanceHighlighted = true;
         _distanceOcrNote = null;
+        _distanceErrorHighlighted = false;
       } else {
         _distanceController.clear();
         _distanceOcrNote = StringsProvider.instance.t('ocr_no_distance');
+        _distanceErrorHighlighted = true;
       }
 
       if (duration != null) {
@@ -648,9 +712,11 @@ class _LogJobScreenState extends State<LogJobScreen> {
         else _durationUnit = 'min';
         _durationHighlighted = true;
         _durationOcrNote = null;
+        _durationErrorHighlighted = false;
       } else {
         _durationController.clear();
         _durationOcrNote = StringsProvider.instance.t('ocr_no_duration');
+        _durationErrorHighlighted = true;
       }
     });
 
@@ -1048,7 +1114,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                         ),
                         const SizedBox(height: 32),
 
-                        if (_activeToggle == "scan" || _isOcrLoading) ...[
+                        if (_isOcrLoading) ...[
                           Container(
                             height: 250,
                             decoration: BoxDecoration(
@@ -1125,6 +1191,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                             controller: _platformFieldController,
                             readOnly: true,
                             isHighlighted: _platformHighlighted,
+                            isErrorHighlighted: _platformErrorHighlighted,
                             onTap: () => _showPlatformPickerBottomSheet(context),
                           ),
                           const SizedBox(height: 20),
@@ -1139,6 +1206,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                                   controller: _fareController,
                                   prefixText: "₹ ",
                                   isHighlighted: _fareHighlighted,
+                                  isErrorHighlighted: _fareErrorHighlighted,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                   validator: (val) {
                                     if (val == null || val.isEmpty) return StringsProvider.instance.t('logjob_fare_required');
@@ -1182,6 +1250,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                                   hintText: StringsProvider.instance.t('logjob_distance_hint'),
                                   controller: _distanceController,
                                   isHighlighted: _distanceHighlighted,
+                                  isErrorHighlighted: _distanceErrorHighlighted,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                   unitOptions: const ['km', 'm'],
                                   currentUnit: _distanceUnit,
@@ -1244,6 +1313,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                                   hintText: StringsProvider.instance.t('logjob_duration_hint'),
                                   controller: _durationController,
                                   isHighlighted: _durationHighlighted,
+                                  isErrorHighlighted: _durationErrorHighlighted,
                                   keyboardType: TextInputType.number,
                                   unitOptions: const ['min', 'hr'],
                                   currentUnit: _durationUnit,
@@ -1470,7 +1540,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                                         ),
                                         subtitle: Text(
                                           p.sampleSize >= 15
-                                              ? "${p.displayName}'s fair rate is based on ${p.sampleSize} real trips logged by GigShield workers in the last 60 days."
+                                              ? "${p.displayName}'s fair rate is based on ${p.sampleSize} real trips logged by GiGly workers in the last 60 days."
                                               : "${p.displayName}'s fair rate is currently an estimate — not enough real data yet.",
                                           style: GoogleFonts.plusJakartaSans(
                                             fontSize: 12,
@@ -1514,7 +1584,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: PlayfulColors.secondary.withOpacity(0.08),
+        color: PlayfulColors.accent,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: PlayfulColors.border, width: 2),
         boxShadow: const [
@@ -1539,7 +1609,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                       style: GoogleFonts.outfit(
                         fontWeight: FontWeight.w900,
                         fontSize: 16,
-                        color: PlayfulColors.foreground,
+                        color: PlayfulColors.background,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -1548,7 +1618,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: PlayfulColors.mutedForeground,
+                        color: PlayfulColors.background.withOpacity(0.8),
                       ),
                     ),
                   ],
@@ -1556,6 +1626,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
               ),
               const SizedBox(width: 12),
               PlayfulMicButton(
+                key: _micKey,
                 textOnLeft: false,
                 onSpeechResult: (transcript) {
                   _processVoiceRecording(transcript);
@@ -1611,6 +1682,13 @@ class _LogJobScreenState extends State<LogJobScreen> {
     final s = StringsProvider.instance;
     _showLoadingDialog(context, s.t('logjob_voice_parsing'));
     
+    if (!_isClarifyingVoiceLoop) {
+      _resolvedVoiceFields['platform'] = null;
+      _resolvedVoiceFields['fare'] = null;
+      _resolvedVoiceFields['distance_km'] = null;
+      _resolvedVoiceFields['duration_min'] = null;
+    }
+
     String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
     if (!kIsWeb && Platform.isAndroid && (baseUrl.contains("127.0.0.1") || baseUrl.contains("localhost"))) {
       baseUrl = baseUrl.replaceAll("127.0.0.1", "10.0.2.2").replaceAll("localhost", "10.0.2.2");
@@ -1624,6 +1702,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
         body: json.encode({
           'transcript': transcript,
           'language_name': getLanguageName(s.lang),
+          'target_field': _voiceClarificationTargetField,
         }),
       );
       
@@ -1631,28 +1710,55 @@ class _LogJobScreenState extends State<LogJobScreen> {
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final platform = data['platform'];
-        final fare = data['fare'];
-        final distance = data['distance_km'];
-        final duration = data['duration_min'];
         
-        final bool hasAny = (platform != null && platform.toString().trim().isNotEmpty) ||
-            fare != null ||
-            distance != null ||
-            duration != null;
-            
-        if (hasAny) {
-          if (mounted) {
-            _showVoiceLoggingConfirmationDialog(context, data);
+        setState(() {
+          if (data['platform'] != null) {
+            _resolvedVoiceFields['platform'] = data['platform'];
           }
+          if (data['fare'] != null) {
+            _resolvedVoiceFields['fare'] = data['fare'];
+          }
+          if (data['distance_km'] != null) {
+            _resolvedVoiceFields['distance_km'] = data['distance_km'];
+          }
+          if (data['duration_min'] != null) {
+            _resolvedVoiceFields['duration_min'] = data['duration_min'];
+          }
+        });
+
+        // Check if there are missing fields
+        String? nextMissingField;
+        if (_resolvedVoiceFields['platform'] == null) {
+          nextMissingField = 'platform';
+        } else if (_resolvedVoiceFields['fare'] == null) {
+          nextMissingField = 'fare';
+        } else if (_resolvedVoiceFields['distance_km'] == null) {
+          nextMissingField = 'distance_km';
+        } else if (_resolvedVoiceFields['duration_min'] == null) {
+          nextMissingField = 'duration_min';
+        }
+
+        if (nextMissingField != null) {
+          _isClarifyingVoiceLoop = true;
+          _voiceClarificationTargetField = nextMissingField;
+
+          String promptText = "";
+          if (nextMissingField == 'platform') {
+            promptText = "I didn't catch the platform. Which platform was this trip for?";
+          } else if (nextMissingField == 'fare') {
+            promptText = "I didn't catch the fare. How many rupees did you earn?";
+          } else if (nextMissingField == 'distance_km') {
+            promptText = "I didn't catch the distance. How many kilometers was the trip?";
+          } else if (nextMissingField == 'duration_min') {
+            promptText = "I didn't catch the duration. How many minutes did the trip take?";
+          }
+
+          await _flutterTts.speak(promptText);
         } else {
+          _isClarifyingVoiceLoop = false;
+          _voiceClarificationTargetField = null;
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("I couldn't understand any details (platform, fare, distance, or duration) from your voice command. Please speak clearly or enter details manually."),
-                backgroundColor: PlayfulColors.secondary,
-              ),
-            );
+            _showVoiceLoggingConfirmationDialog(context, _resolvedVoiceFields);
           }
         }
       } else {

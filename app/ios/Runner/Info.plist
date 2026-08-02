@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>GigSense</string>
+	<string>GiGly</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>gigsense</string>
+	<string>gigly</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -67,15 +67,15 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>GigShield needs your location to include it in your SOS message to emergency contacts.</string>
+	<string>GiGly needs your location to include it in your SOS message to emergency contacts.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>GigSense needs camera access to take a profile photo or scan payslips.</string>
+	<string>GiGly needs camera access to take a profile photo or scan payslips.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>GigSense needs library access to let you pick a profile photo or select payslip screenshots.</string>
+	<string>GiGly needs library access to let you pick a profile photo or select payslip screenshots.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>GigSense needs microphone access to record your voice logs and convert them to text.</string>
+	<string>GiGly needs microphone access to record your voice logs and convert them to text.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>GigSense needs speech recognition access to transcribe your spoken voice logs.</string>
+	<string>GiGly needs speech recognition access to transcribe your spoken voice logs.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>whatsapp</string>
