@@ -234,6 +234,8 @@ class AppStrings {
       'draft_disclaimer': 'General guidance, not legal advice — review before sending.',
 
       'err_connecting_scan_service': 'Error connecting to scan service.',
+      'logjob_long_trip_title': 'Unusually Long Trip',
+      'logjob_long_trip_desc': 'The entered distance or duration is very high. Are you sure these details are correct?',
 },
 
     // ------------------------------------------------------------------ HINDI
@@ -460,6 +462,8 @@ class AppStrings {
       'draft_disclaimer': 'General guidance, not legal advice — review before sending.',
 
       'err_connecting_scan_service': 'Error connecting to scan service.',
+      'logjob_long_trip_title': 'असामान्य रूप से लंबी यात्रा',
+      'logjob_long_trip_desc': 'दर्ज की गई दूरी या अवधि बहुत अधिक है। क्या आप सुनिश्चित हैं कि ये विवरण सही हैं?',
 },
 
     // ------------------------------------------------------------------ KANNADA
@@ -686,6 +690,8 @@ class AppStrings {
       'draft_disclaimer': 'General guidance, not legal advice — review before sending.',
 
       'err_connecting_scan_service': 'Error connecting to scan service.',
+      'logjob_long_trip_title': 'ಅಸಾಮಾನ್ಯ ಉದ್ದದ ಪ್ರಯಾಣ',
+      'logjob_long_trip_desc': 'ನಮೂದಿಸಿದ ದೂರ ಅಥವಾ ಸಮಯ ತುಂಬಾ ಹೆಚ್ಚಾಗಿದೆ. ಈ ವಿವರಗಳು ಸರಿಯಾಗಿವೆ ಎಂದು ನೀವು ಖಚಿತಪಡಿಸಿಕೊಳ್ಳಿ?',
 },
     // ------------------------------------------------------------------ TAMIL
     // Note: machine-translation pass — review with a fluent speaker before production.
@@ -910,6 +916,8 @@ class AppStrings {
       'draft_disclaimer': 'General guidance, not legal advice — review before sending.',
 
       'err_connecting_scan_service': 'Error connecting to scan service.',
+      'logjob_long_trip_title': 'అసాధారణమైన సుదీర్ఘ ప్రయాణం',
+      'logjob_long_trip_desc': 'నమోదు చేసిన దూరం లేదా సమయం చాలా ఎక్కువ. ఈ వివరాలు సరైనవేనా?',
 },
 
     // ------------------------------------------------------------------ TELUGU
@@ -1135,6 +1143,8 @@ class AppStrings {
       'draft_disclaimer': 'General guidance, not legal advice — review before sending.',
 
       'err_connecting_scan_service': 'Error connecting to scan service.',
+      'logjob_long_trip_title': 'அசாதாரணமான நீண்ட பயணம்',
+      'logjob_long_trip_desc': 'உள்ளிடப்பட்ட தூரம் அல்லது நேரம் மிக அதிகம். இந்த விவரங்கள் சரியானவையா?',
 },
     // ------------------------------------------------------------------ MALAYALAM
     'ml': {
@@ -1341,6 +1351,8 @@ class AppStrings {
       'draft_disclaimer': 'General guidance, not legal advice — review before sending.',
 
       'err_connecting_scan_service': 'Error connecting to scan service.',
+      'logjob_long_trip_title': 'അസാധാരണമായ നീണ്ട യാത്ര',
+      'logjob_long_trip_desc': 'നൽകിയ ദൂരമോ സമയമോ വളരെ കൂടുതലാണ്. ഈ വിവരങ്ങൾ ശരിയാണെന്ന് ഉറപ്പാണോ?',
 },
   };
 }

@@ -1116,8 +1116,18 @@ class _LogJobScreenState extends State<LogJobScreen> {
                                   currentUnit: _distanceUnit,
                                   onUnitChanged: (newUnit) {
                                     setState(() {
+                                      final valStr = _distanceController.text.trim();
                                       _distanceUnit = newUnit;
-                                      _distanceController.clear();
+                                      if (valStr.isNotEmpty) {
+                                        final numVal = double.tryParse(valStr);
+                                        if (numVal != null) {
+                                          if (newUnit == 'm') {
+                                            _distanceController.text = (numVal * 1000).toStringAsFixed(0);
+                                          } else {
+                                            _distanceController.text = (numVal / 1000).toStringAsFixed(1);
+                                          }
+                                        }
+                                      }
                                     });
                                     _checkFormValid();
                                   },
@@ -1168,8 +1178,18 @@ class _LogJobScreenState extends State<LogJobScreen> {
                                   currentUnit: _durationUnit,
                                   onUnitChanged: (newUnit) {
                                     setState(() {
+                                      final valStr = _durationController.text.trim();
                                       _durationUnit = newUnit;
-                                      _durationController.clear();
+                                      if (valStr.isNotEmpty) {
+                                        final numVal = double.tryParse(valStr);
+                                        if (numVal != null) {
+                                          if (newUnit == 'hr') {
+                                            _durationController.text = (numVal / 60).toStringAsFixed(2);
+                                          } else {
+                                            _durationController.text = (numVal * 60).toStringAsFixed(0);
+                                          }
+                                        }
+                                      }
                                     });
                                     _checkFormValid();
                                   },
@@ -1550,8 +1570,29 @@ class _LogJobScreenState extends State<LogJobScreen> {
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (mounted) {
-          _showVoiceLoggingConfirmationSheet(context, data);
+        final platform = data['platform'];
+        final fare = data['fare'];
+        final distance = data['distance_km'];
+        final duration = data['duration_min'];
+        
+        final bool hasAny = (platform != null && platform.toString().trim().isNotEmpty) ||
+            fare != null ||
+            distance != null ||
+            duration != null;
+            
+        if (hasAny) {
+          if (mounted) {
+            _showVoiceLoggingConfirmationDialog(context, data);
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text("I couldn't understand any details (platform, fare, distance, or duration) from your voice command. Please speak clearly or enter details manually."),
+                backgroundColor: PlayfulColors.secondary,
+              ),
+            );
+          }
         }
       } else {
         throw Exception("Server returned status ${response.statusCode}");
@@ -1566,140 +1607,133 @@ class _LogJobScreenState extends State<LogJobScreen> {
     }
   }
 
-  void _showVoiceLoggingConfirmationSheet(BuildContext context, Map<String, dynamic> parsedData) {
+  void _showVoiceLoggingConfirmationDialog(BuildContext context, Map<String, dynamic> parsedData) {
     final s = StringsProvider.instance;
-    
-    final platformController = TextEditingController(text: parsedData['platform'] ?? '');
-    final fareController = TextEditingController(text: parsedData['fare'] != null ? parsedData['fare'].toString() : '');
-    final distanceController = TextEditingController(text: parsedData['distance_km'] != null ? parsedData['distance_km'].toString() : '');
-    final durationController = TextEditingController(text: parsedData['duration_min'] != null ? parsedData['duration_min'].toString() : '');
-    
-    String tempSelectedPlatform = (parsedData['platform'] as String?)?.toLowerCase() ?? 'other';
-    final List<String> validPlatforms = ["zomato", "swiggy", "uber", "ola", "rapido", "zepto", "blinkit", "porter", "other"];
-    if (!validPlatforms.contains(tempSelectedPlatform)) {
-      tempSelectedPlatform = 'other';
-    }
-    
-    platformController.text = tempSelectedPlatform[0].toUpperCase() + tempSelectedPlatform.substring(1);
+    final platform = parsedData['platform'];
+    final fare = parsedData['fare'];
+    final distance = parsedData['distance_km'];
+    final duration = parsedData['duration_min'];
 
-    showModalBottomSheet(
+    final platformText = (platform != null && platform.toString().trim().isNotEmpty) ? platform.toString() : null;
+    final fareText = fare != null ? "₹$fare" : null;
+    final distanceText = distance != null ? "$distance km" : null;
+    final durationText = duration != null ? "$duration min" : null;
+
+    final bool allPresent = platformText != null && fare != null && distance != null && duration != null;
+
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: PlayfulColors.background,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        side: BorderSide(color: PlayfulColors.border, width: 2),
-      ),
+      barrierDismissible: false,
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-            left: 24,
-            right: 24,
-            top: 24,
+        return AlertDialog(
+          backgroundColor: PlayfulColors.background,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: const BorderSide(color: PlayfulColors.border, width: 2),
           ),
-          child: Column(
+          title: Text(
+            s.t('logjob_voice_confirm_title'),
+            style: GoogleFonts.outfit(fontWeight: FontWeight.w900, color: PlayfulColors.foreground),
+          ),
+          content: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                s.t('logjob_voice_confirm_title'),
-                style: GoogleFonts.outfit(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 20,
-                  color: PlayfulColors.foreground,
-                ),
+                "Here is what I understood from your voice log:",
+                style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14, color: PlayfulColors.foreground),
               ),
+              const SizedBox(height: 16),
+              _buildParsedRow("Platform", platformText ?? "[Missing]", platformText != null),
+              _buildParsedRow("Fare", fareText ?? "[Missing]", fare != null),
+              _buildParsedRow("Distance", distanceText ?? "[Missing]", distance != null),
+              _buildParsedRow("Duration", durationText ?? "[Missing]", duration != null),
               const SizedBox(height: 20),
-              
-              PlayfulInput(
-                labelText: s.t('logjob_platform'),
-                hintText: s.t('logjob_platform_hint'),
-                controller: platformController,
-                readOnly: true,
-                onTap: () async {
-                  final String? choice = await showModalBottomSheet<String>(
-                    context: ctx,
-                    backgroundColor: PlayfulColors.background,
-                    shape: const RoundedRectangleBorder(
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                      side: BorderSide(color: PlayfulColors.border, width: 2),
-                    ),
-                    builder: (pickerCtx) {
-                      return Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: validPlatforms.map((p) {
-                            return ListTile(
-                              title: Text(p[0].toUpperCase() + p.substring(1), style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
-                              onTap: () => Navigator.pop(pickerCtx, p),
-                            );
-                          }).toList(),
-                        ),
-                      );
-                    }
-                  );
-                  if (choice != null) {
-                    tempSelectedPlatform = choice;
-                    platformController.text = choice[0].toUpperCase() + choice.substring(1);
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
-              
-              PlayfulInput(
-                labelText: s.t('logjob_fare'),
-                hintText: s.t('logjob_fare_hint'),
-                controller: fareController,
-                prefixText: "₹ ",
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              ),
-              const SizedBox(height: 16),
-              
-              Row(
-                children: [
-                  Expanded(
-                    child: PlayfulInput(
-                      labelText: s.t('logjob_distance') + " (km)",
-                      hintText: s.t('logjob_distance_hint'),
-                      controller: distanceController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    ),
+              if (!allPresent)
+                Text(
+                  "Some details are missing. Tapping 'Yes, it's correct' will fill in what was heard so you can complete the rest manually.",
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12,
+                    color: PlayfulColors.secondary,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: PlayfulInput(
-                      labelText: s.t('logjob_duration') + " (min)",
-                      hintText: s.t('logjob_duration_hint'),
-                      controller: durationController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              
-              PlayfulButton(
-                onPressed: () {
-                  setState(() {
-                    _selectedPlatform = tempSelectedPlatform;
-                    _platformFieldController.text = platformController.text;
-                    _fareController.text = fareController.text;
-                    _distanceController.text = distanceController.text;
-                    _durationController.text = durationController.text;
-                    _distanceUnit = 'km';
-                    _durationUnit = 'min';
-                  });
-                  Navigator.pop(ctx);
-                  _submitJob();
-                },
-                child: Text(s.t('btn_save_continue')),
-              ),
+                )
+              else
+                Text(
+                  "Does this look correct?",
+                  style: GoogleFonts.plusJakartaSans(fontSize: 14, color: PlayfulColors.foreground, fontWeight: FontWeight.w500),
+                ),
             ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(s.t('stt_cancel'), style: GoogleFonts.plusJakartaSans(color: PlayfulColors.foreground, fontWeight: FontWeight.bold)),
+            ),
+            PlayfulSecondaryButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                setState(() {
+                  if (platformText != null) {
+                    final pLower = platformText.toLowerCase();
+                    final validPlatforms = ["zomato", "swiggy", "uber", "ola", "rapido", "zepto", "blinkit", "porter"];
+                    if (validPlatforms.contains(pLower)) {
+                      _selectedPlatform = pLower;
+                      _platformFieldController.text = platformText;
+                    } else {
+                      _selectedPlatform = "other";
+                      _platformFieldController.text = platformText;
+                    }
+                  }
+                  if (fare != null) {
+                    _fareController.text = fare.toString();
+                  }
+                  if (distance != null) {
+                    _distanceController.text = distance.toString();
+                    _distanceUnit = 'km';
+                  }
+                  if (duration != null) {
+                    _durationController.text = duration.toString();
+                    _durationUnit = 'min';
+                  }
+                });
+                _checkFormValid();
+                if (allPresent) {
+                  _submitJob();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Pre-filled details. Please fill in the missing fields to log the job."),
+                      backgroundColor: PlayfulColors.accent,
+                    ),
+                  );
+                }
+              },
+              child: Text(s.t('btn_yes_correct')),
+            ),
+          ],
         );
       },
+    );
+  }
+
+  Widget _buildParsedRow(String label, String value, bool isPresent) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: GoogleFonts.plusJakartaSans(color: PlayfulColors.mutedForeground, fontWeight: FontWeight.bold, fontSize: 13)),
+          Text(
+            value,
+            style: GoogleFonts.outfit(
+              color: isPresent ? PlayfulColors.foreground : PlayfulColors.secondary,
+              fontWeight: FontWeight.w800,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

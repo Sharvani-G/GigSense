@@ -361,7 +361,18 @@ class _BatchConfirmScreenState extends State<BatchConfirmScreen> {
                                 currentUnit: row.distanceUnit,
                                 onUnitChanged: (unit) {
                                   setState(() {
+                                    final valStr = row.distanceController.text.trim();
                                     row.distanceUnit = unit;
+                                    if (valStr.isNotEmpty) {
+                                      final numVal = double.tryParse(valStr);
+                                      if (numVal != null) {
+                                        if (unit == 'm') {
+                                          row.distanceController.text = (numVal * 1000).toStringAsFixed(0);
+                                        } else {
+                                          row.distanceController.text = (numVal / 1000).toStringAsFixed(1);
+                                        }
+                                      }
+                                    }
                                   });
                                 },
                                 isHighlighted: false,
@@ -378,7 +389,18 @@ class _BatchConfirmScreenState extends State<BatchConfirmScreen> {
                                 currentUnit: row.durationUnit,
                                 onUnitChanged: (unit) {
                                   setState(() {
+                                    final valStr = row.durationController.text.trim();
                                     row.durationUnit = unit;
+                                    if (valStr.isNotEmpty) {
+                                      final numVal = double.tryParse(valStr);
+                                      if (numVal != null) {
+                                        if (unit == 'hr') {
+                                          row.durationController.text = (numVal / 60).toStringAsFixed(2);
+                                        } else {
+                                          row.durationController.text = (numVal * 60).toStringAsFixed(0);
+                                        }
+                                      }
+                                    }
                                   });
                                 },
                                 isHighlighted: false,

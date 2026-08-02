@@ -166,6 +166,9 @@ Analyze the following voice recording transcript from a gig worker (which could 
 - Distance (in kilometers)
 - Duration (in minutes)
 
+CRITICAL RULE:
+- DO NOT invent, hallucinate, or assume values for any fields that are not clearly mentioned in the transcript. If a field is not mentioned, return null for it.
+
 Transcript: "{transcript}"
 
 Response MUST be a single raw JSON block ONLY. Do not include markdown code block formatting (such as ```json ... ```) or any other text before or after the JSON.
