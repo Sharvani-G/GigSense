@@ -137,6 +137,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         'experienceYears': 0,
         'experienceMonths': 0,
         'profilePhotoBase64': '',
+        'hasSeenHelpWalkthrough': false,
         'preferredLanguage': 'en',
         'createdAt': FieldValue.serverTimestamp(),
       });

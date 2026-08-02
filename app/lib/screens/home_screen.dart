@@ -17,6 +17,7 @@ import 'fairness_map_screen.dart';
 import '../i18n/strings.dart';
 import 'sos_active_screen.dart';
 import '../main.dart' show showLanguagePicker, MainNavigationController;
+import 'help_walkthrough_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final VoidCallback onNavigateToLogJob;
@@ -55,6 +56,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   String _userName = "THERE";
   bool _userFetched = false;
   bool _isPhoneSheetOpen = false;
+  bool _isHelpWalkthroughOpen = false;
   StreamSubscription<DocumentSnapshot>? _userSubscription;
 
   // Savings Goal variables
@@ -461,6 +463,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             _userFetched = true;
           });
           _calculateSavingsProgress();
+
+          final hasSeenHelp = data['hasSeenHelpWalkthrough'] ?? true;
+          if (hasSeenHelp == false && !_isHelpWalkthroughOpen) {
+            _isHelpWalkthroughOpen = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HelpWalkthroughScreen(autoRegisterFlag: true),
+                ),
+              ).then((_) {
+                _isHelpWalkthroughOpen = false;
+              });
+            });
+          }
           
           if (cachedWeekStart != null) {
             final weekStartDateTime = cachedWeekStart.toDate();
@@ -784,17 +801,53 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     children: [
                       const SizedBox(height: 16),
                       // Header
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                        "${StringsProvider.instance.t('greeting')}, $_userName!",
-                        style: GoogleFonts.outfit(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 28,
-                          color: PlayfulColors.foreground,
-                        ),
-                      ),
+                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                "${StringsProvider.instance.t('greeting')}, $_userName!",
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 28,
+                                  color: PlayfulColors.foreground,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const HelpWalkthroughScreen()),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: PlayfulColors.border, width: 2),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: PlayfulColors.border,
+                                    offset: Offset(2, 2),
+                                    blurRadius: 0,
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.help_outline,
+                                color: PlayfulColors.accent,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Text(
