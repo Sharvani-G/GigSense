@@ -1548,8 +1548,6 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
   bool _manualSmsEnabled = false;
   
   String _primaryChannel = 'whatsapp';
-  bool _liveLocationEnabled = true;
-  int _liveDuration = 30; // 15, 30, 60
   bool _isSaving = false;
 
   @override
@@ -1572,10 +1570,6 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
       _primaryChannel = settings['primaryChannel'] ?? 'manualSms';
       if (_primaryChannel == 'sms') _primaryChannel = 'manualSms';
     }
-    
-    final locationMode = settings['locationMode'] ?? 'live';
-    _liveLocationEnabled = locationMode == 'live';
-    _liveDuration = settings['liveLocationDurationMinutes'] ?? 30;
     
     final s = StringsProvider.instance;
     final defaultTemplate = s.t('sos_message_template');
@@ -1620,8 +1614,6 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
         'manualSms': _manualSmsEnabled,
       },
       'primaryChannel': _primaryChannel,
-      'locationMode': _liveLocationEnabled ? 'live' : 'none',
-      'liveLocationDurationMinutes': _liveDuration,
       'messageTemplate': _templateController.text.trim(),
     };
 
@@ -1650,8 +1642,6 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
         'manualSms': _manualSmsEnabled,
       },
       'primaryChannel': _primaryChannel,
-      'locationMode': _liveLocationEnabled ? 'live' : 'none',
-      'liveLocationDurationMinutes': _liveDuration,
       'messageTemplate': _templateController.text.trim(),
     };
 
@@ -1838,47 +1828,6 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
                   ),
               ],
             ),
-            
-            const SizedBox(height: 16),
-            
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "LIVE LOCATION TRACKING",
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: PlayfulColors.mutedForeground,
-                    letterSpacing: 1.5,
-                  ),
-                ),
-                Switch(
-                  value: _liveLocationEnabled,
-                  activeColor: PlayfulColors.accent,
-                  onChanged: (val) => setState(() => _liveLocationEnabled = val),
-                ),
-              ],
-            ),
-            
-            if (_liveLocationEnabled) ...[
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text("Sharing Duration:", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13)),
-                  DropdownButton<int>(
-                    value: _liveDuration,
-                    items: const [
-                      DropdownMenuItem(value: 15, child: Text("15 Minutes")),
-                      DropdownMenuItem(value: 30, child: Text("30 Minutes")),
-                      DropdownMenuItem(value: 60, child: Text("60 Minutes")),
-                    ],
-                    onChanged: (val) => setState(() => _liveDuration = val!),
-                  ),
-                ],
-              ),
-            ],
             
             const SizedBox(height: 20),
             

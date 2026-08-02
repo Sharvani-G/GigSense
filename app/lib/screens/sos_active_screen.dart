@@ -19,61 +19,40 @@ class SOSManager {
   static final SOSManager instance = SOSManager._();
   static const MethodChannel _smsChannel = MethodChannel('com.example.app/sms');
 
-  String? activeSessionId;
   Map<String, dynamic>? activeContact;
-  DateTime? expiresAt;
-  Timer? _locationTimer;
-  Timer? _countdownTimer;
-  int secondsRemaining = 0;
-  
+  String? activeLocationLink;
   VoidCallback? onTick;
 
-  bool get isActive => activeSessionId != null && expiresAt != null && DateTime.now().isBefore(expiresAt!);
+  bool get isActive => activeContact != null;
 
   Future<void> startSOS(Map<String, dynamic> contact, Map<String, dynamic> settings, String workerName, BuildContext context, {bool isTest = false}) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    final sessionId = FirebaseFirestore.instance.collection('liveLocations').doc().id;
-    activeSessionId = sessionId;
     activeContact = contact;
-    
-    final durationMin = settings['liveLocationDurationMinutes'] as int? ?? 30;
-    final startedAt = DateTime.now();
-    expiresAt = startedAt.add(Duration(minutes: durationMin));
-    secondsRemaining = durationMin * 60;
 
+    // Resolve static current location
+    String locationLink = "";
     try {
-      // 1. Initialize doc in Firestore
-      await FirebaseFirestore.instance.collection('liveLocations').doc(sessionId).set({
-        'uid': user.uid,
-        'startedAt': Timestamp.fromDate(startedAt),
-        'expiresAt': Timestamp.fromDate(expiresAt!),
-        'active': true,
-        'locations': [],
-      });
-    } catch (e) {
-      debugPrint("Error writing liveLocations doc: $e");
-    }
-
-    // 2. Start location timer
-    _locationTimer?.cancel();
-    _locationTimer = Timer.periodic(const Duration(seconds: 20), (t) => _updateLocation());
-    _updateLocation();
-
-    // 3. Start countdown timer
-    _countdownTimer?.cancel();
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (secondsRemaining <= 1) {
-        stopSOS();
-        if (onTick != null) onTick!();
-      } else {
-        secondsRemaining--;
-        if (onTick != null) onTick!();
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
       }
-    });
+      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (serviceEnabled) {
+          final Position position = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+          ).timeout(const Duration(seconds: 5));
+          locationLink = "https://www.google.com/maps?q=${position.latitude},${position.longitude}";
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching location for SOS alert: $e");
+    }
+    activeLocationLink = locationLink;
 
-    // 4. Launch all configured channels
+    // Launch all configured channels
     final Map<String, dynamic> channels = settings['channels'] as Map<String, dynamic>? ?? {
       'whatsapp': true,
       'autoSms': Platform.isAndroid,
@@ -109,7 +88,7 @@ class SOSManager {
       launchChannel(primaryChan, workerName, isTest, context: context);
     }
 
-    // 5. Navigate to SOS Active Screen
+    // Navigate to SOS Active Screen
     if (context.mounted) {
       Navigator.push(
         context,
@@ -118,39 +97,8 @@ class SOSManager {
     }
   }
 
-  Future<void> _updateLocation() async {
-    if (activeSessionId == null) return;
-    try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
-      if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
-        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        if (serviceEnabled) {
-          final Position position = await Geolocator.getCurrentPosition(
-            locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-          ).timeout(const Duration(seconds: 5));
-
-          await FirebaseFirestore.instance.collection('liveLocations').doc(activeSessionId).update({
-            'locations': FieldValue.arrayUnion([
-              {
-                'latitude': position.latitude,
-                'longitude': position.longitude,
-                'timestamp': Timestamp.now(),
-              }
-            ])
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint("Error updating location: $e");
-    }
-  }
-
   Future<void> launchChannel(String channel, String workerName, bool isTest, {BuildContext? context}) async {
-    if (activeSessionId == null) return;
+    if (activeContact == null) return;
     
     // Resolve template
     final s = StringsProvider.instance;
@@ -174,7 +122,7 @@ class SOSManager {
     }
 
     final String timeStr = TimeOfDay.now().format(WidgetsBinding.instance.focusManager.primaryFocus?.context ?? WidgetsBinding.instance.rootElement!);
-    final String link = "https://gigshield-e38ec.web.app/track/$activeSessionId";
+    final String link = activeLocationLink ?? "";
 
     String message = template
         .replaceAll("{name}", workerName)
@@ -309,21 +257,9 @@ class SOSManager {
   }
 
   Future<void> stopSOS() async {
-    if (activeSessionId != null) {
-      try {
-        await FirebaseFirestore.instance.collection('liveLocations').doc(activeSessionId).update({
-          'active': false,
-        });
-      } catch (e) {
-        debugPrint("Error stopping SOS: $e");
-      }
-    }
-    _locationTimer?.cancel();
-    _countdownTimer?.cancel();
-    activeSessionId = null;
     activeContact = null;
-    expiresAt = null;
-    secondsRemaining = 0;
+    activeLocationLink = null;
+    if (onTick != null) onTick!();
   }
 }
 
@@ -375,16 +311,11 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
     }
   }
 
-  String _formatDuration(int totalSecs) {
-    final int minutes = totalSecs ~/ 60;
-    final int seconds = totalSecs % 60;
-    return "${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}";
-  }
+
 
   @override
   Widget build(BuildContext context) {
     final s = StringsProvider.instance;
-    final seconds = SOSManager.instance.secondsRemaining;
     
     // Check which secondary channels are enabled in settings
     return PopScope(
@@ -452,23 +383,29 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          s.t('sos_sharing_location'),
+                          "SOS SAFETY ALERT ACTIVE",
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
+                            color: const Color(0xFFE11D48),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Icon(
+                          Icons.radar_rounded,
+                          size: 72,
+                          color: Color(0xFFE11D48),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          "A safety alert containing your current location map link has been triggered to your emergency contact.",
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 13,
                             color: PlayfulColors.mutedForeground,
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        Text(
-                          _formatDuration(seconds),
-                          style: GoogleFonts.shareTechMono(
-                            fontSize: 54,
-                            fontWeight: FontWeight.bold,
-                            color: PlayfulColors.foreground,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
                         
                         // Contact Info
                         const Divider(color: PlayfulColors.border, thickness: 2),
