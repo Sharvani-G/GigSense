@@ -999,7 +999,6 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
           color: s.statusColor.withOpacity(0.25),
           borderColor: s.statusColor,
           borderStrokeWidth: 3.0,
-          isFilled: true,
         ));
       }
 
