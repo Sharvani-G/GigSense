@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, Form, status
 from fastapi.responses import JSONResponse, StreamingResponse
 from dotenv import load_dotenv
+from typing import Optional
 
 # Load environment variables first
 load_dotenv()
@@ -603,7 +604,7 @@ async def draft_complaint_endpoint(request: ComplaintRequest):
     return {"complaint_draft": draft_text}
 
 @app.post("/admin/recalculate-benchmarks")
-async def recalculate_benchmarks():
+async def recalculate_benchmarks(platform: Optional[str] = None):
     if db is None:
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -615,21 +616,27 @@ async def recalculate_benchmarks():
         # 1. Fetch cutoff date: 60 days ago
         cutoff_date = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=60)
         
-        # 2. Fetch all platforms/benchmarks
+        # 2. Fetch platforms/benchmarks (scoped if platform specified)
         benchmarks_ref = db.collection("benchmarks")
-        platforms = [doc.id for doc in benchmarks_ref.stream()]
+        if platform:
+            platforms = [platform.lower().strip()]
+        else:
+            platforms = [doc.id for doc in benchmarks_ref.stream()]
         
-        # 3. Fetch all jobs in one go to optimize DB reads
+        # 3. Fetch jobs (scoped if platform specified) to optimize DB reads
         all_jobs_ref = db.collection("jobs")
-        all_jobs_docs = all_jobs_ref.stream()
+        if platform:
+            all_jobs_docs = all_jobs_ref.where("platform", "==", platform.lower().strip()).stream()
+        else:
+            all_jobs_docs = all_jobs_ref.stream()
         
         # Group jobs by platform in-memory
         jobs_by_platform = {p: [] for p in platforms}
         for doc in all_jobs_docs:
             job = doc.to_dict()
-            platform = job.get("platform")
-            if platform in jobs_by_platform:
-                jobs_by_platform[platform].append(job)
+            p_val = (job.get("platform") or "").lower().strip()
+            if p_val in jobs_by_platform:
+                jobs_by_platform[p_val].append(job)
         
         # Helper function for median
         def calculate_median(values):
@@ -760,6 +767,162 @@ async def recalculate_benchmarks():
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={"error": f"Failed to recalculate: {str(e)}"}
+        )
+
+@app.post("/admin/seed-demo-community-data")
+async def seed_demo_community_data():
+    if db is None:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"error": "Database is not initialized"}
+        )
+    
+    # DEBUG-ONLY GUARD: Prevent running in production environments
+    if os.getenv("ENV") == "production":
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={"error": "Not allowed in production environment"}
+        )
+
+    try:
+        # 1. Clean up existing synthetic worker data to avoid duplicate pollution
+        jobs_ref = db.collection("jobs")
+        existing_docs = jobs_ref.where("user_id", ">=", "worker_demo_").where("user_id", "<=", "worker_demo_\uf8ff").stream()
+        batch = db.batch()
+        deleted_count = 0
+        for doc in existing_docs:
+            batch.delete(doc.reference)
+            deleted_count += 1
+            if deleted_count % 400 == 0:
+                batch.commit()
+                batch = db.batch()
+        if deleted_count % 400 != 0:
+            batch.commit()
+
+        # 2. Setup platforms & benchmark rates for expected fare computation
+        platforms = {
+            'uber': {'rate_per_km': 12.00, 'rate_per_min': 1.50},
+            'ola': {'rate_per_km': 11.50, 'rate_per_min': 1.40},
+            'zomato': {'rate_per_km': 8.00, 'rate_per_min': 1.00},
+            'swiggy': {'rate_per_km': 8.00, 'rate_per_min': 1.00},
+        }
+
+        # 3. Setup localities and their underpaid skews
+        localities = {
+            'Koramangala, Bengaluru': {'skew': 'fair'},
+            'Indiranagar, Bengaluru': {'skew': 'fair'},
+            'HSR Layout, Bengaluru': {'skew': 'underpaid'},
+            'Whitefield, Bengaluru': {'skew': 'mixed'},
+            'Jayanagar, Bengaluru': {'skew': 'mixed'}
+        }
+
+        import random
+        random.seed(42)  # Deterministic seed for reproducible demo data
+
+        workers = [f"worker_demo_{i}" for i in range(1, 11)]  # 10 synthetic workers
+        job_sources = ['manual', 'ocr', 'stt']
+
+        seeded_jobs = []
+        now = datetime.datetime.now(datetime.timezone.utc)
+
+        # Generate 150 jobs
+        total_to_generate = 150
+        for i in range(total_to_generate):
+            worker = random.choice(workers)
+            platform = random.choice(list(platforms.keys()))
+            rates = platforms[platform]
+            
+            # Select locality
+            locality_name = random.choice(list(localities.keys()))
+            locality_cfg = localities[locality_name]
+
+            # Generate distance & duration
+            dist = round(random.uniform(2.0, 15.0), 2)
+            dur = round(dist * random.uniform(1.8, 2.5), 1)
+
+            # Compute expected fare
+            expected = round((rates['rate_per_km'] * dist) + (rates['rate_per_min'] * dur), 2)
+
+            # Determine fairness based on locality skew
+            skew = locality_cfg['skew']
+            roll = random.random()
+            if skew == 'fair':
+                is_underpaid_target = roll < 0.10  # 10% underpaid
+            elif skew == 'underpaid':
+                is_underpaid_target = roll < 0.80  # 80% underpaid
+            else:
+                is_underpaid_target = roll < 0.30  # 30% underpaid
+
+            if is_underpaid_target:
+                fare = round(expected * random.uniform(0.65, 0.82), 2)
+            else:
+                fare = round(expected * random.uniform(0.88, 1.20), 2)
+
+            is_underpaid = fare < (expected * 0.85)
+
+            # Spread timestamps across last 40 days
+            days_ago = random.uniform(0, 40)
+            job_time = now - datetime.timedelta(days=days_ago)
+
+            explanation = (
+                "This came in noticeably below what's typical for this distance and platform."
+                if is_underpaid else
+                f"This is about what's typical for a {dist:.1f}km {platform.capitalize()} trip."
+            )
+
+            job_doc = {
+                'user_id': worker,
+                'platform': platform,
+                'fare': fare,
+                'distance_km': dist,
+                'duration_min': dur,
+                'expected_fare': expected,
+                'is_underpaid': is_underpaid,
+                'explanation': explanation,
+                'source': random.choice(job_sources),
+                'rate_source': 'community' if random.random() > 0.5 else 'seed',
+                'sample_size': random.randint(10, 80),
+                'area_hint': locality_name,
+                'job_timestamp': job_time,
+                'created_at': job_time,
+                'base_fare': round(fare * 0.7, 2),
+                'incentive_amount': 0.0 if random.random() > 0.2 else round(fare * 0.15, 2),
+                'surge_amount': 0.0 if random.random() > 0.1 else round(fare * 0.1, 2),
+                'deduction_amount': 0.0,
+                'deduction_reason_stated': '',
+                'is_demo_data': True
+            }
+
+            seeded_jobs.append(job_doc)
+
+        # Write jobs in batches to Firestore
+        batch = db.batch()
+        written = 0
+        for job in seeded_jobs:
+            doc_ref = jobs_ref.document()
+            batch.set(doc_ref, job)
+            written += 1
+            if written % 400 == 0:
+                batch.commit()
+                batch = db.batch()
+        if written % 400 != 0:
+            batch.commit()
+
+        # Run recalculation once to sync platform medians
+        await recalculate_benchmarks()
+
+        return {
+            "status": "success",
+            "message": "Demo community data seeded successfully",
+            "records_deleted": deleted_count,
+            "records_created": len(seeded_jobs)
+        }
+
+    except Exception as e:
+        print(f"Error seeding demo community data: {e}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": f"Failed to seed data: {str(e)}"}
         )
 
 @app.post("/complaint-draft")

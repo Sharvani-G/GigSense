@@ -198,9 +198,20 @@ class _BatchConfirmScreenState extends State<BatchConfirmScreen> {
         await FirebaseFirestore.instance.collection('jobs').add(jobData);
       }
 
+      // Fire background community rates recalculation for distinct platforms imported in this batch
+      final distinctPlatforms = _rows.map((r) => r.platform.toLowerCase().trim()).where((p) => p.isNotEmpty).toSet();
+      final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+      for (final platform in distinctPlatforms) {
+        final Uri recalculateUrl = Uri.parse('$baseUrl/admin/recalculate-benchmarks?platform=$platform');
+        http.post(recalculateUrl).then((response) {
+          debugPrint("Background batch auto-recalculate triggered for $platform: ${response.statusCode}");
+        }).catchError((err) {
+          debugPrint("Failed to trigger background batch auto-recalculate for $platform: $err");
+        });
+      }
+
       // Fire insight regeneration once
       if (uid != 'anonymous_user') {
-        final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
         final Uri url = Uri.parse('$baseUrl/weekly-insight?user_id=$uid');
         http.get(url).then((response) {
           debugPrint("Background batch weekly-insight regeneration triggered: ${response.statusCode}");

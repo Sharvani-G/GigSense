@@ -799,8 +799,17 @@ class _LogJobScreenState extends State<LogJobScreen> {
       localJobData['id'] = docRef.id;
       debugPrint("Successfully saved job to Firestore with ID: ${docRef.id}");
 
+      final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
+
+      // Trigger background community rates recalculation for this specific platform
+      final Uri recalculateUrl = Uri.parse('$baseUrl/admin/recalculate-benchmarks?platform=${platform.toLowerCase()}');
+      http.post(recalculateUrl).then((response) {
+        debugPrint("Background auto-recalculate triggered for $platform: ${response.statusCode}");
+      }).catchError((err) {
+        debugPrint("Failed to trigger background auto-recalculate for $platform: $err");
+      });
+
       if (userId != 'anonymous_user') {
-        final String baseUrl = dotenv.env['API_URL'] ?? 'http://127.0.0.1:8000';
         final Uri url = Uri.parse('$baseUrl/weekly-insight?user_id=$userId');
         http.get(url).then((response) {
           debugPrint("Background weekly-insight regeneration triggered: ${response.statusCode}");
