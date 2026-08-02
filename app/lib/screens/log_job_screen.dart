@@ -11,6 +11,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'playful_widgets.dart';
 import 'fairness_result_screen.dart';
 import 'batch_confirm_screen.dart';
+import 'ocr_result_screen.dart';
 import '../i18n/strings.dart';
 
 class LogJobScreen extends StatefulWidget {
@@ -47,6 +48,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
   String? _durationOcrNote;
   String? _rawOcrText;
   bool _showRawOcr = false;
+  int _failedScanCount = 0;
 
   // Breakdown specific states
   double? _baseFare;
@@ -475,6 +477,9 @@ class _LogJobScreenState extends State<LogJobScreen> {
         if (isBatch) {
           final List<dynamic> candidates = data['candidates'] ?? [];
           if (candidates.isNotEmpty) {
+            setState(() {
+              _failedScanCount = 0;
+            });
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -492,113 +497,66 @@ class _LogJobScreenState extends State<LogJobScreen> {
         final String ocrStatus = data['status'] ?? 'partial';
         final String rawText = data['raw_text'] ?? '';
 
+        if (ocrStatus == 'success') {
+          setState(() {
+            _failedScanCount = 0;
+            _isOcrLoading = false;
+          });
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OcrResultScreen(
+                ocrData: data,
+                onEdit: () {
+                  _prefillManualEntry(data);
+                },
+              ),
+            ),
+          );
+          return;
+        }
+
         setState(() {
+          _failedScanCount++;
           _rawOcrText = rawText;
           _showRawOcr = false;
+          _jobSource = "manual";
+          _activeToggle = "manual";
 
-          if (ocrStatus == 'irrelevant') {
-            _jobSource = "manual";
-            _activeToggle = "manual";
-            _ocrGeneralNote = "This doesn't look like a trip screenshot — try picking a different image, or switch to Manual Entry";
-            
-            _fareController.clear();
-            _distanceController.clear();
-            _durationController.clear();
-            _selectedPlatform = "other";
-            _platformFieldController.text = "Other";
-            
-            _fareOcrNote = null;
-            _distanceOcrNote = null;
-            _durationOcrNote = null;
-
-            _baseFare = null;
-            _incentiveAmount = null;
-            _surgeAmount = null;
-            _deductionAmount = null;
-            _deductionReasonStated = null;
+          if (_failedScanCount >= 3) {
+            _showRateLimitDialog();
           } else {
-            _jobSource = "ocr";
-            _activeToggle = "manual";
-
-            if (ocrStatus == 'partial') {
-              _ocrGeneralNote = "Couldn't read the screenshot clearly — go ahead and fill this in.";
-            } else {
-              _ocrGeneralNote = null;
-            }
-
-            _baseFare = data['base_fare'] != null ? (data['base_fare'] as num).toDouble() : null;
-            _incentiveAmount = data['incentive_amount'] != null ? (data['incentive_amount'] as num).toDouble() : null;
-            _surgeAmount = data['surge_amount'] != null ? (data['surge_amount'] as num).toDouble() : null;
-            _deductionAmount = data['deduction_amount'] != null ? (data['deduction_amount'] as num).toDouble() : null;
-            _deductionReasonStated = data['deduction_reason_stated'] as bool?;
-
-            final String? platform = data['platform'];
-            final double? fare = data['fare'] != null ? (data['fare'] as num).toDouble() : null;
-            final double? distance = data['distance'] != null ? (data['distance'] as num).toDouble() : null;
-            final String? distanceUnit = data['distance_unit'];
-            final double? duration = data['duration'] != null ? (data['duration'] as num).toDouble() : null;
-            final String? durationUnit = data['duration_unit'];
-
-            if (platform != null) {
-              final matched = _allPlatforms.firstWhere(
-                (p) => p.id == platform.toLowerCase(),
-                orElse: () => PlatformItem(id: 'other', displayName: 'Other', category: 'other_gig', ratePerKm: 10.0, ratePerMin: 1.30, sampleSize: 0),
+            if (ocrStatus == 'irrelevant') {
+              _ocrGeneralNote = "This doesn't look like an earnings receipt — try a clearer screenshot of the trip summary.";
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("This doesn't look like an earnings receipt — try a clearer screenshot of the trip summary."),
+                  backgroundColor: PlayfulColors.secondary,
+                ),
               );
-              if (matched.id != 'other') {
-                _selectedPlatform = matched.id;
-                _platformFieldController.text = matched.displayName;
-                _platformHighlighted = true;
-              } else {
-                _selectedPlatform = "other";
-                _platformFieldController.text = "Other";
-              }
-            } else {
+              _fareController.clear();
+              _distanceController.clear();
+              _durationController.clear();
               _selectedPlatform = "other";
               _platformFieldController.text = "Other";
-            }
-
-            if (fare != null) {
-              _fareController.text = fare.toString();
-              _fareHighlighted = true;
               _fareOcrNote = null;
-            } else {
-              _fareController.clear();
-              _fareOcrNote = StringsProvider.instance.t('ocr_no_fare');
-            }
-
-            if (distance != null) {
-              _distanceController.text = distance.toString();
-              if (distanceUnit == 'm') _distanceUnit = 'm';
-              else _distanceUnit = 'km';
-              _distanceHighlighted = true;
               _distanceOcrNote = null;
-            } else {
-              _distanceController.clear();
-              _distanceOcrNote = StringsProvider.instance.t('ocr_no_distance');
-            }
-
-            if (duration != null) {
-              _durationController.text = duration.toString();
-              if (durationUnit == 'hr') _durationUnit = 'hr';
-              else _durationUnit = 'min';
-              _durationHighlighted = true;
               _durationOcrNote = null;
+              _baseFare = null;
+              _incentiveAmount = null;
+              _surgeAmount = null;
+              _deductionAmount = null;
+              _deductionReasonStated = null;
             } else {
-              _durationController.clear();
-              _durationOcrNote = StringsProvider.instance.t('ocr_no_duration');
+              _ocrGeneralNote = "Couldn't confidently read some details (fare, distance, or duration) from this screenshot. Please verify or enter them manually.";
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Couldn't confidently read some details (fare, distance, or duration) from this screenshot. Please verify or enter them manually."),
+                  backgroundColor: PlayfulColors.secondary,
+                ),
+              );
+              _prefillManualEntry(data);
             }
-          }
-        });
-
-        // Clear highlight flags after animation completes
-        Future.delayed(const Duration(milliseconds: 1000), () {
-          if (mounted) {
-            setState(() {
-              _fareHighlighted = false;
-              _distanceHighlighted = false;
-              _durationHighlighted = false;
-              _platformHighlighted = false;
-            });
           }
         });
       } else {
@@ -607,22 +565,142 @@ class _LogJobScreenState extends State<LogJobScreen> {
     } catch (e) {
       debugPrint("OCR scan failed: $e. Falling back to blank form.");
       setState(() {
+        _failedScanCount++;
         _activeToggle = "manual";
         _jobSource = "manual";
-        _ocrGeneralNote = "Couldn't read the screenshot clearly — go ahead and fill this in.";
-        _rawOcrText = "Failed to communicate with OCR service.";
-        _showRawOcr = false;
-        _fareController.clear();
-        _distanceController.clear();
-        _durationController.clear();
-        _selectedPlatform = "other";
-        _platformFieldController.text = "Other";
+        if (_failedScanCount >= 3) {
+          _showRateLimitDialog();
+        } else {
+          _ocrGeneralNote = "Couldn't read the screenshot clearly — go ahead and fill this in.";
+          _rawOcrText = "Failed to communicate with OCR service.";
+          _showRawOcr = false;
+          _fareController.clear();
+          _distanceController.clear();
+          _durationController.clear();
+          _selectedPlatform = "other";
+          _platformFieldController.text = "Other";
+        }
       });
     } finally {
       setState(() {
         _isOcrLoading = false;
       });
     }
+  }
+
+  void _prefillManualEntry(Map<String, dynamic> data) {
+    setState(() {
+      _jobSource = "ocr";
+      _activeToggle = "manual";
+
+      _baseFare = data['base_fare'] != null ? (data['base_fare'] as num).toDouble() : null;
+      _incentiveAmount = data['incentive_amount'] != null ? (data['incentive_amount'] as num).toDouble() : null;
+      _surgeAmount = data['surge_amount'] != null ? (data['surge_amount'] as num).toDouble() : null;
+      _deductionAmount = data['deduction_amount'] != null ? (data['deduction_amount'] as num).toDouble() : null;
+      _deductionReasonStated = data['deduction_reason_stated'] as bool?;
+
+      final String? platform = data['platform'];
+      final double? fare = data['fare'] != null ? (data['fare'] as num).toDouble() : null;
+      final double? distance = data['distance'] != null ? (data['distance'] as num).toDouble() : null;
+      final String? distanceUnit = data['distance_unit'];
+      final double? duration = data['duration'] != null ? (data['duration'] as num).toDouble() : null;
+      final String? durationUnit = data['duration_unit'];
+
+      if (platform != null) {
+        final matched = _allPlatforms.firstWhere(
+          (p) => p.id == platform.toLowerCase(),
+          orElse: () => PlatformItem(id: 'other', displayName: 'Other', category: 'other_gig', ratePerKm: 10.0, ratePerMin: 1.30, sampleSize: 0),
+        );
+        if (matched.id != 'other') {
+          _selectedPlatform = matched.id;
+          _platformFieldController.text = matched.displayName;
+          _platformHighlighted = true;
+        } else {
+          _selectedPlatform = "other";
+          _platformFieldController.text = "Other";
+        }
+      } else {
+        _selectedPlatform = "other";
+        _platformFieldController.text = "Other";
+      }
+
+      if (fare != null) {
+        _fareController.text = fare.toString();
+        _fareHighlighted = true;
+        _fareOcrNote = null;
+      } else {
+        _fareController.clear();
+        _fareOcrNote = StringsProvider.instance.t('ocr_no_fare');
+      }
+
+      if (distance != null) {
+        _distanceController.text = distance.toString();
+        if (distanceUnit == 'm') _distanceUnit = 'm';
+        else _distanceUnit = 'km';
+        _distanceHighlighted = true;
+        _distanceOcrNote = null;
+      } else {
+        _distanceController.clear();
+        _distanceOcrNote = StringsProvider.instance.t('ocr_no_distance');
+      }
+
+      if (duration != null) {
+        _durationController.text = duration.toString();
+        if (durationUnit == 'hr') _durationUnit = 'hr';
+        else _durationUnit = 'min';
+        _durationHighlighted = true;
+        _durationOcrNote = null;
+      } else {
+        _durationController.clear();
+        _durationOcrNote = StringsProvider.instance.t('ocr_no_duration');
+      }
+    });
+
+    Future.delayed(const Duration(milliseconds: 1000), () {
+      if (mounted) {
+        setState(() {
+          _fareHighlighted = false;
+          _distanceHighlighted = false;
+          _durationHighlighted = false;
+          _platformHighlighted = false;
+        });
+      }
+    });
+  }
+
+  void _showRateLimitDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: PlayfulColors.background,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: const BorderSide(color: PlayfulColors.border, width: 2),
+          ),
+          title: Text(
+            "Scan Limit Reached",
+            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: PlayfulColors.foreground),
+          ),
+          content: Text(
+            "You've tried a few unclear scans — take a break and try again in a bit, or use Manual Entry.",
+            style: GoogleFonts.plusJakartaSans(color: PlayfulColors.foreground),
+          ),
+          actions: [
+            PlayfulSecondaryButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                setState(() {
+                  _failedScanCount = 0;
+                });
+              },
+              child: const Text("Got it"),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _submitJob() async {
@@ -991,57 +1069,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                                       ),
                                     ],
                                   ),
-                                  if (_rawOcrText != null && _rawOcrText!.trim().isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    const Divider(color: PlayfulColors.border, thickness: 1),
-                                    const SizedBox(height: 4),
-                                    InkWell(
-                                      onTap: () {
-                                        setState(() {
-                                          _showRawOcr = !_showRawOcr;
-                                        });
-                                      },
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            _showRawOcr ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                                            size: 16,
-                                            color: PlayfulColors.accent,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            _showRawOcr ? "Hide what I read" : "Show what I read",
-                                            style: GoogleFonts.plusJakartaSans(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                              color: PlayfulColors.accent,
-                                              decoration: TextDecoration.underline,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    if (_showRawOcr) ...[
-                                      const SizedBox(height: 8),
-                                      Container(
-                                        width: double.infinity,
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: PlayfulColors.border, width: 1),
-                                        ),
-                                        child: Text(
-                                          _rawOcrText!.trim(),
-                                          style: GoogleFonts.shareTechMono(
-                                            fontSize: 12,
-                                            color: PlayfulColors.foreground,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
+                                  // Raw OCR text display removed to prevent user confusion.
                                 ],
                               ),
                             ),
