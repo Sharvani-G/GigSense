@@ -1249,7 +1249,7 @@ class PlayfulSafetyContextWidget extends StatefulWidget {
 }
 
 class _PlayfulSafetyContextWidgetState extends State<PlayfulSafetyContextWidget> {
-  bool _expanded = false;
+  bool _expanded = true;
   bool _loading = false;
   String? _score;
   String? _message;
@@ -1334,7 +1334,7 @@ class _PlayfulSafetyContextWidgetState extends State<PlayfulSafetyContextWidget>
           _message = "Late-night trips warrant extra caution; consider sharing your trip details with someone you trust.";
         } else if (isEvening) {
           _score = "moderate";
-          _message = "Stick to well-lit, busy routes where possible, and consider letting someone know your last drop-off time.";
+          _message = "This route passes through 2 zones with limited recent fairness data — treat the comparison as an estimate.";
         } else {
           _score = "low";
           _message = "";

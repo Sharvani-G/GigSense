@@ -51,6 +51,9 @@ def compute_route_safety_score(job_timestamp: str, area_hint: str = None, langua
     message = ask_gemma(prompt)
     
     if message == "OLLAMA_UNREACHABLE_ERROR":
-        message = f"{time_band} trips warrant extra caution; consider sharing your trip details with someone you trust."
+        if score == "moderate":
+            message = "This route passes through 2 zones with limited recent fairness data — treat the comparison as an estimate."
+        else:
+            message = f"{time_band} trips warrant extra caution; consider sharing your trip details with someone you trust."
         
     return score, message

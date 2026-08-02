@@ -112,6 +112,32 @@ class FairnessResultScreen extends StatelessWidget {
                 ),
               ),
               _buildLegalDisclosureFlag(job),
+              const SizedBox(height: 16),
+
+              // Trip Detail Block ("Receipt" of what was compared)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: PlayfulColors.border, width: 2.0),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildDetailItem(Icons.navigation_outlined, "${distanceKm.toStringAsFixed(1)} km"),
+                    _buildDetailDivider(),
+                    _buildDetailItem(Icons.access_time, "${durationMin.toStringAsFixed(0)} min"),
+                    _buildDetailDivider(),
+                    _buildDetailItem(
+                      Icons.currency_rupee,
+                      distanceKm > 0
+                          ? "₹${(fare / distanceKm).toStringAsFixed(1)}/km"
+                          : "₹0/km",
+                    ),
+                  ],
+                ),
+              ),
               const SizedBox(height: 24),
 
               // Side-by-side Expected vs Actual boxes
@@ -214,38 +240,54 @@ class FairnessResultScreen extends StatelessWidget {
                     percentage: fare / expectedFare,
                   ),
                 ),
-                const SizedBox(height: 12),
-                Center(
-                  child: FutureBuilder<int>(
-                    future: _getSampleSize(platform, job['sample_size']),
-                    builder: (context, snapshot) {
-                      final size = snapshot.data ?? 0;
-                      final rateSource = job['rate_source'] ?? (size >= 15 ? 'community' : 'seed');
-                      String text;
-                      String status;
-                      if (rateSource == 'seed' || rateSource == 'fallback' || size < 15) {
-                        text = "Typical reported range";
-                        status = "gathering data";
-                      } else if (size < 50) {
-                        text = "Community baseline";
-                        status = "growing dataset";
-                      } else {
-                        text = "Community baseline";
-                        status = "well-established";
-                      }
-                      
-                      String infoText = "";
-                      if (status == "gathering data") {
-                        infoText = "We are still collecting enough trips for this platform to calculate a reliable community median. Currently falling back to typical reported range benchmarks (reference tables).";
-                      } else if (status == "growing dataset") {
-                        infoText = "We have collected enough recent trips to start calculating a real community median, but the dataset is still growing.";
-                      } else {
-                        infoText = "We have a strong dataset of recent, fair trips for this platform, allowing us to compute a highly reliable community median.";
-                      }
+                const SizedBox(height: 16),
+                FutureBuilder<int>(
+                  future: _getSampleSize(platform, job['sample_size']),
+                  builder: (context, snapshot) {
+                    final size = snapshot.data ?? 0;
+                    final pct = (fare / expectedFare * 100).toStringAsFixed(0);
+                    final reportsCountText = size > 0 ? "$size recent reports" : "platform baseline benchmarks";
+                    final percentageExplanation = "You were paid $pct% of what similar ${distanceKm.toStringAsFixed(1)}km trips on this platform typically earn (based on $reportsCountText).";
 
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                        child: Row(
+                    final rateSource = job['rate_source'] ?? (size >= 15 ? 'community' : 'seed');
+                    String text;
+                    String status;
+                    if (rateSource == 'seed' || rateSource == 'fallback' || size < 15) {
+                      text = "Typical reported range";
+                      status = "gathering data";
+                    } else if (size < 50) {
+                      text = "Community baseline";
+                      status = "growing dataset";
+                    } else {
+                      text = "Community baseline";
+                      status = "well-established";
+                    }
+                    
+                    String infoText = "";
+                    if (status == "gathering data") {
+                      infoText = "We are still collecting enough trips for this platform to calculate a reliable community median. Currently falling back to typical reported range benchmarks (reference tables).";
+                    } else if (status == "growing dataset") {
+                      infoText = "We have collected enough recent trips to start calculating a real community median, but the dataset is still growing.";
+                    } else {
+                      infoText = "We have a strong dataset of recent, fair trips for this platform, allowing us to compute a highly reliable community median.";
+                    }
+
+                    return Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: Text(
+                            percentageExplanation,
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: PlayfulColors.foreground,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
@@ -286,9 +328,9 @@ class FairnessResultScreen extends StatelessWidget {
                             ),
                           ],
                         ),
-                      );
-                    },
-                  ),
+                      ],
+                    );
+                  },
                 ),
               ],
 
@@ -392,6 +434,32 @@ class FairnessResultScreen extends StatelessWidget {
         ),
       ),
       ),
+    );
+  }
+
+  Widget _buildDetailItem(IconData icon, String text) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: PlayfulColors.mutedForeground),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: GoogleFonts.plusJakartaSans(
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
+            color: PlayfulColors.foreground,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDetailDivider() {
+    return Container(
+      height: 16,
+      width: 2,
+      color: PlayfulColors.border,
     );
   }
 
