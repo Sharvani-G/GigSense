@@ -370,6 +370,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
       if (snapshot.docs.isNotEmpty) {
         final List<PlatformItem> loaded = [];
         for (var doc in snapshot.docs) {
+          if (doc.id.contains('_')) continue;
           final data = doc.data();
           final int sampleSize = (data['sampleSize'] as num?)?.toInt() ?? 0;
           
@@ -1536,16 +1537,6 @@ class _LogJobScreenState extends State<LogJobScreen> {
                                             fontSize: 15,
                                             fontWeight: FontWeight.bold,
                                             color: PlayfulColors.foreground,
-                                          ),
-                                        ),
-                                        subtitle: Text(
-                                          p.sampleSize >= 15
-                                              ? "${p.displayName}'s fair rate is based on ${p.sampleSize} real trips logged by GiGly workers in the last 60 days."
-                                              : "${p.displayName}'s fair rate is currently an estimate — not enough real data yet.",
-                                          style: GoogleFonts.plusJakartaSans(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w500,
-                                            color: PlayfulColors.mutedForeground,
                                           ),
                                         ),
                                       ),

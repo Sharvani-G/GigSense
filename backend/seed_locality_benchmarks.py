@@ -39,7 +39,7 @@ platforms = {
     'other': {'displayName': 'Other', 'rate_per_km': 12.00, 'rate_per_min': 1.00, 'category': 'other_gig'},
 }
 
-print("Querying and deleting old locality-specific benchmarks...")
+print("Querying and deleting old locality-specific benchmarks from the benchmarks collection...")
 benchmarks_ref = db.collection('benchmarks')
 docs = list(benchmarks_ref.stream())
 deleted_count = 0
@@ -54,9 +54,24 @@ for doc in docs:
             batch = db.batch()
 if deleted_count % 400 != 0:
     batch.commit()
-print(f"Deleted {deleted_count} old locality-specific benchmarks.")
+print(f"Deleted {deleted_count} old locality-specific benchmarks from the 'benchmarks' collection.")
 
-print("Seeding locality-specific benchmarks...")
+print("Querying and deleting old locality-specific benchmarks from the 'locality_benchmarks' collection...")
+locality_benchmarks_ref = db.collection('locality_benchmarks')
+loc_docs = list(locality_benchmarks_ref.stream())
+deleted_loc_count = 0
+batch = db.batch()
+for doc in loc_docs:
+    batch.delete(doc.reference)
+    deleted_loc_count += 1
+    if deleted_loc_count % 400 == 0:
+        batch.commit()
+        batch = db.batch()
+if deleted_loc_count % 400 != 0:
+    batch.commit()
+print(f"Deleted {deleted_loc_count} old locality-specific benchmarks from the 'locality_benchmarks' collection.")
+
+print("Seeding locality-specific benchmarks to 'locality_benchmarks' collection...")
 batch = db.batch()
 count = 0
 for loc in localities:
@@ -86,7 +101,7 @@ for loc in localities:
             'sampleSize': 0
         }
         
-        doc_ref = benchmarks_ref.document(doc_id)
+        doc_ref = locality_benchmarks_ref.document(doc_id)
         batch.set(doc_ref, doc_data)
         count += 1
         if count % 400 == 0:
@@ -95,4 +110,4 @@ for loc in localities:
 
 if count % 400 != 0:
     batch.commit()
-print(f"Successfully seeded {count} locality-specific benchmarks!")
+print(f"Successfully seeded {count} locality-specific benchmarks into 'locality_benchmarks'!")

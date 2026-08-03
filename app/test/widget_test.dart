@@ -5,7 +5,7 @@ void main() {
   test('AppStrings localization translation check', () {
     final s = StringsProvider.instance;
     s.setLanguage('en');
-    expect(s.t('app_name'), 'GIGLY');
+    expect(s.t('app_name'), 'GiGly');
     expect(s.t('tagline'), 'Fair pay, on your side.');
   });
 }

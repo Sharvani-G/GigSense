@@ -70,6 +70,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
   bool _isLocatingUser = false;
 
   // Search State
+  final Stream<QuerySnapshot> _mapReportsStream = FirebaseFirestore.instance.collection('mapFairnessReports').snapshots();
   final TextEditingController _searchController = TextEditingController();
   List<SearchSuggestion> _suggestions = [];
   bool _isOnlineSearching = false;
@@ -408,6 +409,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
   }
 
   void _onSearchChanged(String val) {
+    setState(() {}); // Immediate rebuild to filter results and toggle clear button
     if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 300), () {
       _updateSuggestions(val);
@@ -804,7 +806,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
       ),
       body: SafeArea(
         child: StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance.collection('mapFairnessReports').snapshots(),
+          stream: _mapReportsStream,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator(color: PlayfulColors.accent));
@@ -813,8 +815,13 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
             final docs = snapshot.data?.docs ?? [];
             final zoneStats = _computeZoneStats(docs);
 
+            final searchQuery = _searchController.text.toLowerCase().trim();
+            final filteredZoneStats = searchQuery.isEmpty
+                ? zoneStats
+                : zoneStats.where((z) => z.zone.toLowerCase().contains(searchQuery)).toList();
+
             // Filter zones that have actual trip entries
-            final activeZones = zoneStats.where((z) => z.totalTrips >= 2).toList();
+            final activeZones = filteredZoneStats.where((z) => z.totalTrips >= 2).toList();
 
             // Sort by expected percentage descending
             activeZones.sort((a, b) => b.averagePercentage.compareTo(a.averagePercentage));
@@ -1000,8 +1007,8 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                 // Main Content View
                 Expanded(
                   child: _activeView == "map"
-                      ? _buildMapView(zoneStats)
-                      : _buildListView(zoneStats),
+                      ? _buildMapView(filteredZoneStats)
+                      : _buildListView(filteredZoneStats),
                 ),
               ],
             );
@@ -1122,6 +1129,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
         child: Stack(
           children: [
             FlutterMap(
+              key: const Key('fairness_map_view'),
               mapController: _mapController,
               options: const MapOptions(
                 initialCenter: LatLng(12.9716, 77.5946),
@@ -1139,6 +1147,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
 
             // Top Search Bar Layout Overlay
             Positioned(
+              key: const Key('search_bar_positioned'),
               top: 16,
               left: 16,
               right: 16,
@@ -1163,6 +1172,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                     ),
                     Expanded(
                       child: TextField(
+                        key: const Key('search_bar_textfield'),
                         controller: _searchController,
                         onChanged: _onSearchChanged,
                         onSubmitted: _searchOnline,
@@ -1198,9 +1208,9 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
               ),
             ),
 
-            // Suggestions List Overlay Dropdown
             if (_suggestions.isNotEmpty || _isOnlineSearching)
               Positioned(
+                key: const Key('suggestions_dropdown_positioned'),
                 top: 72,
                 left: 16,
                 right: 16,
@@ -1291,8 +1301,8 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                 ),
               ),
 
-            // User GPS Locate Button (floating above the legend)
             Positioned(
+              key: const Key('gps_locate_button_positioned'),
               bottom: 135,
               right: 12,
               child: GestureDetector(
@@ -1329,9 +1339,9 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
               ),
             ),
 
-            // Dynamic Nearest Zone Card
             if (_userLocation != null)
               Builder(
+                key: const Key('nearest_zone_card_builder'),
                 builder: (context) {
                   final nearest = _getNearestZone(stats);
                   if (nearest == null) return const SizedBox.shrink();
@@ -1423,8 +1433,8 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                 },
               ),
 
-            // Persistent Legend Overlay (Bottom area)
             Positioned(
+              key: const Key('legend_overlay_positioned'),
               bottom: 12,
               left: 12,
               right: 12,

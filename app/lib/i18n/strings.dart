@@ -31,7 +31,7 @@ class AppStrings {
       'badge_fair_pay': 'Fair Pay',
       'badge_underpaid': 'Possibly Underpaid',
 
-      'app_name': 'GIGLY',
+      'app_name': 'GiGly',
       'tagline': 'Fair pay, on your side.',
 
       // Login
@@ -97,7 +97,7 @@ class AppStrings {
       'logjob_offline_note': 'Connection issue. Using offline mode.',
 
       // Chat
-      'chat_title': 'GIGI',
+      'chat_title': 'GiGi',
       'chat_subtitle': 'Worker pay & rights assistant',
       'chat_empty_drawer': 'No conversations yet — start one below',
       'chat_new': '+ NEW CHAT',
@@ -158,7 +158,7 @@ class AppStrings {
       'sos_live_tracking_inactive': 'Location sharing has ended.',
       'sos_message_template': 'This is an automatic safety alert from GiGly. {name} may need help and has shared their live location with you: {link}. Sent at {time}.',
     
-      'walkthrough_title': 'HOW GIGLY WORKS',
+      'walkthrough_title': 'HOW GiGly WORKS',
       'walkthrough_welcome': 'Welcome to GiGly!',
       'walkthrough_welcome_desc': 'Here is a quick overview of our tools designed to help you check pay fairness, protect your rights, and stay safe.',
       'walkthrough_log_title': 'Logging Your Trips',
@@ -263,7 +263,7 @@ class AppStrings {
       'badge_fair_pay': 'उचित वेतन',
       'badge_underpaid': 'संभावित कम वेतन',
 
-      'app_name': 'GIGLY',
+      'app_name': 'GiGly',
       'tagline': 'उचित वेतन, आपके साथ।',
 
       // Login
@@ -329,7 +329,7 @@ class AppStrings {
       'logjob_offline_note': 'कनेक्शन समस्या। ऑफलाइन मोड का उपयोग हो रहा है।',
 
       // Chat
-      'chat_title': 'GIGI',
+      'chat_title': 'GiGi',
       'chat_subtitle': 'श्रमिक वेतन और अधिकार सहायक',
       'chat_empty_drawer': 'अभी तक कोई बातचीत नहीं — नीचे शुरू करें',
       'chat_new': '+ नई चैट',
@@ -495,7 +495,7 @@ class AppStrings {
       'badge_fair_pay': 'ನ್ಯಾಯಯುತ ವೇತನ',
       'badge_underpaid': 'ಕಡಿಮೆ ಪಾವತಿ ಸಾಧ್ಯತೆ',
 
-      'app_name': 'GIGLY',
+      'app_name': 'GiGly',
       'tagline': 'ನ್ಯಾಯಯುತ ವೇತನ, ನಿಮ್ಮ ಪರವಾಗಿ.',
 
       // Login
@@ -561,7 +561,7 @@ class AppStrings {
       'logjob_offline_note': 'ಸಂಪರ್ಕ ಸಮಸ್ಯೆ. ಆಫ್‌ಲೈನ್ ಮೋಡ್ ಬಳಸಲಾಗುತ್ತಿದೆ.',
 
       // Chat
-      'chat_title': 'GIGI',
+      'chat_title': 'GiGi',
       'chat_subtitle': 'ಕಾರ್ಮಿಕ ವೇತನ ಮತ್ತು ಹಕ್ಕುಗಳ ಸಹಾಯಕ',
       'chat_empty_drawer': 'ಇನ್ನೂ ಯಾವುದೇ ಸಂವಾದ ಇಲ್ಲ — ಕೆಳಗೆ ಪ್ರಾರಂಭಿಸಿ',
       'chat_new': '+ ಹೊಸ ಚಾಟ್',
@@ -726,7 +726,7 @@ class AppStrings {
       'badge_fair_pay': 'நியாயமான கட்டணம்',
       'badge_underpaid': 'குறைந்த கட்டணம் சாத்தியம்',
 
-      'app_name': 'GIGLY',
+      'app_name': 'GiGly',
       'tagline': 'நியாயமான ஊதியம், உங்கள் பக்கத்தில்.',
 
       // Login
@@ -792,7 +792,7 @@ class AppStrings {
       'logjob_offline_note': 'இணைப்பு சிக்கல். ஆஃப்லைன் பயன்முறையைப் பயன்படுத்துகிறது.',
 
       // Chat
-      'chat_title': 'GIGI',
+      'chat_title': 'GiGi',
       'chat_subtitle': 'தொழிலாளர் ஊதியம் மற்றும் உரிமைகள் உதவியாளர்',
       'chat_empty_drawer': 'இன்னும் உரையாடல்கள் எதுவும் இல்லை - கீழே தொடங்கவும்',
       'chat_new': '+ புதிய அரட்டை',
@@ -838,7 +838,7 @@ class AppStrings {
       'sos_live_tracking_inactive': 'இருப்பிடப் பகுதி முடிவடைந்தது.',
       'sos_message_template': 'இது கிக்ஷீல்ட் (GiGly) இன் தானியங்கி பாதுகாப்பு எச்சரிக்கை ஆகும். {name}-க்கு உதவி தேவைப்படலாம், மேலும் அவர் தனது நேரலை இருப்பிடத்தை உங்களுடன் பகிர்ந்துள்ளார்: {link}. அனுப்பப்பட்ட நேரம்: {time}.',
     
-      'walkthrough_title': 'HOW GIGLY WORKS',
+      'walkthrough_title': 'HOW GiGly WORKS',
       'walkthrough_welcome': 'Welcome to GiGly!',
       'walkthrough_welcome_desc': 'Here is a quick overview of our tools designed to help you check pay fairness, protect your rights, and stay safe.',
       'walkthrough_log_title': 'Logging Your Trips',
@@ -957,7 +957,7 @@ class AppStrings {
       'badge_fair_pay': 'సరైన వేతనం',
       'badge_underpaid': 'తక్కువ చెల్లింపు అవకాశం',
 
-      'app_name': 'GIGLY',
+      'app_name': 'GiGly',
       'tagline': 'సరైన వేతనం, మీ వైపు.',
 
       // Login
@@ -1023,7 +1023,7 @@ class AppStrings {
       'logjob_offline_note': 'కనెక్షన్ సమస్య. ఆఫ్‌లైన్ మోడ్ ఉపయోగించబడుతోంది.',
 
       // Chat
-      'chat_title': 'GIGI',
+      'chat_title': 'GiGi',
       'chat_subtitle': 'కార్మికుల వేతనం & హక్కుల సహాయకుడు',
       'chat_empty_drawer': 'ఇంకా సంభాషణలేవీ లేవు - కింద ప్రారంభించండి',
       'chat_new': '+ కొత్త చాట్',
@@ -1069,7 +1069,7 @@ class AppStrings {
       'sos_live_tracking_inactive': 'లొకేషన్ భాగస్వామ్యం ముഗിసింది.',
       'sos_message_template': 'ఇది గీగ్‌షీల్డ్ (GiGly) నుండి ఒక ఆటోమేటిక్ సేఫ్టీ అలర్ట్. {name} కు సహాయం అవసరం కావచ్చు మరియు వారు తమ లైవ్ లొకేషన్‌ను మీతో పంచుకున్నారు: {link}. పంపిన సమయం: {time}.',
     
-      'walkthrough_title': 'HOW GIGLY WORKS',
+      'walkthrough_title': 'HOW GiGly WORKS',
       'walkthrough_welcome': 'Welcome to GiGly!',
       'walkthrough_welcome_desc': 'Here is a quick overview of our tools designed to help you check pay fairness, protect your rights, and stay safe.',
       'walkthrough_log_title': 'Logging Your Trips',
@@ -1168,7 +1168,7 @@ class AppStrings {
 },
     // ------------------------------------------------------------------ MALAYALAM
     'ml': {
-      'app_name': 'GIGLY',
+      'app_name': 'GiGly',
       'tagline': 'ന്യായമായ വേതനം, നിങ്ങളുടെ കൂടെ.',
       'login': 'ലോഗിൻ ചെയ്യുക',
       'signup': 'സൈൻ അപ്പ് ചെയ്യുക',
@@ -1222,7 +1222,7 @@ class AppStrings {
       'logjob_analyzing': 'സ്ക്രീൻഷോട്ട് വിശകലനം ചെയ്യുന്നു...',
       'logjob_offline': 'ഓഫ്‌ലൈൻ മോഡ്: ജോലി കണക്കുകൂട്ടൽ വിജയകരമായി പൂർത്തിയായി!',
       'logjob_offline_note': 'കണക്ഷൻ പ്രശ്നം. ഓഫ്‌ലൈൻ മോഡ് ഉപയോഗിക്കുന്നു.',
-      'chat_title': 'GIGI',
+      'chat_title': 'GiGi',
       'chat_subtitle': 'തൊഴിലാളി വേതന & അവകാശ സഹായി',
       'chat_empty_drawer': 'ഇതുവരെ സംഭാഷണങ്ങളൊന്നുമില്ല — താഴെ തുടങ്ങുക',
       'chat_new': '+ പുതിയ ചാറ്റ്',
@@ -1281,7 +1281,7 @@ class AppStrings {
       'sos_live_tracking_inactive': 'ലൊക്കേഷൻ പങ്കിടൽ അവസാനിച്ചു.',
       'sos_message_template': 'ഇത് ഗിഗ്ഷീൽഡിൽ (GiGly) നിന്നുള്ള ഒരു ഓട്ടോമാറ്റിക് സുരക്ഷാ അലേർട്ട് ആണ്. {name}-ന് സഹായം ആവശ്യമായി വന്നേക്കാം, കൂടാതെ അവർ തങ്ങളുടെ ലൈവ് ലൊക്കേഷൻ നിങ്ങളുമായി പങ്കുവെച്ചിട്ടുണ്ട്: {link}. അയച്ച സമയം: {time}.',
     
-      'walkthrough_title': 'HOW GIGLY WORKS',
+      'walkthrough_title': 'HOW GiGly WORKS',
       'walkthrough_welcome': 'Welcome to GiGly!',
       'walkthrough_welcome_desc': 'Here is a quick overview of our tools designed to help you check pay fairness, protect your rights, and stay safe.',
       'walkthrough_log_title': 'Logging Your Trips',

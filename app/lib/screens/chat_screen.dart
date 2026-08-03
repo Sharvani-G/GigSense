@@ -645,7 +645,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "GIGI",
+                          StringsProvider.instance.t('chat_title'),
                           style: GoogleFonts.outfit(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,

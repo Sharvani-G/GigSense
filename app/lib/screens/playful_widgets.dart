@@ -1634,16 +1634,18 @@ void showPlayfulSnackBar(BuildContext context, String message, {bool isError = f
   );
 }
 
-enum GiGiState { idle, talking, happy }
+enum GiGiState { idle, talking, happy, blink }
 
 class GiGiAvatar extends StatefulWidget {
   final double size;
   final bool isStreaming;
+  final GiGiState? forceState;
 
   const GiGiAvatar({
     super.key,
     this.size = 32,
     this.isStreaming = false,
+    this.forceState,
   });
 
   @override
@@ -1657,6 +1659,9 @@ class _GiGiAvatarState extends State<GiGiAvatar> {
   @override
   void initState() {
     super.initState();
+    if (widget.forceState != null) {
+      _avatarState = widget.forceState!;
+    }
   }
 
   @override
@@ -1668,13 +1673,20 @@ class _GiGiAvatarState extends State<GiGiAvatar> {
   @override
   void didUpdateWidget(covariant GiGiAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.isStreaming != oldWidget.isStreaming) {
+    if (widget.isStreaming != oldWidget.isStreaming || widget.forceState != oldWidget.forceState) {
       _updateAnimation();
     }
   }
 
   void _updateAnimation() {
     _animationTimer?.cancel();
+    
+    if (widget.forceState != null) {
+      setState(() {
+        _avatarState = widget.forceState!;
+      });
+      return;
+    }
     
     // Check motion reduction
     final disableMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
@@ -1751,24 +1763,42 @@ class _GiGiAvatarState extends State<GiGiAvatar> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     // Left Eye
-                    Container(
-                      width: size * 0.12,
-                      height: size * 0.12,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
+                    _avatarState == GiGiState.blink
+                        ? Container(
+                            width: size * 0.12,
+                            height: 2,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(1),
+                            ),
+                          )
+                        : Container(
+                            width: size * 0.12,
+                            height: size * 0.12,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
                     SizedBox(width: size * 0.2),
                     // Right Eye
-                    Container(
-                      width: size * 0.12,
-                      height: size * 0.12,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
+                    _avatarState == GiGiState.blink
+                        ? Container(
+                            width: size * 0.12,
+                            height: 2,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(1),
+                            ),
+                          )
+                        : Container(
+                            width: size * 0.12,
+                            height: size * 0.12,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
                   ],
                 ),
                 SizedBox(height: size * 0.08),
