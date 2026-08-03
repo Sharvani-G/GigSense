@@ -2048,7 +2048,76 @@ class AboutScreen extends StatelessWidget {
                   ),
                 );
               }),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
+              Text(
+                'DEVELOPERS',
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: PlayfulColors.foreground,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: PlayfulColors.border, width: 2.0),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: PlayfulColors.border,
+                      offset: Offset(4, 4),
+                      blurRadius: 0,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: PlayfulColors.accent,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: PlayfulColors.border, width: 2.0),
+                      ),
+                      child: const Icon(
+                        Icons.code,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Team Mutex',
+                            style: GoogleFonts.outfit(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: PlayfulColors.foreground,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '• Sharan S\n• Sharvani G',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              height: 1.5,
+                              color: PlayfulColors.foreground,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
               Text(
                 s.t('chat_disclaimer'),
                 textAlign: TextAlign.center,

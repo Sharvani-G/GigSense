@@ -23,7 +23,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   bool _isLoading = true;
   bool _isFetchingMore = false;
   bool _hasMore = true;
-  DocumentSnapshot? _lastDocument;
   List<Map<String, dynamic>> _jobs = [];
   final ScrollController _scrollController = ScrollController();
 
@@ -67,7 +66,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
       setState(() {
         _isLoading = true;
         _jobs.clear();
-        _lastDocument = null;
         _hasMore = true;
       });
     } else {
@@ -79,48 +77,44 @@ class _HistoryScreenState extends State<HistoryScreen> {
     try {
       final userId = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous_user';
       
-      Query query = FirebaseFirestore.instance
+      // Load all jobs to filter/sort in memory to bypass composite index requirement
+      final querySnapshot = await FirebaseFirestore.instance
           .collection('jobs')
-          .where('user_id', isEqualTo: userId);
+          .where('user_id', isEqualTo: userId)
+          .get();
 
-      if (_selectedPlatforms.isNotEmpty) {
-        final platformFilter = _selectedPlatforms.map((p) => p.toLowerCase()).take(10).toList();
-        query = query.where('platform', whereIn: platformFilter);
-      }
-
-      if (_selectedFairness == "Possibly Underpaid") {
-        query = query.where('is_underpaid', isEqualTo: true);
-      } else if (_selectedFairness == "Fair Pay") {
-        query = query.where('is_underpaid', isEqualTo: false);
-      }
-
-      query = query.orderBy('job_timestamp', descending: true).limit(20);
-
-      if (_lastDocument != null) {
-        query = query.startAfterDocument(_lastDocument!);
-      }
-
-      final querySnapshot = await query.get();
-      final docs = querySnapshot.docs;
-
-      if (docs.length < 20) {
-        _hasMore = false;
-      }
-
-      if (docs.isNotEmpty) {
-        _lastDocument = docs.last;
-      }
-
-      final List<Map<String, dynamic>> loaded = docs
-          .map((doc) => {...doc.data() as Map<String, dynamic>, 'id': doc.id})
+      List<Map<String, dynamic>> loaded = querySnapshot.docs
+          .map((doc) => {...doc.data(), 'id': doc.id})
           .toList();
 
+      // In-memory filter: Platforms
+      if (_selectedPlatforms.isNotEmpty) {
+        final platformFilter = _selectedPlatforms.map((p) => p.toLowerCase()).toList();
+        loaded = loaded.where((job) {
+          final platform = (job['platform'] as String?)?.toLowerCase() ?? '';
+          return platformFilter.contains(platform);
+        }).toList();
+      }
+
+      // In-memory filter: Fairness
+      if (_selectedFairness == "Possibly Underpaid") {
+        loaded = loaded.where((job) => job['is_underpaid'] == true).toList();
+      } else if (_selectedFairness == "Fair Pay") {
+        loaded = loaded.where((job) => job['is_underpaid'] == false).toList();
+      }
+
+      // In-memory sort: Descending by job_timestamp (or created_at as fallback)
+      loaded.sort((a, b) {
+        final timeA = _parseTimestamp(a['job_timestamp'] ?? a['created_at']) ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final timeB = _parseTimestamp(b['job_timestamp'] ?? b['created_at']) ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return timeB.compareTo(timeA);
+      });
+
+      // No more pagination needed since we fetch all at once
+      _hasMore = false;
+
       setState(() {
-        if (isRefresh) {
-          _jobs = loaded;
-        } else {
-          _jobs.addAll(loaded);
-        }
+        _jobs = loaded;
         _isLoading = false;
         _isFetchingMore = false;
       });
@@ -442,7 +436,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     final bool hasUndisclosedDeduction = deduction != null && deduction > 0 && !reasonStated;
                     final explanation = job['explanation'] ?? (isUnderpaid
                         ? "This came in noticeably below what's typical for this distance and platform."
-                        : "This is about what's typical for a ${(job['distance_km'] as num?)?.toDouble()?.toStringAsFixed(1) ?? '0'}km $platformName trip.");
+                        : "This is about what's typical for a ${((job['distance_km'] as num?)?.toDouble() ?? 0.0).toStringAsFixed(1)}km $platformName trip.");
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 16.0),

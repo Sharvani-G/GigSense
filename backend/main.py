@@ -201,13 +201,56 @@ def get_user_language(user_id: str) -> str:
     """Fetch the user's preferredLanguage from Firestore. Returns 'en' on any error."""
     return get_user_profile(user_id).get('preferredLanguage', 'en')
 
+def is_fare_or_job_related_query(message: str) -> bool:
+    """Algorithm 1: Intent Classifier — Only inject user job logs if the query is actually about fares/trips/earnings."""
+    if not message:
+        return False
+    msg_lower = message.lower()
+    if message.startswith("[IMAGE") or "fare" in msg_lower or "trip" in msg_lower or "ride" in msg_lower:
+        return True
+    
+    keywords = [
+        "pay", "payout", "earning", "earned", "money", "rupee", "rs", "₹", "deduction",
+        "underpaid", "fairness", "benchmark", "shortfall", "salary", "bonus", "incentive",
+        "swiggy", "zomato", "uber", "ola", "rapido", "zepto", "blinkit", "porter", "indrive",
+        "last trip", "recent trip", "my ride", "my delivery", "this trip", "that trip",
+        "how much", "what did i get", "cut", "commission", "rate", "km"
+    ]
+    return any(k in msg_lower for k in keywords)
+
+def sanitize_chat_history(history_docs: list) -> tuple:
+    """Algorithm 2: History Sanitization & Deduplication — Remove consecutive duplicate messages and limit context window."""
+    sanitized = []
+    last_assistant_msg = ""
+    
+    for msg in history_docs:
+        role = msg.get("role", "user")
+        content = msg.get("content", "").strip()
+        if not content:
+            continue
+        
+        # Skip consecutive exact duplicate assistant responses
+        if role == "assistant":
+            if content == last_assistant_msg:
+                continue
+            last_assistant_msg = content
+            
+        sanitized.append(msg)
+        
+    # Keep max last 6 turns (12 messages) for clean focused LLM attention
+    pruned = sanitized[-12:]
+    return pruned, last_assistant_msg
+
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
-    recent_jobs = get_recent_jobs(request.user_id)[:5]
-    recent_jobs_json = json.dumps(recent_jobs)
+    # Algorithm 1: Selective Context Injection based on query intent
+    if is_fare_or_job_related_query(request.message):
+        recent_jobs = get_recent_jobs(request.user_id)[:5]
+        recent_jobs_json = json.dumps(recent_jobs)
+    else:
+        recent_jobs_json = "None requested by user for this general query."
 
-    history = []
-    conversation_history_str = ""
+    raw_history = []
     messages_ref = None
     if db is not None:
         try:
@@ -218,18 +261,20 @@ async def chat_endpoint(request: ChatRequest):
                 .document(request.session_id)
                 .collection("messages")
             )
-            # Fetch last 10 messages from session to build chat history
-            docs = messages_ref.order_by("timestamp", direction=firestore.Query.DESCENDING).limit(10).get()
-            history = [doc.to_dict() for doc in docs]
-            history.reverse()  # reverse to chronological order
-            
-            for msg in history:
-                role = msg.get("role", "user")
-                content = msg.get("content", "")
-                role_label = "Worker" if role == "user" else "Assistant"
-                conversation_history_str += f"{role_label}: {content}\n"
+            # Fetch last 12 messages from session to build chat history
+            docs = messages_ref.order_by("timestamp", direction=firestore.Query.DESCENDING).limit(12).get()
+            raw_history = [doc.to_dict() for doc in docs]
+            raw_history.reverse()  # reverse to chronological order
         except Exception as e:
             print(f"Error fetching chat history: {e}")
+
+    # Algorithm 2: Sanitize history & extract previous assistant response for repetition check
+    history, last_assistant_msg = sanitize_chat_history(raw_history)
+    
+    conversation_history_str = ""
+    for msg in history:
+        role_label = "Worker" if msg.get("role") == "user" else "Assistant"
+        conversation_history_str += f"{role_label}: {msg.get('content', '')}\n"
 
     profile = get_user_profile(request.user_id)
     lang_code = profile.get('preferredLanguage', 'en')
@@ -297,7 +342,7 @@ async def chat_endpoint(request: ChatRequest):
                 "content": system_prompt
             })
             
-            # Append preceding conversation history
+            # Append preceding sanitized conversation history
             for msg in history:
                 role = msg.get("role", "user")
                 content = msg.get("content", "")
@@ -343,6 +388,10 @@ async def chat_endpoint(request: ChatRequest):
                     chunk = word + (" " if i < len(words) - 1 else "")
                     yield json.dumps({"chunk": chunk}) + "\n"
                     await asyncio.sleep(0.01)
+
+        # Algorithm 3: Output Anti-Repetition Guardrail — Prevent storing or returning exact repeated answers
+        if full_response and last_assistant_msg and full_response.strip().lower() == last_assistant_msg.strip().lower():
+            full_response = "I've already provided that response above! Feel free to ask if you'd like more details or have another question."
 
         # Save user message and assistant reply to Firestore server-side
         if messages_ref is not None and full_response:
