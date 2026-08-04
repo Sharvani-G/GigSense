@@ -2,6 +2,19 @@
 
 Submission for the **Synaptrix Hackathon** — Polished and perfected through intense post-hackathon cycles of real-world trials, error-tracking, and robust optimization.
 
+---
+
+## 📲 Download GiGly v1.2.0
+
+Select the appropriate package for your device to download directly from the GitHub Release:
+
+* 📱 **[Universal Build (All Devices)](https://github.com/Sharvani-G/GigSense/releases/download/v1.2.0/GiGly-v1.2.0-release.apk)** (58.1 MB) — *Contains support for all hardware configurations. Recommended if you are unsure.*
+* 🚀 **[Modern Mobiles (ARM64)](https://github.com/Sharvani-G/GigSense/releases/download/v1.2.0/GiGly-v1.2.0-modern-mobiles.apk)** (21.3 MB) — *Optimized for 64-bit modern devices (arm64-v8a).*
+* 💾 **[Older Mobiles (ARMv7)](https://github.com/Sharvani-G/GigSense/releases/download/v1.2.0/GiGly-v1.2.0-old-mobiles.apk)** (19.1 MB) — *Optimized for older 32-bit devices (armeabi-v7a).*
+* 💻 **[Emulator Testing (x86_64)](https://github.com/Sharvani-G/GigSense/releases/download/v1.2.0/GiGly-v1.2.0-emulator-testing.apk)** (22.8 MB) — *Built for x86_64 emulator configurations.*
+
+---
+
 GiGly is a mobile-first earnings companion and safety shield designed for gig workers in India ( Ola, Uber, Swiggy, Zomato, Rapido). It aggregates job metrics, evaluates pay fairness using crowdsourced rate benchmarks, provides a context-aware AI assistant (GiGi), and secures workers with stateful SOS tracking.
 
 The entire app is built on a custom **Playful Geometric Design System** featuring vibrant, high-contrast HSL colors, bold offset borders, rounded card widgets, and custom micro-animations to ensure maximum accessibility.
