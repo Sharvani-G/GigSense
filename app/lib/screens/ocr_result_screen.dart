@@ -7,7 +7,6 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../i18n/strings.dart';
-import '../i18n/strings_provider.dart';
 import 'playful_widgets.dart';
 
 class OcrResultScreen extends StatefulWidget {

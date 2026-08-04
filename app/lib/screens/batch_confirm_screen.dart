@@ -9,7 +9,6 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'playful_widgets.dart';
 import '../i18n/strings.dart';
-import '../i18n/strings_provider.dart';
 
 class CandidateRow {
   String platform;
