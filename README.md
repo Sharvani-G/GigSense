@@ -50,32 +50,31 @@ This project was built and refined by:
 
 ---
 
-## 💡 How Core Features Work
+## 💡 Key App Concepts & Major Features
 
-### 1. Manual & OCR Job Logging
-* **Form-based Input**: Workers log trips manually with easy forms that handle distance (KM) and time (Minutes) units automatically.
-* **Screenshot OCR Scanner**: Workers take screenshots of delivery/ride payouts and upload them. The app runs Tesseract OCR to automatically parse the fare, duration, and distance.
-* **Receipt Filter**: A custom classifier automatically filters out irrelevant/invalid screenshot uploads (like restaurant food bills or delivery lists) to keep log data clean.
+### 🗺️ Real-Time Pay Fairness Map (Crowdsourced)
+* **Actual Worker Logs (Not Company Claims)**: Unlike static maps that display platform-advertised rates, GiGly compiles real-time ride and delivery data logged directly by workers in the city.
+* **Zone Fairness Baselines**: Aggregates average pay metrics across neighborhoods (like Indiranagar, Koramangala, Yelahanka) and colors them Green (Fair pay), Orange (Mixed), or Pink (Underpaid) based on expectations.
+* **Real-time Filters**: Allows workers to dynamically filter neighborhood averages by platform (Uber, Ola, Swiggy, Zomato) and shift hour (Morning, Evening, Late-Night) to plan their routes for maximum earnings.
 
-### 2. Underpayment & Pay Fairness Check
-* **Fairness Flag**: Compares the worker's logged job payout to active crowdsourced benchmarks in Firestore. If the payout is lower than expected, it marks the trip with a **⚠️ Possible Underpayment** warning card on the Home Screen.
-* **Deduction Alert**: Triggers if the platform makes deductions without giving a reason, violating local labor transparency guidelines.
-* **Dispute Complaint Draft**: For any underpaid trip, the app automatically drafts a formal dispute text (e.g., under the Code on Social Security 2020) that the user can copy and paste into aggregator chat boxes.
+### 🤖 GiGi AI Assistant & Adaptive Memory
+* **Context-Aware Coaching**: GiGi acts as a personalized legal coach. It dynamically parses the worker's recent ride logs in Firestore to answer specific questions (e.g., *"Why was my Rapido trip flagged?"*).
+* **GiGi Memory (Adaptive Context Caching)**: Includes a persistent memory system where GiGi remembers critical context about the worker (e.g., *full-time delivery rider, working 10+ hour shifts in Indiranagar*). It uses this memory to adapt suggestions and advice over time, avoiding repetitive introductions.
+* **Indian Labor Law Grounding**: GiGi is fact-restricted and grounded in verified legal guidelines like the **Code on Social Security 2020** and the **Karnataka Platform-Based Gig Workers Act 2025** to explain pay guidelines, rate deductions, and union benefits.
 
-### 3. ADVANCED Locality Pay Fairness Map
-* Shows Pay Fairness Health across different regions (zones) in the city using real-time worker logs.
-* **Color-Coded Zones**:
-  * **Green**: Pays full expected rates.
-  * **Orange**: Pays close to expected rates.
-  * **Pink**: Underpayment patterns detected.
-* **Time & Platform Filters**: Users can filter trends by platforms (Zomato, Swiggy, Ola, Uber) and time of day (Morning, Evening, Late-Night).
+### 🌐 Deep Multilingual Coverage
+* **Zero Language Mixture**: The user interface is completely translated across all screens—preventing confusing English and regional language mixtures.
+* **Supported Languages**: Fully localizes both UI labels and AI assistant prompts into 6 major languages: **English, हिन्दी (Hindi), ಕನ್ನಡ (Kannada), தமிழ் (Tamil), తెలుగు (Telugu), and മലയാളം (Malayalam)**.
+* **Adaptive Voice Input**: GiGi adjusts its speech recognition model automatically to parse Kannada, Hindi, and other languages based on the user's active application language.
 
-### 4. Interactive AI Chatbot (GiGi)
-* An AI assistant grounded directly in the user's logged trips and Firestore databases.
-* **Indian Labor Law Grounding**: Fact-checked responses regarding worker rights, social security, and local regulations.
-* **Voice & Text Input**: Supports speech-to-text input, adjusting its language recognition models dynamically based on the active UI language.
+### ⚠️ Burnout & Fatigue Monitoring
+* **Continuous Shift Tracker**: Scans logged trip timestamps in a rolling 24-hour window.
+* **Fatigue Alerts**: Displays proactive, friendly alert nudges on the Home Screen dashboard if daily active hours exceed 10 hours (or weekly totals exceed 50 hours), encouraging workers to rest before they experience exhaustion or risk safety.
 
-### 5. Stateful SOS Safety Broadcast
-* **Silent Background SMS**: Utilizes Android `SmsManager` to send silent live coordinates to trusted emergency contacts.
-* **Persistent Lockout**: Navigation is locked to the active SOS view while broadcasting is active, ensuring the worker's safety interface remains visible.
-* **WhatsApp Templates**: Pre-fills emergency coordinate templates to send via WhatsApp quickly.
+### 🛡️ Stateful SOS Safety Broadcast
+* **Silent Native SMS Dispatch**: Calls Android `SmsManager` to send silent live coordinate updates in the background to emergency contacts.
+* **Stateful Navigation Lockout**: Locks the worker's interface to the active SOS safety card, preventing accidental exits while a safety session is broadcasting.
+
+### 📷 Screenshot OCR Receipt Classifier
+* **Heuristic OCR Extractor**: Parses screenshots of ride summaries, automatically extracting the platform, earnings (₹), trip duration (minutes), and distance (KM).
+* **Invalid Image Filter**: An integrated receipt classifier filters out irrelevant images (like food menus, general screenshots) and requests a valid ride receipt.
