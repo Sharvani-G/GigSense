@@ -150,6 +150,9 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
   String? _getMatchedZone(String? areaHint) {
     if (areaHint == null || areaHint.trim().isEmpty) return null;
     final hint = areaHint.toLowerCase().trim();
+    if (hint.contains('jp nagar') || hint.contains('jayaprakash') || hint.contains('j.p. nagar')) {
+      return 'jayanagar';
+    }
     for (var zone in _zoneCoordinates.keys) {
       if (hint.contains(zone) || zone.contains(hint)) {
         return zone;
@@ -167,7 +170,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
       // Try to resolve locality from new schema field 'locality', fall back to 'area_hint'
       String? area = data['locality']?.toString().toLowerCase().trim();
       if (area == null || !_zoneCoordinates.containsKey(area)) {
-        area = _getMatchedZone(data['area_hint']);
+        area = _getMatchedZone(data['area_hint'] ?? data['locality']);
       }
       if (area == null) continue;
 

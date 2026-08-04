@@ -25,3 +25,6 @@ build/
 
 # Android binaries
 *.apk
+
+# Web dependencies
+node_modules/

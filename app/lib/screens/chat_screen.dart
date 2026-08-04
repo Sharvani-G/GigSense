@@ -44,7 +44,41 @@ class _ChatScreenState extends State<ChatScreen> {
   List<ChatMessage> _localMessages = [];
   bool _isLoading = false;
   bool _initializing = true;
+  bool _hasSeenGigiIntro = true;
   StreamSubscription<String>? _streamSubscription;
+
+  Future<void> _checkGigiIntro() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous_user';
+    if (uid == 'anonymous_user') return;
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      if (doc.exists) {
+        final data = doc.data();
+        final seen = data?['hasSeenGigiIntro'] ?? false;
+        if (!seen) {
+          if (mounted) {
+            setState(() {
+              _hasSeenGigiIntro = false;
+            });
+            await FirebaseFirestore.instance.collection('users').doc(uid).set({
+              'hasSeenGigiIntro': true,
+            }, SetOptions(merge: true));
+          }
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _hasSeenGigiIntro = false;
+          });
+          await FirebaseFirestore.instance.collection('users').doc(uid).set({
+            'hasSeenGigiIntro': true,
+          }, SetOptions(merge: true));
+        }
+      }
+    } catch (e) {
+      debugPrint("Error checking GiGi intro flag: $e");
+    }
+  }
 
   Future<void> _fetchMessagesForSession(String sessionId) async {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? 'anonymous_user';
@@ -71,6 +105,13 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         setState(() {
           _localMessages = messages;
+          if (!_hasSeenGigiIntro) {
+            _localMessages.insert(0, ChatMessage(
+              id: 'gigi_intro_static',
+              text: StringsProvider.instance.t('chat_gigi_intro'),
+              isUser: false,
+            ));
+          }
         });
         _scrollToBottom();
       }
@@ -224,6 +265,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _initializeChat() async {
+    await _checkGigiIntro();
     final deepLinkId = MainNavigationController.activeSessionId.value;
     if (deepLinkId != null) {
       setState(() {
@@ -309,6 +351,13 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _activeSessionId = sessionId;
         _localMessages = [];
+        if (!_hasSeenGigiIntro) {
+          _localMessages.insert(0, ChatMessage(
+            id: 'gigi_intro_static',
+            text: StringsProvider.instance.t('chat_gigi_intro'),
+            isUser: false,
+          ));
+        }
         _isLoading = false;
       });
     }

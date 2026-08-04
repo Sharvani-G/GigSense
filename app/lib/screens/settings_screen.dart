@@ -313,6 +313,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   onTap: () => _showSOSSettingsBottomSheet(context),
                                 ),
                                 _buildDivider(),
+
+                                // GiGi Memory row
+                                _buildSettingsRow(
+                                  icon: Icons.psychology_outlined,
+                                  label: s.t('settings_gigi_memory'),
+                                  trailingText: s.t('settings_gigi_memory_manage'),
+                                  onTap: () => _showGiGiMemoryBottomSheet(context),
+                                ),
+                                _buildDivider(),
                                 // About row
                                 _buildSettingsRow(
                                   icon: Icons.info_outline_rounded,
@@ -671,6 +680,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             }
           },
         );
+      },
+    );
+  }
+
+  void _showGiGiMemoryBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return const _GiGiMemoryBottomSheetContent();
       },
     );
   }
@@ -2733,6 +2753,290 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _GiGiMemoryBottomSheetContent — Bottom sheet displaying & managing remembered notes
+// ---------------------------------------------------------------------------
+class _GiGiMemoryBottomSheetContent extends StatefulWidget {
+  const _GiGiMemoryBottomSheetContent();
+
+  @override
+  State<_GiGiMemoryBottomSheetContent> createState() => _GiGiMemoryBottomSheetContentState();
+}
+
+class _GiGiMemoryBottomSheetContentState extends State<_GiGiMemoryBottomSheetContent> {
+  bool _loading = true;
+  List<Map<String, dynamic>> _notes = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMemoryNotes();
+  }
+
+  Future<void> _loadMemoryNotes() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      setState(() => _loading = false);
+      return;
+    }
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        final list = data['memoryNotes'] as List?;
+        if (list != null) {
+          setState(() {
+            _notes = list.map((e) => Map<String, dynamic>.from(e)).toList();
+            _loading = false;
+          });
+          return;
+        }
+      }
+    } catch (e) {
+      debugPrint("Error loading memory notes: $e");
+    }
+    if (mounted) {
+      setState(() {
+        _notes = [];
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _deleteNote(int index) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    
+    setState(() {
+      _notes.removeAt(index);
+    });
+
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        'memoryNotes': _notes,
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Memory note removed")),
+        );
+      }
+    } catch (e) {
+      debugPrint("Error deleting memory note: $e");
+      _loadMemoryNotes();
+    }
+  }
+
+  Future<void> _clearAll() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    setState(() {
+      _notes = [];
+    });
+
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        'memoryNotes': FieldValue.delete(),
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("All memories cleared")),
+        );
+      }
+    } catch (e) {
+      debugPrint("Error clearing memory notes: $e");
+      _loadMemoryNotes();
+    }
+  }
+
+  String _getPlainLanguageNote(Map<String, dynamic> note) {
+    final cat = note['category'] ?? '';
+    final val = note['value'] ?? '';
+    switch (cat) {
+      case 'preferred_name':
+        return "You like to be called \"$val\"";
+      case 'style_preference':
+        return "Style: \"$val\"";
+      case 'general_note':
+        return "Fact: \"$val\"";
+      default:
+        return "\"$val\"";
+    }
+  }
+
+  IconData _getIconForCategory(String cat) {
+    switch (cat) {
+      case 'preferred_name':
+        return Icons.face_outlined;
+      case 'style_preference':
+        return Icons.chat_bubble_outline_rounded;
+      case 'general_note':
+        return Icons.psychology_outlined;
+      default:
+        return Icons.bookmark_border_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    return Container(
+      padding: EdgeInsets.only(
+        top: 24,
+        left: 24,
+        right: 24,
+        bottom: mq.viewInsets.bottom + 24,
+      ),
+      decoration: const BoxDecoration(
+        color: Color(0xFFFFFDF5),
+        border: Border(
+          top: BorderSide(color: PlayfulColors.border, width: 4),
+        ),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(32),
+          topRight: Radius.circular(32),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "GiGi Memory",
+                style: GoogleFonts.outfit(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: PlayfulColors.foreground,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, color: PlayfulColors.foreground),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            "GiGi remembers these preferences to customize its responses in your conversations.",
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey[700],
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (_loading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24.0),
+                child: CircularProgressIndicator(color: PlayfulColors.accent),
+              ),
+            )
+          else if (_notes.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: PlayfulColors.border, width: 2),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.sentiment_satisfied_alt_outlined, size: 48, color: PlayfulColors.accent),
+                  const SizedBox(height: 12),
+                  Text(
+                    "GiGi hasn't remembered anything yet!",
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.outfit(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: PlayfulColors.foreground,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Tell GiGi things like \"call me Sharan\" or \"keep your responses short\" in the chat, and they will show up here.",
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Column(
+              children: [
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 250),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: _notes.length,
+                    separatorBuilder: (context, index) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final note = _notes[index];
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: PlayfulColors.border, width: 1.5),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _getIconForCategory(note['category'] ?? ''),
+                              color: PlayfulColors.accent,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                _getPlainLanguageNote(note),
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: PlayfulColors.foreground,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                              onPressed: () => _deleteNote(index),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 20),
+                PlayfulButton(
+                  backgroundColor: const Color(0xFFFEE2E2),
+                  onPressed: _clearAll,
+                  child: Text(
+                    "Clear All Memories",
+                    style: GoogleFonts.outfit(
+                      color: Colors.red[900],
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          const SizedBox(height: 12),
+        ],
       ),
     );
   }

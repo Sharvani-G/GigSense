@@ -697,7 +697,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        "ALERTS & NOTIFICATIONS",
+                        StringsProvider.instance.t('notifications_title'),
                         style: GoogleFonts.outfit(
                           fontSize: 16,
                           fontWeight: FontWeight.w900,
@@ -706,21 +706,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                       TextButton(
                         onPressed: () async {
-                          // Mark all as read
-                          final qSnapshot = await FirebaseFirestore.instance
-                              .collection('users')
-                              .doc(userId)
-                              .collection('notifications')
-                              .where('read', isEqualTo: false)
-                              .get();
-                          final batch = FirebaseFirestore.instance.batch();
-                          for (var doc in qSnapshot.docs) {
-                            batch.update(doc.reference, {'read': true});
+                          try {
+                            // Mark all as read
+                            final qSnapshot = await FirebaseFirestore.instance
+                                .collection('users')
+                                .doc(userId)
+                                .collection('notifications')
+                                .where('read', isEqualTo: false)
+                                .get();
+                            if (qSnapshot.docs.isNotEmpty) {
+                              final batch = FirebaseFirestore.instance.batch();
+                              for (var doc in qSnapshot.docs) {
+                                batch.update(doc.reference, {'read': true});
+                              }
+                              await batch.commit();
+                            }
+                          } catch (e) {
+                            debugPrint("Error marking all notifications as read: $e");
                           }
-                          await batch.commit();
                         },
                         child: Text(
-                          "Mark all as read",
+                          StringsProvider.instance.t('notifications_mark_all'),
                           style: GoogleFonts.plusJakartaSans(
                             color: PlayfulColors.accent,
                             fontWeight: FontWeight.bold,
@@ -754,7 +760,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                 const Icon(Icons.notifications_none, size: 48, color: PlayfulColors.mutedForeground),
                                 const SizedBox(height: 12),
                                 Text(
-                                  "You're all caught up! No notifications yet.",
+                                  StringsProvider.instance.t('notifications_empty'),
                                   style: GoogleFonts.plusJakartaSans(
                                     fontSize: 13,
                                     fontWeight: FontWeight.bold,
@@ -781,9 +787,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             }
                             
                             return GestureDetector(
-                              onTap: () {
+                              onTap: () async {
                                 if (!isRead) {
-                                  docs[index].reference.update({'read': true});
+                                  try {
+                                    await docs[index].reference.update({'read': true});
+                                  } catch (e) {
+                                    debugPrint("Error marking notification as read: $e");
+                                  }
                                 }
                               },
                               child: Container(

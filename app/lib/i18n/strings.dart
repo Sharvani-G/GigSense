@@ -103,11 +103,18 @@ class AppStrings {
       'chat_new': '+ NEW CHAT',
       'chat_intro':
           'Hey — ask me anything about your pay, your rights, or how to raise a complaint. I\'ll look at your recent jobs if it\'s relevant.',
+      'chat_gigi_intro':
+          'Hey, I\'m GiGi! I\'m here to help with anything about your pay, your rights, or how GiGly works — fairness checks, complaints, all of that. Heads up though, I\'m not really built for random stuff like coding help or trivia, so let\'s stick to gig-work things and I\'ll be genuinely useful to you.',
       'chat_hint': 'Type your question...',
       'chat_disclaimer': 'General guidance, not legal advice.',
       'chat_error_loading': 'Error loading messages.',
       'chat_error_reply':
           'I\'m having trouble responding right now — try again in a moment.',
+
+      // Notifications
+      'notifications_title': 'ALERTS & NOTIFICATIONS',
+      'notifications_mark_all': 'Mark all as read',
+      'notifications_empty': 'You\'re all caught up! No notifications yet.',
 
       // Quick-reply chips
       'chip_pay_fair': 'Is this fair pay?',
@@ -128,6 +135,8 @@ class AppStrings {
       'lang_ta': 'தமிழ் (Tamil)',
       'lang_te': 'తెలుగు (Telugu)',
       'edit_profile': 'Edit Profile',
+      'settings_gigi_memory': 'GiGi Memory',
+      'settings_gigi_memory_manage': 'Manage',
       'btn_save': 'SAVE',
       'about_gigly': 'About GiGly',
       'about_desc': 'GiGly helps you check if you\'re being paid fairly, stay safe on the job, and know your rights as a gig worker in India.',

@@ -13,6 +13,7 @@ load_dotenv()
 
 import json
 import datetime
+import re
 from ocr import extract_job_data
 from stt import transcribe_audio
 from llm import ask_gemma, ask_gemma_stream, get_chat_system_prompt, get_weekly_insight_prompt, get_complaint_draft_prompt, ask_gemma_chat, ask_gemma_chat_stream, translate_to_language
@@ -241,6 +242,107 @@ def sanitize_chat_history(history_docs: list) -> tuple:
     pruned = sanitized[-12:]
     return pruned, last_assistant_msg
 
+def parse_and_strip_memory_updates(text: str) -> tuple:
+    # Matches [MEMORY_UPDATE: <json>]
+    pattern = r'\[MEMORY_UPDATE:\s*(\{.*?\})\s*\]'
+    matches = re.findall(pattern, text, flags=re.DOTALL)
+    
+    updates = []
+    for match_str in matches:
+        try:
+            # Clean up potential markdown formatting inside JSON or minor typos
+            clean_json = match_str.strip()
+            update = json.loads(clean_json)
+            if isinstance(update, dict) and "category" in update and "value" in update:
+                # Validate category is one of the allowed ones
+                if update["category"] in ["preferred_name", "style_preference", "general_note"]:
+                    updates.append({
+                        "category": update["category"],
+                        "value": str(update["value"]).strip()
+                    })
+        except Exception as e:
+            print(f"Error parsing memory update JSON: {e}")
+            # Try a fallback parse if JSON decode fails (e.g. if single quotes were used)
+            try:
+                cat_match = re.search(r'["\']category["\']\s*:\s*["\'](.*?)["\']', match_str)
+                val_match = re.search(r'["\']value["\']\s*:\s*["\'](.*?)["\']', match_str)
+                if cat_match and val_match:
+                    cat = cat_match.group(1)
+                    val = val_match.group(1)
+                    if cat in ["preferred_name", "style_preference", "general_note"]:
+                        updates.append({
+                            "category": cat,
+                            "value": val.strip()
+                        })
+            except Exception:
+                pass
+
+    # Strip the tags from the text
+    cleaned_text = re.sub(pattern, '', text, flags=re.DOTALL).strip()
+    return cleaned_text, updates
+
+def save_memory_updates(user_id: str, updates: list):
+    if db is None or not user_id or user_id == 'anonymous_user':
+        return
+    try:
+        user_ref = db.collection("users").document(user_id)
+        doc = user_ref.get()
+        user_data = doc.to_dict() if doc.exists else {}
+        
+        memory_notes = user_data.get("memoryNotes", [])
+        if not isinstance(memory_notes, list):
+            memory_notes = []
+            
+        now = datetime.datetime.now(datetime.timezone.utc)
+        
+        for up in updates:
+            cat = up["category"]
+            val = up["value"]
+            
+            if cat in ["preferred_name", "style_preference"]:
+                # Replace if existing
+                replaced = False
+                for note in memory_notes:
+                    if note.get("category") == cat:
+                        note["value"] = val
+                        note["updatedAt"] = now
+                        replaced = True
+                        break
+                if not replaced:
+                    memory_notes.append({
+                        "category": cat,
+                        "value": val,
+                        "updatedAt": now
+                    })
+            elif cat == "general_note":
+                # General notes accumulate
+                memory_notes.append({
+                    "category": cat,
+                    "value": val,
+                    "updatedAt": now
+                })
+                
+        # Apply cap (max 15 entries)
+        def get_timestamp(note):
+            ts = note.get("updatedAt")
+            if isinstance(ts, datetime.datetime):
+                return ts
+            elif isinstance(ts, str):
+                try:
+                    return datetime.datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                except Exception:
+                    pass
+            # Default to Unix epoch
+            return datetime.datetime.fromtimestamp(0, datetime.timezone.utc)
+            
+        memory_notes.sort(key=get_timestamp)
+        if len(memory_notes) > 15:
+            memory_notes = memory_notes[-15:]
+            
+        user_ref.set({"memoryNotes": memory_notes}, merge=True)
+    except Exception as e:
+        print(f"Error saving memory updates: {e}")
+
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
     # Algorithm 1: Selective Context Injection based on query intent
@@ -277,6 +379,17 @@ async def chat_endpoint(request: ChatRequest):
         conversation_history_str += f"{role_label}: {msg.get('content', '')}\n"
 
     profile = get_user_profile(request.user_id)
+    memory_notes = profile.get("memoryNotes", [])
+    memory_notes_str = ""
+    if isinstance(memory_notes, list) and memory_notes:
+        notes_list = []
+        for note in memory_notes:
+            cat = note.get("category")
+            val = note.get("value")
+            if cat and val:
+                notes_list.append(f"- Category: {cat}, Value: {val}")
+        memory_notes_str = "\n".join(notes_list)
+
     lang_code = profile.get('preferredLanguage', 'en')
     worker_type = profile.get('workerType', 'other_gig_worker')
     worker_types = profile.get('workerTypes')
@@ -312,7 +425,8 @@ async def chat_endpoint(request: ChatRequest):
         worker_type_desc=worker_type_desc,
         recent_jobs_json=recent_jobs_json,
         conversation_history_str=conversation_history_str,
-        language_name=language_name
+        language_name=language_name,
+        memory_notes_str=memory_notes_str
     )
 
     async def event_generator():
@@ -359,31 +473,32 @@ async def chat_endpoint(request: ChatRequest):
 
             is_english = language_name.lower() == "english"
             
+            # Generate the full English response first from the model
+            english_response = ""
+            for chunk in ask_gemma_chat_stream(chat_messages):
+                if chunk == "OLLAMA_UNREACHABLE_ERROR":
+                    yield json.dumps({"error": "Assistant is temporarily unavailable — please try again in a moment."}) + "\n"
+                    return
+                english_response += chunk
+                await asyncio.sleep(0.001)
+
+            # Parse and strip memory updates from English response
+            cleaned_english_response, memory_updates = parse_and_strip_memory_updates(english_response)
+
+            # Save memory updates if any exist
+            if memory_updates and db is not None:
+                save_memory_updates(request.user_id, memory_updates)
+
             if is_english:
-                # Stream directly
-                for chunk in ask_gemma_chat_stream(chat_messages):
-                    if chunk == "OLLAMA_UNREACHABLE_ERROR":
-                        yield json.dumps({"error": "Assistant is temporarily unavailable — please try again in a moment."}) + "\n"
-                        return
-                    full_response += chunk
-                    yield json.dumps({"chunk": chunk}) + "\n"
-                    await asyncio.sleep(0.001)
+                full_response = cleaned_english_response
             else:
-                # Generate full English response first
-                english_response = ""
-                for chunk in ask_gemma_chat_stream(chat_messages):
-                    if chunk == "OLLAMA_UNREACHABLE_ERROR":
-                        yield json.dumps({"error": "Assistant is temporarily unavailable — please try again in a moment."}) + "\n"
-                        return
-                    english_response += chunk
-                    await asyncio.sleep(0.001)
-                
-                # Perform the second stage translation to target language
-                translated_response = translate_to_language(english_response, language_name)
+                # Perform the second stage translation to target language on the cleaned English response
+                translated_response = translate_to_language(cleaned_english_response, language_name)
                 full_response = translated_response
-                
-                # Stream the translation chunks to the client
-                words = translated_response.split(" ")
+
+            # Stream the full response chunks to the client to simulate typing
+            if full_response:
+                words = full_response.split(" ")
                 for i, word in enumerate(words):
                     chunk = word + (" " if i < len(words) - 1 else "")
                     yield json.dumps({"chunk": chunk}) + "\n"

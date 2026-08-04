@@ -1655,6 +1655,7 @@ class GiGiAvatar extends StatefulWidget {
 class _GiGiAvatarState extends State<GiGiAvatar> {
   GiGiState _avatarState = GiGiState.idle;
   Timer? _animationTimer;
+  bool _talkingToggle = false;
 
   @override
   void initState() {
@@ -1681,13 +1682,6 @@ class _GiGiAvatarState extends State<GiGiAvatar> {
   void _updateAnimation() {
     _animationTimer?.cancel();
     
-    if (widget.forceState != null) {
-      setState(() {
-        _avatarState = widget.forceState!;
-      });
-      return;
-    }
-    
     // Check motion reduction
     final disableMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
     if (disableMotion) {
@@ -1697,17 +1691,23 @@ class _GiGiAvatarState extends State<GiGiAvatar> {
       return;
     }
 
-    if (widget.isStreaming) {
+    final isCurrentlyTalking = widget.forceState == GiGiState.talking || (widget.forceState == null && widget.isStreaming);
+    
+    if (isCurrentlyTalking) {
+      setState(() {
+        _avatarState = GiGiState.talking;
+      });
       _animationTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
         if (mounted) {
           setState(() {
-            _avatarState = _avatarState == GiGiState.idle ? GiGiState.talking : GiGiState.idle;
+            _talkingToggle = !_talkingToggle;
           });
         }
       });
     } else {
+      final nextState = widget.forceState ?? GiGiState.idle;
       // If transitioning from talking to idle, show happy face briefly
-      if (_avatarState == GiGiState.talking) {
+      if (_avatarState == GiGiState.talking && nextState == GiGiState.idle) {
         setState(() {
           _avatarState = GiGiState.happy;
         });
@@ -1720,7 +1720,7 @@ class _GiGiAvatarState extends State<GiGiAvatar> {
         });
       } else {
         setState(() {
-          _avatarState = GiGiState.idle;
+          _avatarState = nextState;
         });
       }
     }
@@ -1841,34 +1841,33 @@ class _GiGiAvatarState extends State<GiGiAvatar> {
 
   Widget _buildMouth(double size) {
     if (_avatarState == GiGiState.idle) {
-      return Container(
-        width: size * 0.2,
-        height: 2,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(1),
-        ),
+      return CustomPaint(
+        size: Size(size * 0.2, size * 0.06),
+        painter: const _SmilePainter(curvature: 1.2),
       );
     } else if (_avatarState == GiGiState.talking) {
-      return Container(
-        width: size * 0.16,
-        height: size * 0.12,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          border: Border.all(color: PlayfulColors.border, width: 1.5),
-        ),
+      return CustomPaint(
+        size: Size(size * 0.2, size * 0.14),
+        painter: _OpenSmilePainter(openness: _talkingToggle ? 0.4 : 0.9),
+      );
+    } else if (_avatarState == GiGiState.happy) {
+      return CustomPaint(
+        size: Size(size * 0.22, size * 0.08),
+        painter: const _SmilePainter(curvature: 2.2),
       );
     } else {
       return CustomPaint(
-        size: Size(size * 0.22, size * 0.08),
-        painter: _SmilePainter(),
+        size: Size(size * 0.2, size * 0.06),
+        painter: const _SmilePainter(curvature: 1.2),
       );
     }
   }
 }
 
 class _SmilePainter extends CustomPainter {
+  final double curvature;
+  const _SmilePainter({this.curvature = 1.8});
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
@@ -1879,12 +1878,42 @@ class _SmilePainter extends CustomPainter {
       
     final path = Path()
       ..moveTo(0, 0)
-      ..quadraticBezierTo(size.width / 2, size.height * 2, size.width, 0);
+      ..quadraticBezierTo(size.width / 2, size.height * curvature, size.width, 0);
       
     canvas.drawPath(path, paint);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class _OpenSmilePainter extends CustomPainter {
+  final double openness;
+  const _OpenSmilePainter({required this.openness});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    final borderPaint = Paint()
+      ..color = PlayfulColors.border
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
+
+    final path = Path();
+    path.moveTo(0, size.height * 0.2);
+    path.quadraticBezierTo(size.width / 2, size.height * 0.4, size.width, size.height * 0.2);
+    path.quadraticBezierTo(size.width / 2, size.height * (1.2 + openness * 0.8), 0, size.height * 0.2);
+    path.close();
+
+    canvas.drawPath(path, paint);
+    canvas.drawPath(path, borderPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
 
