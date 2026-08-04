@@ -13,6 +13,10 @@ Select the appropriate package for your device to download directly from the Git
 * 💾 **[Older Mobiles (ARMv7)](https://github.com/Sharvani-G/GigSense/releases/download/v1.2.0/GiGly-v1.2.0-old-mobiles.apk)** (19.1 MB) — *Optimized for older 32-bit devices (armeabi-v7a).*
 * 💻 **[Emulator Testing (x86_64)](https://github.com/Sharvani-G/GigSense/releases/download/v1.2.0/GiGly-v1.2.0-emulator-testing.apk)** (22.8 MB) — *Built for x86_64 emulator configurations.*
 
+> ⚠️ **Android Installation Note (Play Protect Warning)**
+> Since these APKs are downloaded directly (sideloaded) and not installed from the official Google Play Store, Android Play Protect may show a block warning during installation.
+> **To Install**: Tap **"More details"** on the popup, then select **"Install anyway"** to complete the installation.
+
 ---
 
 GiGly is a mobile-first earnings companion and safety shield designed for gig workers in India ( Ola, Uber, Swiggy, Zomato, Rapido). It aggregates job metrics, evaluates pay fairness using crowdsourced rate benchmarks, provides a context-aware AI assistant (GiGi), and secures workers with stateful SOS tracking.
@@ -72,7 +76,7 @@ This project was built and refined by:
 * **Fatigue Alerts**: Displays proactive, friendly alert nudges on the Home Screen dashboard if daily active hours exceed 10 hours (or weekly totals exceed 50 hours), encouraging workers to rest before they experience exhaustion or risk safety.
 
 ### 🛡️ Stateful SOS Safety Broadcast
-* **Silent Native SMS Dispatch**: Calls Android `SmsManager` to send silent live coordinate updates in the background to emergency contacts.
+* **Silent Native SMS Dispatch**: Calls Android `SmsManager` to send silent live coordinates to trusted emergency contacts.
 * **Stateful Navigation Lockout**: Locks the worker's interface to the active SOS safety card, preventing accidental exits while a safety session is broadcasting.
 
 ### 📷 Screenshot OCR Receipt Classifier
