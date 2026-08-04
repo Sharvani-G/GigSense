@@ -222,12 +222,12 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
       if (totalTrips < 2) {
         list.add(ZoneStats(
           zone: zone,
-          platformsLabel: _platformFilter == 'all' ? 'All Platforms' : _platformFilter[0].toUpperCase() + _platformFilter.substring(1),
+          platformsLabel: _platformFilter == 'all' ? StringsProvider.instance.t('map_all_platforms') : _platformFilter[0].toUpperCase() + _platformFilter.substring(1),
           averagePercentage: 0.0,
           totalTrips: totalTrips,
           confidenceTier: "Estimated",
           statusColor: const Color(0xFF94A3B8), // Gray
-          interpretation: "Not enough reported trips to calculate a locality baseline.",
+          interpretation: StringsProvider.instance.t('map_interpret_no_data'),
         ));
         return;
       }
@@ -263,13 +263,13 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
       String interpretation;
       if (averagePercentage >= 100.0) {
         statusColor = PlayfulColors.quaternary; // Mint
-        interpretation = "Workers reporting trips here have generally been paid the full expected rate.";
+        interpretation = StringsProvider.instance.t('map_interpret_fair');
       } else if (averagePercentage >= 85.0) {
         statusColor = PlayfulColors.tertiary; // Amber
-        interpretation = "Workers reporting trips here have generally been paid close to the expected rate.";
+        interpretation = StringsProvider.instance.t('map_interpret_mixed');
       } else {
         statusColor = PlayfulColors.secondary; // Pink
-        interpretation = "Workers reporting trips here have generally experienced significant underpayments.";
+        interpretation = StringsProvider.instance.t('map_interpret_underpaid');
       }
 
       list.add(ZoneStats(
@@ -401,7 +401,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("You are outside the monitored Bangalore zones.")),
+            SnackBar(content: Text(StringsProvider.instance.t('map_outside_zones'))),
           );
         }
       }
@@ -593,12 +593,12 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                     ),
                     child: Text(
                       stats.totalTrips < 2
-                          ? "NO DATA"
+                          ? StringsProvider.instance.t('map_status_no_data')
                           : stats.averagePercentage >= 100.0
-                              ? "Trending Fair"
+                              ? StringsProvider.instance.t('map_status_fair')
                               : stats.averagePercentage >= 85.0
-                                  ? "Mixed Pay"
-                                  : "Trending Underpaid",
+                                  ? StringsProvider.instance.t('map_status_mixed')
+                                  : StringsProvider.instance.t('map_status_underpaid'),
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
@@ -612,10 +612,17 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
               const Divider(color: PlayfulColors.border, thickness: 2),
               const SizedBox(height: 12),
 
-              _buildDetailRow("Platforms covered", stats.platformsLabel),
-              _buildDetailRow("Average pay rate", stats.totalTrips >= 2 ? "${stats.averagePercentage.toStringAsFixed(0)}% of expected" : "N/A"),
-              _buildDetailRow("Confidence tier", stats.confidenceTier),
-              _buildDetailRow("Total reported trips", "${stats.totalTrips}"),
+              _buildDetailRow(StringsProvider.instance.t('map_platforms_covered'), stats.platformsLabel),
+              _buildDetailRow(StringsProvider.instance.t('map_average_pay_rate'), stats.totalTrips >= 2 ? StringsProvider.instance.t('map_pct_expected').replaceFirst('{}', stats.averagePercentage.toStringAsFixed(0)) : "N/A"),
+              _buildDetailRow(
+                StringsProvider.instance.t('map_confidence_tier'),
+                stats.confidenceTier == 'Estimated'
+                    ? StringsProvider.instance.t('map_tier_estimated')
+                    : stats.confidenceTier == 'Growing'
+                        ? StringsProvider.instance.t('map_tier_growing')
+                        : StringsProvider.instance.t('map_tier_established'),
+              ),
+              _buildDetailRow(StringsProvider.instance.t('map_total_reported_trips'), "${stats.totalTrips}"),
 
               const SizedBox(height: 20),
 
@@ -650,7 +657,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          "Estimated — limited local data available yet",
+                          StringsProvider.instance.t('map_estimated_limited_data'),
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
@@ -785,22 +792,22 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
   @override
   Widget build(BuildContext context) {
     final String platformLabel = _platformFilter == 'all'
-        ? 'All Platforms'
+        ? StringsProvider.instance.t('map_all_platforms')
         : _platformFilter[0].toUpperCase() + _platformFilter.substring(1);
 
     final String timeLabel = _timeFilter == 'all'
-        ? 'All Day'
+        ? StringsProvider.instance.t('map_all_day')
         : _timeFilter == 'morning'
-            ? 'Mornings'
+            ? StringsProvider.instance.t('map_mornings')
             : _timeFilter == 'evening'
-                ? 'Evenings'
-                : 'Late-Nights';
+                ? StringsProvider.instance.t('map_evenings')
+                : StringsProvider.instance.t('map_latenights');
 
     return Scaffold(
       backgroundColor: PlayfulColors.background,
       appBar: AppBar(
         title: Text(
-          "FAIRNESS MAP",
+          StringsProvider.instance.t('map_title'),
           style: GoogleFonts.outfit(fontWeight: FontWeight.w900, fontSize: 18, color: PlayfulColors.foreground),
         ),
         elevation: 0,
@@ -969,7 +976,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                               ),
                               child: Center(
                                 child: Text(
-                                  "Map View",
+                                  StringsProvider.instance.t('map_view'),
                                   style: GoogleFonts.outfit(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w800,
@@ -991,7 +998,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                               ),
                               child: Center(
                                 child: Text(
-                                  "List View",
+                                  StringsProvider.instance.t('list_view'),
                                   style: GoogleFonts.outfit(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w800,
@@ -1185,7 +1192,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                           color: PlayfulColors.foreground,
                         ),
                         decoration: InputDecoration(
-                          hintText: "Search locality or address...",
+                          hintText: StringsProvider.instance.t('map_search_hint'),
                           hintStyle: GoogleFonts.plusJakartaSans(
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
@@ -1251,7 +1258,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                                     dense: true,
                                     leading: const Icon(Icons.search_outlined, color: PlayfulColors.accent, size: 18),
                                     title: Text(
-                                      "Search online for '${_searchController.text}'",
+                                      StringsProvider.instance.t('map_search_online').replaceFirst('{}', _searchController.text),
                                       style: GoogleFonts.plusJakartaSans(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 12,

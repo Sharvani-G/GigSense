@@ -948,7 +948,7 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
           ),
           const SizedBox(height: 24),
           Text(
-            "SET SAVINGS GOAL",
+            StringsProvider.instance.t('btn_set_savings_goal'),
             style: GoogleFonts.outfit(
               fontWeight: FontWeight.w900,
               fontSize: 18,
@@ -959,7 +959,7 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
           ),
           const SizedBox(height: 24),
           Text(
-            "TARGET AMOUNT (₹)",
+            StringsProvider.instance.t('settings_target_amount'),
             style: GoogleFonts.plusJakartaSans(
               fontSize: 11,
               fontWeight: FontWeight.w800,
@@ -1030,7 +1030,7 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          "This target is a lot higher than anything you've earned before — want to set something more achievable instead?",
+                          StringsProvider.instance.t('settings_target_unachievable_warning'),
                           style: GoogleFonts.plusJakartaSans(
                             color: PlayfulColors.foreground,
                             fontWeight: FontWeight.bold,
@@ -1052,7 +1052,7 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
                               border: Border.all(color: PlayfulColors.border, width: 1.5),
                             ),
                             child: Text(
-                              "Set to ₹${formatIndianCurrency(suggestedAmount.toDouble())}",
+                              StringsProvider.instance.t('settings_target_suggested_btn').replaceFirst('{}', formatIndianCurrency(suggestedAmount.toDouble())),
                               textAlign: TextAlign.center,
                               style: GoogleFonts.outfit(
                                 fontWeight: FontWeight.w900,
@@ -1073,7 +1073,7 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
           ),
           const SizedBox(height: 24),
           Text(
-            "GOAL PERIOD",
+            StringsProvider.instance.t('settings_goal_period'),
             style: GoogleFonts.plusJakartaSans(
               fontSize: 11,
               fontWeight: FontWeight.w800,
@@ -1110,7 +1110,7 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
                       ),
                       child: Center(
                         child: Text(
-                          "Weekly",
+                          StringsProvider.instance.t('settings_weekly'),
                           style: GoogleFonts.outfit(
                             fontSize: 14,
                             fontWeight: FontWeight.w800,
@@ -1134,7 +1134,7 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
                       ),
                       child: Center(
                         child: Text(
-                          "Monthly",
+                          StringsProvider.instance.t('settings_monthly'),
                           style: GoogleFonts.outfit(
                             fontSize: 14,
                             fontWeight: FontWeight.w800,
@@ -2822,7 +2822,7 @@ class _GiGiMemoryBottomSheetContentState extends State<_GiGiMemoryBottomSheetCon
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Memory note removed")),
+          SnackBar(content: Text(StringsProvider.instance.t('settings_memory_removed_snack'))),
         );
       }
     } catch (e) {
@@ -2845,7 +2845,7 @@ class _GiGiMemoryBottomSheetContentState extends State<_GiGiMemoryBottomSheetCon
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("All memories cleared")),
+          SnackBar(content: Text(StringsProvider.instance.t('settings_memory_cleared_snack'))),
         );
       }
     } catch (e) {

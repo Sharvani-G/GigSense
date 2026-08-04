@@ -971,14 +971,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final targetMonday = currentMonday.add(Duration(days: _selectedWeekOffset * 7));
     final start = DateTime(targetMonday.year, targetMonday.month, targetMonday.day);
     final end = start.add(const Duration(days: 6));
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    final startMonth = months[start.month - 1];
-    final endMonth = months[end.month - 1];
+    final s = StringsProvider.instance;
+    final startMonth = s.t('month_${start.month}');
+    final endMonth = s.t('month_${end.month}');
     final String dateRange;
     if (_selectedWeekOffset == 0) {
-      dateRange = "This week · ${start.day} $startMonth – ${end.day} $endMonth";
+      dateRange = "${s.t('home_this_week')} · ${start.day} $startMonth – ${end.day} $endMonth";
     } else if (_selectedWeekOffset == -1) {
-      dateRange = "Last week · ${start.day} $startMonth – ${end.day} $endMonth";
+      dateRange = "${s.t('home_last_week')} · ${start.day} $startMonth – ${end.day} $endMonth";
     } else {
       dateRange = "${start.day} $startMonth – ${end.day} $endMonth";
     }
@@ -1397,7 +1397,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ),
             icon: const Icon(Icons.shield_outlined, size: 24),
             label: Text(
-              "I feel unsafe",
+              StringsProvider.instance.t('btn_unsafe'),
               style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
             ),
           ),
@@ -1589,7 +1589,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      "SAVINGS TARGET",
+                      StringsProvider.instance.t('savings_target_header'),
                       style: GoogleFonts.plusJakartaSans(
                         fontWeight: FontWeight.w900,
                         fontSize: 12,
@@ -1599,7 +1599,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                     if (_savingsEarned >= _savingsTarget)
                       Text(
-                        "₹${formatIndianCurrency(_savingsEarned)} of ₹${formatIndianCurrency(_savingsTarget)} — Ahead! 🎉",
+                        StringsProvider.instance.t('savings_ahead')
+                            .replaceFirst('{}', '₹${formatIndianCurrency(_savingsEarned)}')
+                            .replaceFirst('{}', '₹${formatIndianCurrency(_savingsTarget)}'),
                         style: GoogleFonts.outfit(
                           fontSize: 13,
                           fontWeight: FontWeight.w900,
@@ -1608,7 +1610,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       )
                     else
                       Text(
-                        "${((_savingsProgress) * 100).clamp(0, 100).round()}% Completed",
+                        StringsProvider.instance.t('savings_completed')
+                            .replaceFirst('{}', '${((_savingsProgress) * 100).clamp(0, 100).round()}'),
                         style: GoogleFonts.outfit(
                           fontSize: 13,
                           fontWeight: FontWeight.w900,
@@ -1643,7 +1646,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      "₹${formatIndianCurrency(_savingsEarned)} of ₹${formatIndianCurrency(_savingsTarget)} this ${_savingsGoal!['period']}",
+                      StringsProvider.instance.t('savings_progress_label')
+                          .replaceFirst('{}', '₹${formatIndianCurrency(_savingsEarned)}')
+                          .replaceFirst('{}', '₹${formatIndianCurrency(_savingsTarget)}')
+                          .replaceFirst('{}', StringsProvider.instance.t(_savingsGoal!['period'] == 'weekly' ? 'settings_weekly' : 'settings_monthly').toLowerCase()),
                       style: GoogleFonts.plusJakartaSans(
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
@@ -1651,7 +1657,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       ),
                     ),
                     Text(
-                      "${_savingsDaysRemaining}d remaining",
+                      StringsProvider.instance.t('savings_days_remaining')
+                          .replaceFirst('{}', '$_savingsDaysRemaining'),
                       style: GoogleFonts.plusJakartaSans(
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
@@ -1669,10 +1676,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       final periodLength = _savingsGoal!['period'] == 'weekly' ? 7 : 30;
                       final daysElapsed = periodLength - _savingsDaysRemaining;
                       if (daysElapsed < 3 || _jobs.length < 3) {
-                        return "Pacing: More logged trips needed to calculate a reliable pacing forecast.";
+                        return StringsProvider.instance.t('savings_pacing_more_data');
                       }
                       if (daysElapsed <= 0) {
-                        return "Pacing details will appear after the first day of the goal period.";
+                        return StringsProvider.instance.t('savings_pacing_waiting');
                       }
                       final dailyAvg = _savingsEarned / daysElapsed;
                       double projection = dailyAvg * periodLength;
@@ -1680,16 +1687,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         projection = _savingsTarget;
                       }
                       
-                      final String statusMsg;
                       if (projection >= _savingsTarget) {
-                        statusMsg = "you are on track to reach your goal!";
+                        return StringsProvider.instance.t('savings_pacing_ontrack')
+                            .replaceFirst('{}', '₹${formatIndianCurrency(projection)}');
                       } else {
                         final deficit = _savingsTarget - projection;
                         final displayDeficit = (deficit.isInfinite || deficit.isNaN || deficit > 1e12 || deficit < 0) ? 0.0 : deficit;
-                        statusMsg = "running about ₹${formatIndianCurrency(displayDeficit)} under pace.";
+                        return StringsProvider.instance.t('savings_pacing_under')
+                            .replaceFirst('{}', '₹${formatIndianCurrency(projection)}')
+                            .replaceFirst('{}', '₹${formatIndianCurrency(displayDeficit)}');
                       }
-                      
-                      return "Pacing: At your current rate, you are projected to reach ₹${formatIndianCurrency(projection)} — $statusMsg";
                     }(),
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 12,
@@ -1896,7 +1903,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       const Icon(Icons.map_outlined, color: PlayfulColors.accent, size: 24),
                       const SizedBox(width: 8),
                       Text(
-                        "FAIRNESS MAP",
+                        StringsProvider.instance.t('map_title'),
                         style: GoogleFonts.outfit(
                           fontSize: 18,
                           fontWeight: FontWeight.w900,
@@ -1907,7 +1914,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "View live pay fairness trends and underpayment zones across Bengaluru.",
+                    StringsProvider.instance.t('map_desc'),
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,

@@ -7,6 +7,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../i18n/strings.dart';
+import '../i18n/strings_provider.dart';
 import 'playful_widgets.dart';
 
 class OcrResultScreen extends StatefulWidget {
@@ -198,7 +199,7 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Save failed: $e", style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
+            content: Text(StringsProvider.instance.t('err_failed_parse_receipt'), style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
             backgroundColor: PlayfulColors.secondary,
             behavior: SnackBarBehavior.floating,
           ),
@@ -254,7 +255,7 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
                         Navigator.pop(context);
                         widget.onEdit();
                       },
-                      child: const Text("EDIT DETAILS"),
+                      child: Text(s.t('btn_edit')),
                     ),
                   ],
                 ),

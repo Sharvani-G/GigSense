@@ -1481,7 +1481,7 @@ class _PlayfulImagePickerButtonState extends State<PlayfulImagePickerButton> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              "SELECT IMAGE SOURCE",
+              StringsProvider.instance.t('chat_select_image_source'),
               style: GoogleFonts.outfit(
                 fontSize: 16,
                 fontWeight: FontWeight.w900,
@@ -1491,18 +1491,18 @@ class _PlayfulImagePickerButtonState extends State<PlayfulImagePickerButton> {
             const SizedBox(height: 16),
             PlayfulButton(
               onPressed: () => Navigator.pop(context, ImageSource.camera),
-              child: const Text("📸 TAKE PHOTO"),
+              child: Text(StringsProvider.instance.t('chat_take_photo')),
             ),
             const SizedBox(height: 12),
             PlayfulButton(
               onPressed: () => Navigator.pop(context, ImageSource.gallery),
-              child: const Text("📁 CHOOSE FROM GALLERY"),
+              child: Text(StringsProvider.instance.t('chat_choose_gallery')),
             ),
             const SizedBox(height: 12),
             PlayfulButton(
               onPressed: () => Navigator.pop(context),
               backgroundColor: const Color(0xFFE2E8F0),
-              child: const Text("CANCEL", style: TextStyle(color: PlayfulColors.foreground)),
+              child: Text(StringsProvider.instance.t('btn_cancel'), style: const TextStyle(color: PlayfulColors.foreground)),
             ),
           ],
         ),

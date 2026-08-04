@@ -760,7 +760,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                   _failedScanCount = 0;
                 });
               },
-              child: const Text("Got it"),
+              child: Text(StringsProvider.instance.t('btn_got_it')),
             ),
           ],
         );
@@ -1759,7 +1759,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
       debugPrint("Error voice parsing transcript: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to parse voice command. Please enter details manually.")),
+          SnackBar(content: Text(StringsProvider.instance.t('err_voice_parse_failed'))),
         );
       }
     }
@@ -1798,18 +1798,18 @@ class _LogJobScreenState extends State<LogJobScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "Here is what I understood from your voice log:",
+                s.t('logjob_voice_understood'),
                 style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 14, color: PlayfulColors.foreground),
               ),
               const SizedBox(height: 16),
-              _buildParsedRow("Platform", platformText ?? "[Missing]", platformText != null),
-              _buildParsedRow("Fare", fareText ?? "[Missing]", fare != null),
-              _buildParsedRow("Distance", distanceText ?? "[Missing]", distance != null),
-              _buildParsedRow("Duration", durationText ?? "[Missing]", duration != null),
+              _buildParsedRow(s.t('logjob_label_platform'), platformText ?? s.t('logjob_voice_missing'), platformText != null),
+              _buildParsedRow(s.t('logjob_label_fare'), fareText ?? s.t('logjob_voice_missing'), fare != null),
+              _buildParsedRow(s.t('logjob_label_distance'), distanceText ?? s.t('logjob_voice_missing'), distance != null),
+              _buildParsedRow(s.t('logjob_label_duration'), durationText ?? s.t('logjob_voice_missing'), duration != null),
               const SizedBox(height: 20),
               if (!allPresent)
                 Text(
-                  "Some details are missing. Tapping 'Yes, it's correct' will fill in what was heard so you can complete the rest manually.",
+                  s.t('logjob_voice_missing_details'),
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 12,
                     color: PlayfulColors.secondary,
@@ -1818,7 +1818,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                 )
               else
                 Text(
-                  "Does this look correct?",
+                  s.t('logjob_voice_look_correct'),
                   style: GoogleFonts.plusJakartaSans(fontSize: 14, color: PlayfulColors.foreground, fontWeight: FontWeight.w500),
                 ),
             ],
@@ -1860,8 +1860,8 @@ class _LogJobScreenState extends State<LogJobScreen> {
                   _submitJob();
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("Pre-filled details. Please fill in the missing fields to log the job."),
+                    SnackBar(
+                      content: Text(StringsProvider.instance.t('snack_prefilled_missing_fields')),
                       backgroundColor: PlayfulColors.accent,
                     ),
                   );

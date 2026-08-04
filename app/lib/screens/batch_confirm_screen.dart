@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'playful_widgets.dart';
 import '../i18n/strings.dart';
+import '../i18n/strings_provider.dart';
 
 class CandidateRow {
   String platform;
@@ -227,7 +228,9 @@ class _BatchConfirmScreenState extends State<BatchConfirmScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Successfully logged ${_rows.length} ${_rows.length == 1 ? 'job' : 'jobs'}!")),
+        SnackBar(content: Text(_rows.length == 1
+            ? StringsProvider.instance.t('batch_success_logged_singular')
+            : StringsProvider.instance.t('batch_success_logged_plural').replaceFirst('{}', '${_rows.length}'))),
       );
       Navigator.pop(context);
     } catch (e) {
@@ -420,7 +423,7 @@ class _BatchConfirmScreenState extends State<BatchConfirmScreen> {
                   ? const Center(child: CircularProgressIndicator(color: PlayfulColors.accent))
                   : PlayfulButton(
                       onPressed: _rows.isEmpty ? null : _submitAllJobs,
-                      child: Text("CONFIRM & LOG ALL (${_rows.length})"),
+                      child: Text(StringsProvider.instance.t('batch_confirm_log_all').replaceFirst('{}', '${_rows.length}')),
                     ),
             ),
           ],

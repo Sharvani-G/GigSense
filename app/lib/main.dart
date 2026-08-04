@@ -328,39 +328,44 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
-    final s = StringsProvider.instance;
-    return Scaffold(
-      body: _screens[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          MainNavigationController.selectTab(index);
-        },
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: PlayfulColors.accent,
-        unselectedItemColor: PlayfulColors.mutedForeground,
-        backgroundColor: Colors.white,
-        selectedLabelStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 11),
-        unselectedLabelStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 11),
-        items: [
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.home),
-            label: s.t('nav_home'),
+    return ListenableBuilder(
+      listenable: StringsProvider.instance,
+      builder: (context, _) {
+        final s = StringsProvider.instance;
+        return Scaffold(
+          body: _screens[_currentIndex],
+          bottomNavigationBar: BottomNavigationBar(
+            currentIndex: _currentIndex,
+            onTap: (index) {
+              MainNavigationController.selectTab(index);
+            },
+            type: BottomNavigationBarType.fixed,
+            selectedItemColor: PlayfulColors.accent,
+            unselectedItemColor: PlayfulColors.mutedForeground,
+            backgroundColor: Colors.white,
+            selectedLabelStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w800, fontSize: 11),
+            unselectedLabelStyle: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w700, fontSize: 11),
+            items: [
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.home),
+                label: s.t('nav_home'),
+              ),
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.add_circle_outline),
+                label: s.t('nav_log_job'),
+              ),
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.chat_bubble_outline),
+                label: s.t('nav_chat'),
+              ),
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.settings),
+                label: s.t('settings_title'),
+              ),
+            ],
           ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.add_circle_outline),
-            label: s.t('nav_log_job'),
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.chat_bubble_outline),
-            label: s.t('nav_chat'),
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.settings),
-            label: s.t('settings_title'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
