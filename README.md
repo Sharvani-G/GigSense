@@ -1,6 +1,6 @@
 # GiGly — Pay Fairness & Safety Companion for Gig Workers
 
-Submission for the Synaptrix Hackathon.
+Submission for the **Synaptrix Hackathon** — Polished and perfected through intense post-hackathon cycles of real-world trials, error-tracking, and robust optimization.
 
 GiGly is a mobile-first earnings companion and safety shield designed for gig workers in India ( Ola, Uber, Swiggy, Zomato, Rapido). It aggregates job metrics, evaluates pay fairness using crowdsourced rate benchmarks, provides a context-aware AI assistant (GiGi), and secures workers with stateful SOS tracking.
 
@@ -8,9 +8,20 @@ The entire app is built on a custom **Playful Geometric Design System** featurin
 
 ---
 
+## 🛠 From Hackathon Prototype to Stable Release
+
+While GiGly started as a fast-paced submission prototype for the **Synaptrix Hackathon**, we committed to transforming it into a production-ready application. Through multiple iterative trials, code testing, and solving real-world compilation/localization quirks, we refined every feature:
+
+* **Translation Syntax & Engine Fixes**: Meticulously normalized translations to handle nested single quote escapes (e.g. `I'm`), resolving critical compiler crash states.
+* **100% Native Language Parity**: Audited and fixed translation gaps across Settings and Maps views so that the user interface is completely local, with zero English mixture.
+* **Dynamic Zone Comparisons**: Overhauled zone analysis calculations to support dynamic comparisons and multilingual updates.
+* **Refined Database Validation**: Hardened backend schemas and Firebase sync systems to prevent errors when users transition between offline and online states.
+
+---
+
 ## 👥 Contributors
 
-This project was built during the Synaptrix Hackathon by:
+This project was built and refined by:
 
 * **Sharan S** — [@sharancode3](https://github.com/sharancode3)
 * **Sharvani G Bhaskar** — [@Sharvani-G](https://github.com/Sharvani-G)
@@ -19,8 +30,6 @@ This project was built during the Synaptrix Hackathon by:
 
 ## 🚀 What's New in v1.2.0
 
-Version `v1.2.0` focuses on **100% UI localization parity and build stability**. It eliminates mixed-language screens and implements:
-
 * **Complete App-wide Localization**: fully translated all remaining English placeholders in the Settings, Languages, and Map screens. Settings items like `Emergency Contacts`, `GiGi Memory`, and `Manage` are fully localized.
 * **Pay Fairness Map Localization**: Fully localized all map filters (`Morning`, `Evening`, `Late-Night`, `All Platforms`, `All Day`), legends (`Fair`, `Mixed`, `Underpaid`, `No Data`), and metadata cards (`Estimated`, `Growing`, `Well-established` confidence levels).
 * **Safe Translation Engine**: Re-engineered key injection to handle nested single quote escapes (e.g., `'I\'m'`) preventing Dart compiler failures.
@@ -28,7 +37,7 @@ Version `v1.2.0` focuses on **100% UI localization parity and build stability**.
 
 ---
 
-## 🛠 How Core Features Work
+## 💡 How Core Features Work
 
 ### 1. Manual & OCR Job Logging
 * **Form-based Input**: Workers log trips manually with easy forms that handle distance (KM) and time (Minutes) units automatically.
@@ -47,7 +56,6 @@ Version `v1.2.0` focuses on **100% UI localization parity and build stability**.
   * **Orange**: Pays close to expected rates.
   * **Pink**: Underpayment patterns detected.
 * **Time & Platform Filters**: Users can filter trends by platforms (Zomato, Swiggy, Ola, Uber) and time of day (Morning, Evening, Late-Night).
-* **Search Cache**: Saves search queries locally to prevent IP rate-limiting on Nominatim.
 
 ### 4. Interactive AI Chatbot (GiGi)
 * An AI assistant grounded directly in the user's logged trips and Firestore databases.
@@ -58,63 +66,3 @@ Version `v1.2.0` focuses on **100% UI localization parity and build stability**.
 * **Silent Background SMS**: Utilizes Android `SmsManager` to send silent live coordinates to trusted emergency contacts.
 * **Persistent Lockout**: Navigation is locked to the active SOS view while broadcasting is active, ensuring the worker's safety interface remains visible.
 * **WhatsApp Templates**: Pre-fills emergency coordinate templates to send via WhatsApp quickly.
-
----
-
-## 📁 Repository Structure
-
-```
-├── app/                        # Flutter Mobile Frontend Application
-│   ├── lib/
-│   │   ├── i18n/               # Localization strings (strings.dart) & ChangeNotifier provider
-│   │   ├── models/             # Data models (Job, SOS Settings, Contact)
-│   │   ├── screens/            # Application Screens (Home Dashboard, Map, OCR, Settings, SOS)
-│   │   └── widgets/            # Reusable UI widgets (Playful Buttons, Cards, Charts)
-│   └── pubspec.yaml            # Project dependencies & assets configuration
-│
-└── backend/                    # FastAPI Backend Application (Python)
-    ├── main.py                 # API server routing, OCR receipt parsing, Gemini AI helper integrations
-    ├── schemas.py              # Pydantic schemas for data validation
-    └── requirements.txt        # Python library dependencies
-```
-
----
-
-## 📦 How to Run the Project
-
-### 1. Clone the repository
-```bash
-git clone https://github.com/Sharvani-G/GigSense.git
-```
-
-### 2. Configure & Run Backend (FastAPI)
-1. Navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
-2. Install Python dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Set your environment variables in `.env`:
-   ```env
-   GEMINI_API_KEY=your_gemini_api_key_here
-   ```
-4. Start the server:
-   ```bash
-   uvicorn main:app --reload
-   ```
-
-### 3. Configure & Run Mobile App (Flutter)
-1. Navigate to the app directory:
-   ```bash
-   cd ../app
-   ```
-2. Get Flutter packages:
-   ```bash
-   flutter pub get
-   ```
-3. Run the application:
-   ```bash
-   flutter run
-   ```
