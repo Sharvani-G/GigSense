@@ -287,7 +287,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 // Emergency Contacts row
                                 _buildSettingsRow(
                                   icon: Icons.health_and_safety_outlined,
-                                  label: "Emergency Contacts",
+                                  label: s.t('auto_settings_screen_emergency_contacts'),
                                   trailingText: "${_emergencyContacts.length}/5",
                                   onTap: () async {
                                     final updated = await Navigator.push(
@@ -383,7 +383,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const CircularProgressIndicator(color: PlayfulColors.accent),
               const SizedBox(height: 16),
               Text(
-                "Recalculating community rates...",
+                s.t('auto_settings_screen_recalculating_community_rates'),
                 style: GoogleFonts.plusJakartaSans(
                   fontWeight: FontWeight.bold,
                   color: PlayfulColors.foreground,
@@ -413,7 +413,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                "Successfully recalculated community rates!",
+                s.t('auto_settings_screen_successfully_recalculated_com'),
                 style: GoogleFonts.plusJakartaSans(
                   color: PlayfulColors.foreground,
                   fontWeight: FontWeight.bold,
@@ -440,7 +440,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              "Recalculation failed: $e",
+              s.t('auto_settings_screen_recalculation_failed_e').replaceFirst('{}', e.toString()),
               style: GoogleFonts.plusJakartaSans(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -1606,7 +1606,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                     // Working Platforms Multi-select
                     Text(
-                      "WHICH PLATFORMS DO YOU GIG ON?",
+                      s.t('auto_settings_screen_which_platforms_do_you_gig'),
                       style: GoogleFonts.plusJakartaSans(
                         fontWeight: FontWeight.w800,
                         fontSize: 12,
@@ -1652,7 +1652,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                     // Emergency Contact Management
                     Text(
-                      "EMERGENCY CONTACTS (MAX 5)",
+                      s.t('auto_settings_screen_emergency_contacts_max_5'),
                       style: GoogleFonts.plusJakartaSans(
                         fontWeight: FontWeight.w800,
                         fontSize: 12,
@@ -1672,7 +1672,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           border: Border.all(color: PlayfulColors.border, width: 1.5),
                         ),
                         child: Text(
-                          "No emergency contacts added yet.",
+                          s.t('auto_settings_screen_no_emergency_contacts_added_y'),
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 12,
                             color: PlayfulColors.mutedForeground,
@@ -1750,7 +1750,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Text(
-                              "ADD EMERGENCY CONTACT",
+                              s.t('auto_settings_screen_add_emergency_contact'),
                               style: GoogleFonts.outfit(
                                 fontWeight: FontWeight.w900,
                                 fontSize: 11,
@@ -1792,7 +1792,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                   const Icon(Icons.add, size: 16, color: PlayfulColors.foreground),
                                   const SizedBox(width: 4),
                                   Text(
-                                    "ADD TO LIST",
+                                    s.t('auto_settings_screen_add_to_list'),
                                     style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: PlayfulColors.foreground),
                                   ),
                                 ],
@@ -2070,7 +2070,7 @@ class AboutScreen extends StatelessWidget {
               }),
               const SizedBox(height: 24),
               Text(
-                'DEVELOPERS',
+                s.t('auto_settings_screen_developers'),
                 style: GoogleFonts.outfit(
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
@@ -2114,7 +2114,7 @@ class AboutScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Team Mutex',
+                            s.t('auto_settings_screen_team_mutex'),
                             style: GoogleFonts.outfit(
                               fontSize: 16,
                               fontWeight: FontWeight.w900,
@@ -2123,7 +2123,7 @@ class AboutScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '• Sharan S\n• Sharvani G',
+                            s.t('auto_settings_screen_sharan_sn_sharvani_g'),
                             style: GoogleFonts.plusJakartaSans(
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
@@ -2206,7 +2206,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
           side: const BorderSide(color: PlayfulColors.border, width: 2),
         ),
         title: Text(
-          "Add Contact",
+          s.t('auto_settings_screen_add_contact_1'),
           style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
         ),
         content: Column(
@@ -2263,7 +2263,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
         elevation: 0,
         iconTheme: const IconThemeData(color: PlayfulColors.foreground),
         title: Text(
-          "Emergency Contacts",
+          s.t('auto_settings_screen_emergency_contacts'),
           style: GoogleFonts.outfit(
             color: PlayfulColors.foreground,
             fontWeight: FontWeight.w900,
@@ -2284,7 +2284,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                   border: Border.all(color: PlayfulColors.tertiary, width: 2),
                 ),
                 child: Text(
-                  "Set up to 5 trusted contacts. If you ever feel unsafe on a job, you can quickly draft and send an SOS alert to them from the Home screen.",
+                  s.t('auto_settings_screen_set_up_to_5_trusted'),
                   style: GoogleFonts.plusJakartaSans(
                     fontWeight: FontWeight.bold,
                     color: PlayfulColors.foreground,
@@ -2351,7 +2351,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                   onPressed: _showAddDialog,
                   backgroundColor: PlayfulColors.secondary,
                   child: Text(
-                    "ADD CONTACT",
+                    s.t('auto_settings_screen_add_contact'),
                     style: GoogleFonts.outfit(fontWeight: FontWeight.w900),
                   ),
                 ),
@@ -2361,7 +2361,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                 child: _isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
                     : Text(
-                        "SAVE CHANGES",
+                        s.t('auto_settings_screen_save_changes'),
                         style: GoogleFonts.outfit(fontWeight: FontWeight.w900),
                       ),
               ),
@@ -2543,7 +2543,7 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  "SOS SETTINGS",
+                  s.t('auto_settings_screen_sos_settings'),
                   style: GoogleFonts.outfit(
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
@@ -2560,7 +2560,7 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
             const SizedBox(height: 16),
             
             Text(
-              "CHANNELS",
+              s.t('auto_settings_screen_channels'),
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
@@ -2584,11 +2584,11 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
             if (Platform.isAndroid)
               CheckboxListTile(
                 title: Text(
-                  "Automatic SMS Alert (Silent)",
+                  s.t('auto_settings_screen_automatic_sms_alert_silent'),
                   style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
                 subtitle: Text(
-                  "Sends SMS programmatically in background. Requires SMS permission.",
+                  s.t('auto_settings_screen_sends_sms_programmatically_in'),
                   style: GoogleFonts.plusJakartaSans(fontSize: 11, color: PlayfulColors.mutedForeground),
                 ),
                 value: _autoSmsEnabled,
@@ -2637,7 +2637,7 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
             const SizedBox(height: 16),
             
             Text(
-              "PRIMARY SOS METHOD",
+              s.t('auto_settings_screen_primary_sos_method'),
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 11,
                 fontWeight: FontWeight.w800,
@@ -2687,7 +2687,7 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  "CUSTOM ALERT MESSAGE",
+                  s.t('auto_settings_screen_custom_alert_message'),
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
@@ -2698,7 +2698,7 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
                 TextButton(
                   onPressed: _resetTemplate,
                   child: Text(
-                    "Reset to Default",
+                    s.t('auto_settings_screen_reset_to_default'),
                     style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold, fontSize: 11, color: PlayfulColors.accent),
                   ),
                 ),
@@ -2735,7 +2735,7 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
                     child: _isSaving
                         ? const CircularProgressIndicator(color: Colors.white)
                         : Text(
-                            "SAVE SETTINGS",
+                            s.t('auto_settings_screen_save_settings'),
                             style: GoogleFonts.outfit(fontWeight: FontWeight.w900, color: Colors.white),
                           ),
                   ),
@@ -2747,7 +2747,7 @@ class _SOSSettingsBottomSheetContentState extends State<_SOSSettingsBottomSheetC
               onPressed: _sendTestAlert,
               backgroundColor: PlayfulColors.secondary,
               child: Text(
-                "SEND TEST ALERT",
+                s.t('auto_settings_screen_send_test_alert'),
                 style: GoogleFonts.outfit(fontWeight: FontWeight.w900, color: Colors.white),
               ),
             ),
@@ -2910,7 +2910,7 @@ class _GiGiMemoryBottomSheetContentState extends State<_GiGiMemoryBottomSheetCon
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                "GiGi Memory",
+                s.t('auto_settings_screen_gigi_memory'),
                 style: GoogleFonts.outfit(
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
@@ -2925,7 +2925,7 @@ class _GiGiMemoryBottomSheetContentState extends State<_GiGiMemoryBottomSheetCon
           ),
           const SizedBox(height: 12),
           Text(
-            "GiGi remembers these preferences to customize its responses in your conversations.",
+            s.t('auto_settings_screen_gigi_remembers_these_preferen'),
             style: GoogleFonts.plusJakartaSans(
               fontSize: 14,
               fontWeight: FontWeight.w500,
@@ -2953,7 +2953,7 @@ class _GiGiMemoryBottomSheetContentState extends State<_GiGiMemoryBottomSheetCon
                   const Icon(Icons.sentiment_satisfied_alt_outlined, size: 48, color: PlayfulColors.accent),
                   const SizedBox(height: 12),
                   Text(
-                    "GiGi hasn't remembered anything yet!",
+                    s.t('auto_settings_screen_gigi_hasnt_remembered_anythin'),
                     textAlign: TextAlign.center,
                     style: GoogleFonts.outfit(
                       fontSize: 16,
@@ -2963,7 +2963,7 @@ class _GiGiMemoryBottomSheetContentState extends State<_GiGiMemoryBottomSheetCon
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "Tell GiGi things like \"call me Sharan\" or \"keep your responses short\" in the chat, and they will show up here.",
+                    s.t('auto_settings_screen_tell_gigi_things_like_call'),
                     textAlign: TextAlign.center,
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 13,
@@ -3026,7 +3026,7 @@ class _GiGiMemoryBottomSheetContentState extends State<_GiGiMemoryBottomSheetCon
                   backgroundColor: const Color(0xFFFEE2E2),
                   onPressed: _clearAll,
                   child: Text(
-                    "Clear All Memories",
+                    s.t('auto_settings_screen_clear_all_memories'),
                     style: GoogleFonts.outfit(
                       color: Colors.red[900],
                       fontWeight: FontWeight.w800,

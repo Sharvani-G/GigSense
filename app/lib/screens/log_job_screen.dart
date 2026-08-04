@@ -300,7 +300,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            "Didn't catch that clearly — try again or type it in.",
+            s.t('auto_log_job_screen_didnt_catch_that_clearly_try'),
             style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold),
           ),
           backgroundColor: PlayfulColors.secondary,
@@ -745,11 +745,11 @@ class _LogJobScreenState extends State<LogJobScreen> {
             side: const BorderSide(color: PlayfulColors.border, width: 2),
           ),
           title: Text(
-            "Scan Limit Reached",
+            s.t('auto_log_job_screen_scan_limit_reached'),
             style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: PlayfulColors.foreground),
           ),
           content: Text(
-            "You've tried a few unclear scans — take a break and try again in a bit, or use Manual Entry.",
+            s.t('auto_log_job_screen_youve_tried_a_few_unclear'),
             style: GoogleFonts.plusJakartaSans(color: PlayfulColors.foreground),
           ),
           actions: [
@@ -1459,7 +1459,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    "SELECT PLATFORM",
+                    s.t('auto_log_job_screen_select_platform'),
                     style: GoogleFonts.plusJakartaSans(
                       fontWeight: FontWeight.w900,
                       fontSize: 16,

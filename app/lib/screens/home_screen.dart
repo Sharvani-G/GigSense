@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -236,7 +237,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      "MOBILE NUMBER REQUIRED",
+                      s.t('auto_home_screen_mobile_number_required'),
                       style: GoogleFonts.outfit(
                         fontWeight: FontWeight.w900,
                         fontSize: 20,
@@ -246,7 +247,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      "To ensure your safety alerts function correctly, please provide your 10-digit Indian mobile number.",
+                      s.t('auto_home_screen_to_ensure_your_safety_alerts'),
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 13,
                         color: PlayfulColors.mutedForeground,
@@ -306,8 +307,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   // Custom weekday format label
   String _getWeekdayLabel(DateTime dt) {
-    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    return weekdays[dt.weekday - 1];
+    final locale = StringsProvider.instance.lang;
+    return DateFormat.E(locale).format(dt);
   }
 
   Future<void> _fetchAndProcessJobs() async {
@@ -972,8 +973,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     final start = DateTime(targetMonday.year, targetMonday.month, targetMonday.day);
     final end = start.add(const Duration(days: 6));
     final s = StringsProvider.instance;
-    final startMonth = s.t('month_${start.month}');
-    final endMonth = s.t('month_${end.month}');
+    final startMonth = DateFormat.MMM(s.lang).format(start);
+    final endMonth = DateFormat.MMM(s.lang).format(end);
     final String dateRange;
     if (_selectedWeekOffset == 0) {
       dateRange = "${s.t('home_this_week')} · ${start.day} $startMonth – ${end.day} $endMonth";
@@ -1814,7 +1815,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             ? Padding(
                 padding: const EdgeInsets.only(top: 8.0),
                 child: Text(
-                  "No platform earnings logged for this week.",
+                  s.t('auto_home_screen_no_platform_earnings_logged_for'),
                   style: GoogleFonts.plusJakartaSans(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
@@ -1852,7 +1853,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                           ],
                         ),
                         child: Text(
-                          "$nameCapitalized · ₹${formatIndianCurrency(pb.total)} · ${pb.count} ${pb.count == 1 ? 'job' : 'jobs'} (Trust: ${pb.trustScore}%)",
+                          s.t('auto_home_screen_namecapitalized_formatindiancurre').replaceFirst('{}', nameCapitalized.toString()).replaceFirst('{}', formatIndianCurrency(pb.total).toString()).replaceFirst('{}', pb.count.toString()).replaceFirst('{}', pb.count == 1 ? 'job' : 'jobs'.toString()).replaceFirst('{}', pb.trustScore.toString()),
                           style: GoogleFonts.outfit(
                             fontSize: 12,
                             fontWeight: FontWeight.w800,
@@ -2120,11 +2121,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
           backgroundColor: Colors.white,
           title: Text(
-            "Emergency Setup",
+            s.t('auto_home_screen_emergency_setup'),
             style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: PlayfulColors.foreground),
           ),
           content: Text(
-            "You haven't set up any emergency contacts in Settings. One-tap SMS works best when a contact is configured.",
+            s.t('auto_home_screen_you_havent_set_up_any'),
             style: GoogleFonts.plusJakartaSans(color: PlayfulColors.foreground),
           ),
           actions: [
@@ -2134,7 +2135,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 _triggerSOSWithContact({'name': 'Emergency Contact', 'phone': ''});
               },
               child: Text(
-                "SEND ANYWAY",
+                s.t('auto_home_screen_send_anyway'),
                 style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: const Color(0xFFE11D48)),
               ),
             ),
@@ -2151,7 +2152,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ),
               child: Text(
-                "SET UP NOW",
+                s.t('auto_home_screen_set_up_now'),
                 style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white),
               ),
             ),
@@ -2198,7 +2199,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             const Icon(Icons.warning_amber_rounded, color: Color(0xFFE11D48), size: 48),
             const SizedBox(height: 12),
             Text(
-              "TRIGGER EMERGENCY SOS",
+              s.t('auto_home_screen_trigger_emergency_sos'),
               textAlign: TextAlign.center,
               style: GoogleFonts.outfit(
                 fontWeight: FontWeight.w900,
@@ -2214,7 +2215,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              "Select a channel to alert your trusted contact:",
+              s.t('auto_home_screen_select_a_channel_to_alert'),
               textAlign: TextAlign.center,
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 13,
@@ -2264,7 +2265,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        "TRIGGER FULL SOS",
+                        s.t('auto_home_screen_trigger_full_sos'),
                         style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
                       ),
                       Text(
@@ -2298,11 +2299,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        "SEND AUTOMATIC SMS",
+                        s.t('auto_home_screen_send_automatic_sms'),
                         style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
                       ),
                       Text(
-                        "Silent background send (no tap needed)",
+                        s.t('auto_home_screen_silent_background_send_no_tap'),
                         style: GoogleFonts.plusJakartaSans(color: Colors.white.withOpacity(0.8), fontSize: 9),
                       ),
                     ],
@@ -2330,11 +2331,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        "SEND SMS ALERT",
+                        s.t('auto_home_screen_send_sms_alert'),
                         style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
                       ),
                       Text(
-                        "Opens Messages app pre-filled (requires tap)",
+                        s.t('auto_home_screen_opens_messages_app_prefilled_requ'),
                         style: GoogleFonts.plusJakartaSans(color: Colors.white.withOpacity(0.8), fontSize: 9),
                       ),
                     ],
@@ -2362,11 +2363,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        "SEND WHATSAPP ALERT",
+                        s.t('auto_home_screen_send_whatsapp_alert'),
                         style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
                       ),
                       Text(
-                        "Opens WhatsApp (requires send tap)",
+                        s.t('auto_home_screen_opens_whatsapp_requires_send_tap'),
                         style: GoogleFonts.plusJakartaSans(color: Colors.white.withOpacity(0.8), fontSize: 9),
                       ),
                     ],
@@ -2394,11 +2395,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        "MAKE EMERGENCY CALL",
+                        s.t('auto_home_screen_make_emergency_call'),
                         style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
                       ),
                       Text(
-                        "Opens Phone dialer immediately",
+                        s.t('auto_home_screen_opens_phone_dialer_immediately'),
                         style: GoogleFonts.plusJakartaSans(color: Colors.white.withOpacity(0.8), fontSize: 9),
                       ),
                     ],
@@ -2414,7 +2415,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             child: TextButton(
               onPressed: () => Navigator.pop(ctx),
               child: Text(
-                "CANCEL",
+                s.t('auto_home_screen_cancel'),
                 style: GoogleFonts.outfit(
                   fontWeight: FontWeight.bold,
                   color: PlayfulColors.mutedForeground,

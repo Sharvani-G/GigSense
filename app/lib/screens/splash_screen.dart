@@ -227,11 +227,11 @@ class _GiGlySplashState extends State<GiGlySplash> with SingleTickerProviderStat
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text("G", style: textStyle.copyWith(color: _letterColors[0])),
+                    Text("G", style: textStyle.copyWith(color: _letterColors[0])), // audit-ignore
                     _buildStaticLetterI(textStyle),
-                    Text("G", style: textStyle.copyWith(color: _letterColors[2])),
-                    Text("l", style: textStyle.copyWith(color: _letterColors[3])),
-                    Text("y", style: textStyle.copyWith(color: _letterColors[4])),
+                    Text("G", style: textStyle.copyWith(color: _letterColors[2])), // audit-ignore
+                    Text("l", style: textStyle.copyWith(color: _letterColors[3])), // audit-ignore
+                    Text("y", style: textStyle.copyWith(color: _letterColors[4])), // audit-ignore
                   ],
                 ),
                 const SizedBox(height: 24),
@@ -252,20 +252,20 @@ class _GiGlySplashState extends State<GiGlySplash> with SingleTickerProviderStat
                   children: [
                     ScaleTransition(
                       scale: _letterScales[0],
-                      child: Text("G", style: textStyle.copyWith(color: _letterColors[0])),
+                      child: Text("G", style: textStyle.copyWith(color: _letterColors[0])), // audit-ignore // audit-ignore
                     ),
                     _buildLetterI(_letterScales[1], _eyePopScale, textStyle),
                     ScaleTransition(
                       scale: _letterScales[2],
-                      child: Text("G", style: textStyle.copyWith(color: _letterColors[2])),
+                      child: Text("G", style: textStyle.copyWith(color: _letterColors[2])), // audit-ignore // audit-ignore
                     ),
                     ScaleTransition(
                       scale: _letterScales[3],
-                      child: Text("l", style: textStyle.copyWith(color: _letterColors[3])),
+                      child: Text("l", style: textStyle.copyWith(color: _letterColors[3])), // audit-ignore // audit-ignore
                     ),
                     ScaleTransition(
                       scale: _letterScales[4],
-                      child: Text("y", style: textStyle.copyWith(color: _letterColors[4])),
+                      child: Text("y", style: textStyle.copyWith(color: _letterColors[4])), // audit-ignore // audit-ignore
                     ),
                   ],
                 ),

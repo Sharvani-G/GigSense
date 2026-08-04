@@ -271,7 +271,7 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
                     children: [
                       const SizedBox(height: 12),
                       Text(
-                        "SCREENSHOT ANALYSIS RESULT",
+                        s.t('auto_ocr_result_screen_screenshot_analysis_result'),
                         textAlign: TextAlign.center,
                         style: GoogleFonts.plusJakartaSans(
                           fontWeight: FontWeight.w900,
@@ -303,7 +303,7 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              "EXTRACTED TRIP DETAILS",
+                              s.t('auto_ocr_result_screen_extracted_trip_details'),
                               style: GoogleFonts.plusJakartaSans(
                                 fontWeight: FontWeight.w900,
                                 fontSize: 11,

@@ -933,11 +933,12 @@ class _SessionRowState extends State<_SessionRow> {
     if (dt == null) return "";
     final now = DateTime.now();
     final diff = now.difference(dt);
-    if (diff.inMinutes < 1) return "Just now";
-    if (diff.inMinutes < 60) return "${diff.inMinutes}m ago";
-    if (diff.inHours < 24) return "${diff.inHours}h ago";
-    if (diff.inDays == 1) return "Yesterday";
-    return "${diff.inDays}d ago";
+    final s = StringsProvider.instance;
+    if (diff.inMinutes < 1) return s.t('relative_just_now');
+    if (diff.inMinutes < 60) return s.t('relative_mins_ago').replaceFirst('{}', diff.inMinutes.toString());
+    if (diff.inHours < 24) return s.t('relative_hours_ago').replaceFirst('{}', diff.inHours.toString());
+    if (diff.inDays == 1) return s.t('relative_yesterday');
+    return s.t('relative_days_ago').replaceFirst('{}', diff.inDays.toString());
   }
 
   @override

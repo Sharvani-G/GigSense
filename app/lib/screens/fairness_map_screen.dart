@@ -895,7 +895,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
                   child: Text(
-                    "Showing: $platformLabel · $timeLabel",
+                    StringsProvider.instance.t('auto_fairness_map_screen_showing_platformlabel_tim').replaceFirst('{}', platformLabel.toString()).replaceFirst('{}', timeLabel.toString()),
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
@@ -1408,7 +1408,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    "NEAREST ZONE",
+                                    StringsProvider.instance.t('auto_fairness_map_screen_nearest_zone'),
                                     style: GoogleFonts.outfit(
                                       fontWeight: FontWeight.w900,
                                       fontSize: 9,
@@ -1467,7 +1467,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      "PAY FAIRNESS HEALTH BY LOCALITY",
+                      StringsProvider.instance.t('auto_fairness_map_screen_pay_fairness_health_by_lo'),
                       style: GoogleFonts.outfit(
                         fontWeight: FontWeight.w900,
                         fontSize: 10,
@@ -1477,7 +1477,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      "Tapping a zone shows expected rates & data confidence.",
+                      StringsProvider.instance.t('auto_fairness_map_screen_tapping_a_zone_shows_expe'),
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 9,
                         fontWeight: FontWeight.bold,
@@ -1568,7 +1568,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      "Scope: ${s.platformsLabel}",
+                      StringsProvider.instance.t('auto_fairness_map_screen_scope_splatformslabel').replaceFirst('{}', s.platformsLabel.toString()),
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 11,
                         color: PlayfulColors.mutedForeground,

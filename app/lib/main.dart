@@ -16,8 +16,22 @@ import 'screens/settings_screen.dart';
 import 'screens/playful_widgets.dart';
 import 'screens/splash_screen.dart';
 
+import 'package:intl/date_symbol_data_local.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize date formatting locales
+  try {
+    await initializeDateFormatting('en', null);
+    await initializeDateFormatting('hi', null);
+    await initializeDateFormatting('kn', null);
+    await initializeDateFormatting('te', null);
+    await initializeDateFormatting('ta', null);
+    await initializeDateFormatting('ml', null);
+  } catch (e) {
+    debugPrint("Failed to initialize date formatting: $e");
+  }
 
   // Top-Level framework error handler
   FlutterError.onError = (FlutterErrorDetails details) {

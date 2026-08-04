@@ -256,7 +256,7 @@ class _BatchConfirmScreenState extends State<BatchConfirmScreen> {
       backgroundColor: PlayfulColors.background,
       appBar: AppBar(
         title: Text(
-          "CONFIRM BATCH SCANS",
+          StringsProvider.instance.t('auto_batch_confirm_screen_confirm_batch_scans'),
           style: GoogleFonts.outfit(fontWeight: FontWeight.w900, fontSize: 18, color: PlayfulColors.foreground),
         ),
         elevation: 0,
@@ -269,7 +269,7 @@ class _BatchConfirmScreenState extends State<BatchConfirmScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               child: Text(
-                "We detected ${_rows.length} trip entries. Verify or edit each one before committing to logs.",
+                StringsProvider.instance.t('auto_batch_confirm_screen_we_detected_rowslength_t').replaceFirst('{}', _rows.length.toString()),
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -305,7 +305,7 @@ class _BatchConfirmScreenState extends State<BatchConfirmScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              "TRIP #${index + 1}",
+                              StringsProvider.instance.t('auto_batch_confirm_screen_trip_index_1').replaceFirst('{}', index + 1.toString()),
                               style: GoogleFonts.plusJakartaSans(
                                 fontWeight: FontWeight.w900,
                                 fontSize: 12,

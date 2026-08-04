@@ -477,7 +477,16 @@ async def chat_endpoint(request: ChatRequest):
             english_response = ""
             for chunk in ask_gemma_chat_stream(chat_messages):
                 if chunk == "OLLAMA_UNREACHABLE_ERROR":
-                    yield json.dumps({"error": "Assistant is temporarily unavailable — please try again in a moment."}) + "\n"
+                    chat_errors = {
+                        'en': "Assistant is temporarily unavailable — please try again in a moment.",
+                        'hi': "सहायक अस्थायी रूप से अनुपलब्ध है — कृपया एक क्षण में पुनः प्रयास करें।",
+                        'kn': "ಸಹಾಯಕ ತಾತ್ಕಾಲಿಕವಾಗಿ ಲಭ್ಯವಿಲ್ಲ — ದಯವಿಟ್ಟು ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ ಪ್ರಯತ್ನಿಸಿ.",
+                        'ta': "உதவியாளர் தற்காலிகமாக கிடைக்கவில்லை — ஒரு கணத்தில் மீண்டும் முயற்சிக்கவும்.",
+                        'te': "సహాయకుడు తాత్కాలికంగా అందుబాటులో లేరు — దయచేസി కాసేపటి తర్వాత మళ్లీ ప్రయత్నించండి.",
+                        'ml': "അസിസ്റ്റന്റ് താത്കാലികമായി ലഭ്യമല്ല — ദയവായി അല്പം കഴിഞ്ഞ് വീണ്ടും ശ്രമിക്കുക."
+                    }
+                    err_msg = chat_errors.get(lang_code, chat_errors['en'])
+                    yield json.dumps({"error": err_msg}) + "\n"
                     return
                 english_response += chunk
                 await asyncio.sleep(0.001)
@@ -814,7 +823,7 @@ async def weekly_insight(user_id: str):
         'en': "Log a few jobs and I'll have your first weekly insight ready.",
         'hi': "कुछ काम दर्ज करें और मैं आपकी पहली साप्ताहिक जानकारी तैयार करूंगा।",
         'kn': "ಕೆಲವು ಕೆಲಸಗಳನ್ನು ಲಾಗ್ ಮಾಡಿ ಮತ್ತು ನಿಮ್ಮ ಮೊದಲ ಸಾಪ್ತಾಹಿಕ ಒಳനೋಟವನ್ನು ನಾನು ಸಿದ್ಧಪಡಿಸುತ್ತೇನೆ.",
-        'ta': "ஒரு சில வேலைகளைப் பதிவுചെയ്യவும், உங்களுடைய முதல் வாரാந்திர நுண்ணறிவை ഞാൻ தயார் செய்வேன்.",
+        'ta': "ஒரு சில வேலைகளைப் பதிவுചെയ്യவும், உங்களுடைய முதல் வாரാந்திர நுண்ணறிவை நான் தயார் செய்வேன்.",
         'te': "కొన్ని పనులను నమోదు చేయండి మరియు నేను మీ మొదటి వారపు అంతర్దృష్టిని సిద్ధంగా ఉంచుతాను.",
         'ml': "കുറച്ച് ജോലികൾ ലോഗ് ചെയ്യുക, നിങ്ങളുടെ ആദ്യത്തെ പ്രതിവാര ഉൾക്കാഴ്ച ഞാൻ തയ്യാറാക്കും."
     }
@@ -969,7 +978,8 @@ async def draft_complaint_endpoint(request: ComplaintRequest):
             'hi': f"नमस्ते सहायता टीम। मैं {request.platform} पर अपनी सवारी के संबंध में लिख रहा हूँ। मुझे {request.distance_km:.1f} किमी और {request.duration_min:.0f} मिनट की यात्रा के लिए ₹{request.fare:.2f} का भुगतान किया गया था। बेंचमार्क दरों के आधार पर, अपेक्षित किराया ₹{request.expected_fare:.2f} होना चाहिए। कृपया इस भुगतान की समीक्षा करें। धन्यवाद।",
             'kn': f"ನಮಸ್ಕಾರ ಸಹಾಯ ಕೇಂದ್ರ. {request.platform} ನಲ್ಲಿ ನನ್ನ ಪಯಣದ ಕುರಿತು ನಾನು ಬರೆಯುತ್ತಿದ್ದೇನೆ. {request.distance_km:.1f} ಕಿಮೀ ಮತ್ತು {request.duration_min:.0f} ನಿಮಿಷಗಳ ಪ್ರಯಾಣಕ್ಕೆ ನನಗೆ ₹{request.fare:.2f} ಪಾವತಿಸಲಾಗಿದೆ. ದರಗಳ ಪ್ರಕಾರ, ನಿರೀಕ್ಷಿತ ದರ ₹{request.expected_fare:.2f} ಇರಬೇಕು. ದಯವಿಟ್ಟು ಇದನ್ನು ಪರಿಶೀಲಿಸಿ ನನ್ನ ಪಾವತಿಯನ್ನು ಸರಿಪಡಿಸಿ. ಧನ್ಯವಾದಗಳು.",
             'ta': f"வணக்கம் உதவி மையம். {request.platform} இல் எனது பயணம் குறித்து நான் எழுதுகிறேன். {request.distance_km:.1f} கிமீ மற்றும் {request.duration_min:.0f} நிமிட பயணத்திற்கு எனக்கு ₹{request.fare:.2f} வழங்கப்பட்டது. தரநிலைகளின்படி, எதிர்பார்க்கப்படும் கட்டணம் ₹{request.expected_fare:.2f} ஆகும். தயவுசெய்து இதை மறுபரிசீலனை செய்து சரிசெய்யவும். நன்றி.",
-            'te': f"నమస్కారం సహాయ కేంద్రం. {request.platform} లో నా ప్రయాణానికి సంబంధించి నేను వ్రాస్తున్నాను. {request.distance_km:.1f} కిమీ మరియు {request.duration_min:.0f} నిమిషాల ప్రయాణానికి నాకు ₹{request.fare:.2f} చెల్లించబడింది. ప్రామాణిక రేట్ల ప్రకారం, ఆశించిన ఛార్జీ ₹{request.expected_fare:.2f} ఉండాలి. దయస చేసి దీనిని సమీక్షించండి. ధన్యవాదాలు."
+            'te': f"నమస్కారం సహాయ కేంద్రం. {request.platform} లో నా ప్రయాణానికి సంబంధించి నేను వ్రాస్తున్నాను. {request.distance_km:.1f} కిమీ మరియు {request.duration_min:.0f} నిమిషాల ప్రయాణానికి నాకు ₹{request.fare:.2f} చెల్లించబడింది. ప్రామాణిక రేట్ల ప్రకారం, ఆశించిన ఛార్జీ ₹{request.expected_fare:.2f} ఉండాలి. దయస చేసి దీనిని సమీక్షించండి. ధన్యవాదాలు.",
+            'ml': f"ഹലോ സപ്പോർട്ട്. {request.platform} ലെ എന്റെ യാത്രയുമായി ബന്ധപ്പെട്ടാണ് ഞാൻ എഴുതുന്നത്. {request.distance_km:.1f} കി.മീ, {request.duration_min:.0f} മിനിറ്റ് യാത്രയ്ക്ക് എനിക്ക് ₹{request.fare:.2f} ആണ് ലഭിച്ചത്. ബെഞ്ച്മാർക്ക് നിരക്കുകൾ അനുസരിച്ച് പ്രതീക്ഷിക്കുന്ന തുക ₹{request.expected_fare:.2f} ആണ്. ദയവായി ഈ തുക പരിശോധിക്കണമെന്ന് അഭ്യർത്ഥിക്കുന്നു. നന്ദി."
         }
         draft_text = fallbacks.get(lang_code, fallbacks['en'])
         

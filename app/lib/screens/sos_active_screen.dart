@@ -273,18 +273,18 @@ class SOSManager {
         ),
         backgroundColor: Colors.white,
         title: Text(
-          "WhatsApp Unavailable",
+          s.t('auto_sos_active_screen_whatsapp_unavailable'),
           style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: PlayfulColors.foreground),
         ),
         content: Text(
-          "WhatsApp is not installed or could not be opened. Would you like to copy the SOS alert message to your clipboard instead?",
+          s.t('auto_sos_active_screen_whatsapp_is_not_installed_o'),
           style: GoogleFonts.plusJakartaSans(color: PlayfulColors.foreground),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: Text(
-              "CANCEL",
+              s.t('auto_sos_active_screen_cancel'),
               style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: PlayfulColors.mutedForeground),
             ),
           ),
@@ -442,7 +442,7 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          "SOS SAFETY ALERT ACTIVE",
+                          s.t('auto_sos_active_screen_sos_safety_alert_active'),
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
@@ -457,7 +457,7 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          "A safety alert containing your current location map link has been triggered to your emergency contact.",
+                          s.t('auto_sos_active_screen_a_safety_alert_containing_y'),
                           textAlign: TextAlign.center,
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 13,
@@ -522,7 +522,7 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
                               const Icon(Icons.message_outlined, color: Colors.white, size: 16),
                               const SizedBox(width: 6),
                               Text(
-                                "WhatsApp",
+                                s.t('auto_sos_active_screen_whatsapp'),
                                 style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                               )
                             ],
@@ -543,7 +543,7 @@ class _SOSActiveScreenState extends State<SOSActiveScreen> {
                               const Icon(Icons.phone, color: Colors.white, size: 16),
                               const SizedBox(width: 6),
                               Text(
-                                "Call",
+                                s.t('auto_sos_active_screen_call'),
                                 style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                               )
                             ],

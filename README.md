@@ -147,3 +147,10 @@ Before presenting a demo or performing a release run:
    python scripts/audit_locales.py
    ```
    Ensure it prints: `Success: All languages have 100% key parity with English!`.
+
+3. **Run Hardcoded String Audit**:
+   Verify that all user-facing strings are localized and routed through the translation system (excluding animation components or lines marked with `// audit-ignore`):
+   ```bash
+   python scripts/audit_hardcoded_strings.py
+   ```
+   Ensure it prints: `Success: Zero hardcoded user-facing strings found in Text widgets!`.

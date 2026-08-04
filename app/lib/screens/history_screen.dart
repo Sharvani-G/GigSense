@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl/intl.dart';
 import 'playful_widgets.dart';
 import 'fairness_result_screen.dart';
 import 'home_screen.dart'; // For EmptyStatePainter
@@ -133,11 +134,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   String _formatDateTime(DateTime dt) {
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    final hour = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
-    final period = dt.hour >= 12 ? 'PM' : 'AM';
-    final minuteStr = dt.minute.toString().padLeft(2, '0');
-    return "${months[dt.month - 1]} ${dt.day}, ${dt.year} • $hour:$minuteStr $period";
+    final locale = StringsProvider.instance.lang;
+    return DateFormat('MMM dd, yyyy • hh:mm a', locale).format(dt);
   }
 
   void _showFilterBottomSheet() {
@@ -192,7 +190,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    "FILTER HISTORY",
+                    StringsProvider.instance.t('auto_history_screen_filter_history'),
                     style: GoogleFonts.plusJakartaSans(
                       fontWeight: FontWeight.w900,
                       fontSize: 16,
@@ -205,7 +203,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                   // Fairness Filter
                   Text(
-                    "FAIRNESS STATUS",
+                    StringsProvider.instance.t('auto_history_screen_fairness_status'),
                     style: GoogleFonts.plusJakartaSans(
                       fontWeight: FontWeight.w800,
                       fontSize: 11,
@@ -255,7 +253,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   // Platform Filter
                   if (allPlatforms.isNotEmpty) ...[
                     Text(
-                      "PLATFORMS",
+                      StringsProvider.instance.t('auto_history_screen_platforms'),
                       style: GoogleFonts.plusJakartaSans(
                         fontWeight: FontWeight.w800,
                         fontSize: 11,
@@ -337,7 +335,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           },
                           backgroundColor: Colors.white,
                           child: Text(
-                            "RESET",
+                            StringsProvider.instance.t('auto_history_screen_reset'),
                             style: TextStyle(color: PlayfulColors.foreground),
                           ),
                         ),
@@ -378,7 +376,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          "Job History",
+          StringsProvider.instance.t('auto_history_screen_job_history'),
           style: GoogleFonts.outfit(
             fontWeight: FontWeight.bold,
             color: PlayfulColors.foreground,
@@ -559,7 +557,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                           const Icon(Icons.gavel, size: 10, color: PlayfulColors.secondary),
                                           const SizedBox(width: 4),
                                           Text(
-                                            "Undisclosed Deduction",
+                                            StringsProvider.instance.t('auto_history_screen_undisclosed_deduction'),
                                             style: GoogleFonts.plusJakartaSans(
                                               fontSize: 9,
                                               fontWeight: FontWeight.w800,
@@ -595,7 +593,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                         border: Border.all(color: PlayfulColors.tertiary, width: 1.5),
                                       ),
                                       child: Text(
-                                        "🌆 Evening",
+                                        StringsProvider.instance.t('auto_history_screen_evening'),
                                         style: GoogleFonts.plusJakartaSans(
                                           fontSize: 9,
                                           fontWeight: FontWeight.w800,
@@ -613,7 +611,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                         border: Border.all(color: PlayfulColors.tertiary, width: 1.5),
                                       ),
                                       child: Text(
-                                        "🌙 Late-night",
+                                        StringsProvider.instance.t('auto_history_screen_latenight'),
                                         style: GoogleFonts.plusJakartaSans(
                                           fontSize: 9,
                                           fontWeight: FontWeight.w800,
@@ -659,7 +657,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
           const SizedBox(height: 24),
           Text(
-            "Nothing logged yet — your job history will show up here once you log your first trip.",
+            StringsProvider.instance.t('auto_history_screen_nothing_logged_yet_your_job'),
             textAlign: TextAlign.center,
             style: GoogleFonts.plusJakartaSans(
               fontSize: 16,

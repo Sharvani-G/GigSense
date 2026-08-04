@@ -74,7 +74,7 @@ class FairnessResultScreen extends StatelessWidget {
               const SizedBox(height: 24),
               // Screen Title
               Text(
-                "FAIRNESS CHECK",
+                StringsProvider.instance.t('auto_fairness_result_screen_fairness_check'),
                 textAlign: TextAlign.center,
                 style: GoogleFonts.plusJakartaSans(
                   fontWeight: FontWeight.w900,
@@ -162,7 +162,7 @@ class FairnessResultScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "ACTUAL",
+                            StringsProvider.instance.t('auto_fairness_result_screen_actual'),
                             style: GoogleFonts.plusJakartaSans(
                               fontWeight: FontWeight.w800,
                               fontSize: 12,
@@ -206,7 +206,7 @@ class FairnessResultScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "EXPECTED",
+                            StringsProvider.instance.t('auto_fairness_result_screen_expected'),
                             style: GoogleFonts.plusJakartaSans(
                               fontWeight: FontWeight.w800,
                               fontSize: 12,
@@ -293,7 +293,7 @@ class FairnessResultScreen extends StatelessWidget {
                           children: [
                             Flexible(
                               child: Text(
-                                "$text — $status ($size trips)",
+                                StringsProvider.instance.t('auto_fairness_result_screen_text_status_size_trips').replaceFirst('{}', text.toString()).replaceFirst('{}', status.toString()).replaceFirst('{}', size.toString()),
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.plusJakartaSans(
                                   fontSize: 12,
@@ -490,7 +490,7 @@ class FairnessResultScreen extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              "This screenshot shows a ₹${deduction.toStringAsFixed(2)} deduction with no reason given. Karnataka's Platform-Based Gig Workers Act requires aggregators to disclose deduction reasons.",
+              StringsProvider.instance.t('auto_fairness_result_screen_this_screenshot_shows').replaceFirst('{}', deduction.toStringAsFixed(2).toString()),
               style: GoogleFonts.plusJakartaSans(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
@@ -533,7 +533,7 @@ class FairnessResultScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "TRIP BREAKDOWN",
+            StringsProvider.instance.t('auto_fairness_result_screen_trip_breakdown'),
             style: GoogleFonts.plusJakartaSans(
               fontWeight: FontWeight.w900,
               fontSize: 12,
@@ -737,7 +737,7 @@ class _ComplaintBottomSheetContentState extends State<_ComplaintBottomSheetConte
           ),
           const SizedBox(height: 24),
           Text(
-            "COMPLAINT DRAFT",
+            StringsProvider.instance.t('auto_fairness_result_screen_complaint_draft'),
             style: GoogleFonts.plusJakartaSans(
               fontWeight: FontWeight.w900,
               fontSize: 16,
@@ -829,7 +829,7 @@ class _ComplaintBottomSheetContentState extends State<_ComplaintBottomSheetConte
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: Text(
-                    "CLOSE",
+                    StringsProvider.instance.t('auto_fairness_result_screen_close'),
                     style: GoogleFonts.plusJakartaSans(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,

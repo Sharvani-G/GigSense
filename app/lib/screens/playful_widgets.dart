@@ -453,7 +453,7 @@ class PlayfulToggle extends StatelessWidget {
                 ),
                 child: Center(
                   child: Text(
-                    "Manual Entry",
+                    StringsProvider.instance.t('auto_playful_widgets_manual_entry'),
                     style: GoogleFonts.outfit(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
@@ -484,7 +484,7 @@ class PlayfulToggle extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        "Scan Screenshot",
+                        StringsProvider.instance.t('auto_playful_widgets_scan_screenshot'),
                         style: GoogleFonts.outfit(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
@@ -937,7 +937,7 @@ class PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPro
         ],
         if (_isProcessing && widget.textOnLeft) ...[
           Text(
-            "Transcribing...",
+            StringsProvider.instance.t('auto_playful_widgets_transcribing'),
             style: GoogleFonts.plusJakartaSans(
               fontSize: 12,
               fontWeight: FontWeight.bold,
@@ -974,7 +974,7 @@ class PlayfulMicButtonState extends State<PlayfulMicButton> with SingleTickerPro
         if (_isProcessing && !widget.textOnLeft) ...[
           const SizedBox(width: 8),
           Text(
-            "Transcribing...",
+            StringsProvider.instance.t('auto_playful_widgets_transcribing'),
             style: GoogleFonts.plusJakartaSans(
               fontSize: 12,
               fontWeight: FontWeight.bold,
@@ -1460,7 +1460,7 @@ class _PlayfulSafetyContextWidgetState extends State<PlayfulSafetyContextWidget>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  "Route Safety Guidance — based on localized time context & location details.",
+                  StringsProvider.instance.t('auto_playful_widgets_route_safety_guidance_based_o'),
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
