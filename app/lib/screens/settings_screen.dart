@@ -365,6 +365,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _triggerRecalculateBenchmarks() async {
+    final s = StringsProvider.instance;
     bool dialogClosed = false;
     showDialog(
       context: context,
@@ -2194,6 +2195,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
   }
 
   void _showAddDialog() {
+    final s = StringsProvider.instance;
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
 
@@ -2256,6 +2258,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = StringsProvider.instance;
     return Scaffold(
       backgroundColor: PlayfulColors.background,
       appBar: AppBar(
@@ -2884,6 +2887,7 @@ class _GiGiMemoryBottomSheetContentState extends State<_GiGiMemoryBottomSheetCon
 
   @override
   Widget build(BuildContext context) {
+    final s = StringsProvider.instance;
     final mq = MediaQuery.of(context);
     return Container(
       padding: EdgeInsets.only(

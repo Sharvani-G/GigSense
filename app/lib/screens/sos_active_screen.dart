@@ -264,6 +264,7 @@ class SOSManager {
   }
 
   void _showClipboardDialog(BuildContext context, String message) {
+    final s = StringsProvider.instance;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(

@@ -159,6 +159,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   void _showRequiredPhoneSheet() {
+    final s = StringsProvider.instance;
     final controller = TextEditingController();
     bool loading = false;
     String error = "";
@@ -831,7 +832,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                         ),
                                         if (dt != null)
                                           Text(
-                                            "${dt.day}/${dt.month} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}",
+                                            DateFormat.MMMd(StringsProvider.instance.lang).add_Hm().format(dt),
                                             style: GoogleFonts.plusJakartaSans(
                                               fontSize: 10,
                                               color: PlayfulColors.mutedForeground,
@@ -1474,6 +1475,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildMainDashboard() {
+    final s = StringsProvider.instance;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -2078,6 +2080,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _triggerSOS() async {
+    final s = StringsProvider.instance;
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     
@@ -2170,6 +2173,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     Map<String, dynamic> settings,
     String workerName,
   ) {
+    final s = StringsProvider.instance;
     final channels = settings['channels'] as Map<String, dynamic>? ?? {
       'whatsapp': true,
       'autoSms': Platform.isAndroid,

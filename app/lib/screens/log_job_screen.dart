@@ -277,6 +277,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
   }
 
   void _parseAndSetNumber(String text, TextEditingController controller, {String? fieldType}) {
+    final s = StringsProvider.instance;
     final result = parseSpokenPhrase(text);
     if (result.value != null) {
       setState(() {
@@ -734,6 +735,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
   }
 
   void _showRateLimitDialog() {
+    final s = StringsProvider.instance;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1404,6 +1406,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
   }
 
   void _showPlatformPickerBottomSheet(BuildContext context) {
+    final s = StringsProvider.instance;
     _searchController.clear();
     _filteredPlatforms = List.from(_allPlatforms);
 

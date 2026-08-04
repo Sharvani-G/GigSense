@@ -305,7 +305,7 @@ class _BatchConfirmScreenState extends State<BatchConfirmScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              StringsProvider.instance.t('auto_batch_confirm_screen_trip_index_1').replaceFirst('{}', index + 1.toString()),
+                              StringsProvider.instance.t('auto_batch_confirm_screen_trip_index_1').replaceFirst('{}', (index + 1).toString()),
                               style: GoogleFonts.plusJakartaSans(
                                 fontWeight: FontWeight.w900,
                                 fontSize: 12,
