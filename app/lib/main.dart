@@ -424,12 +424,18 @@ class _LanguagePickerSheetState extends State<LanguagePickerSheet> {
         await FirebaseFirestore.instance
             .collection('users')
             .doc(uid)
-            .update({'preferredLanguage': code});
+            .update({
+          'preferredLanguage': code,
+          // Clear cached insight so it regenerates in the new language
+          'cachedInsightText': FieldValue.delete(),
+          'cachedInsightWeekStart': FieldValue.delete(),
+        });
       } catch (e) {
         debugPrint('Failed to persist language preference: $e');
       }
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

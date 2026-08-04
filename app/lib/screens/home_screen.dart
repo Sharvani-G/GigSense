@@ -70,7 +70,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   double _savingsEarned = 0.0;
 
   // AI Weekly Insight
-  String _insightText = "Log a few jobs and I'll have your first weekly insight ready.";
+  String _insightText = '';
   bool _isInsightLoading = true;
   late final AnimationController _insightAnimationController;
   late final Animation<double> _insightScaleAnimation;
@@ -95,7 +95,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     if (user != null) {
       if (user.isAnonymous) {
         _userName = "THERE";
-        _insightText = "Log a few jobs and I'll have your first weekly insight ready.";
+        _insightText = StringsProvider.instance.t('insight_no_jobs');
         _isInsightLoading = false;
         _userFetched = true;
       } else {
@@ -257,8 +257,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                     const SizedBox(height: 20),
                     PlayfulInput(
-                      labelText: "MOBILE NUMBER",
-                      hintText: "e.g., 9876543210",
+                      labelText: s.t('label_mobile_num_caps'),
+                      hintText: s.t('hint_mobile_num_example'),
                       controller: controller,
                       keyboardType: TextInputType.phone,
                     ),
@@ -437,7 +437,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         if (user.isAnonymous) {
           setState(() {
             _userName = "THERE";
-            _insightText = "Log a few jobs and I'll have your first weekly insight ready.";
+            _insightText = StringsProvider.instance.t('insight_no_jobs');
             _isInsightLoading = false;
             _userFetched = true;
           });
@@ -464,7 +464,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 _isInsightLoading = true;
                 _fetchWeeklyInsight(user.uid);
               } else {
-                _insightText = "Log a few jobs and I'll have your first weekly insight ready.";
+                _insightText = StringsProvider.instance.t('insight_no_jobs');
                 _isInsightLoading = false;
                 _insightAnimationController.forward(from: 0.0);
               }
@@ -592,6 +592,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         body: json.encode({
           'user_id': userId,
           'total_hours': hours,
+          'language_code': StringsProvider.instance.lang,
         }),
       );
       if (response.statusCode == 200) {
@@ -941,14 +942,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       if (!kIsWeb && Platform.isAndroid && (baseUrl.contains("127.0.0.1") || baseUrl.contains("localhost"))) {
         baseUrl = baseUrl.replaceAll("127.0.0.1", "10.0.2.2").replaceAll("localhost", "10.0.2.2");
       }
-      final Uri url = Uri.parse('$baseUrl/weekly-insight?user_id=$userId');
+      final Uri url = Uri.parse('$baseUrl/weekly-insight?user_id=$userId&language_code=${StringsProvider.instance.lang}');
       final response = await http.get(url, headers: {'ngrok-skip-browser-warning': 'true'})
           .timeout(const Duration(seconds: 15));
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         setState(() {
-          _insightText = data['insight_text'] ?? "Log a few jobs and I'll have your first weekly insight ready.";
+          _insightText = data['insight_text'] ?? StringsProvider.instance.t('insight_no_jobs');
           _isInsightLoading = false;
         });
         _insightAnimationController.forward(from: 0.0);
@@ -958,7 +959,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     } catch (e) {
       debugPrint("Error fetching weekly insight: $e");
       setState(() {
-        _insightText = "Insight is taking longer than expected — tap to retry";
+        _insightText = StringsProvider.instance.t('insight_retry');
         _isInsightLoading = false;
       });
       _insightAnimationController.forward(from: 0.0);
@@ -1009,7 +1010,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       unreadCount > 0 ? Icons.notifications_active_outlined : Icons.notifications_none_outlined,
                       color: PlayfulColors.foreground,
                     ),
-                    tooltip: 'Notifications',
+                    tooltip: s.t('label_notifications'),
                     onPressed: () => _showNotificationsSheet(context),
                   ),
                   if (unreadCount > 0)
@@ -1043,7 +1044,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
           IconButton(
             icon: const Icon(Icons.language, color: PlayfulColors.foreground),
-            tooltip: 'Language',
+            tooltip: s.t('label_language'),
             onPressed: () => showLanguagePicker(context),
           ),
           IconButton(
@@ -1296,7 +1297,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       // AI Weekly Insight Pop-in Card
                       GestureDetector(
                         onTap: () {
-                          if (_insightText == "Insight is taking longer than expected — tap to retry" && !_isInsightLoading) {
+                          if (_insightText == StringsProvider.instance.t('insight_retry') && !_isInsightLoading) {
                             final user = FirebaseAuth.instance.currentUser;
                             if (user != null) {
                               _fetchWeeklyInsight(user.uid);

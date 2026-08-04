@@ -622,6 +622,7 @@ class FairnessResultScreen extends StatelessWidget {
                     body: json.encode({
                       'job_id': job['id'] ?? '',
                       'user_id': uid,
+                      'language_code': StringsProvider.instance.lang,
                     }),
                   ).timeout(const Duration(seconds: 30));
 

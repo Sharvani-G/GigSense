@@ -13,6 +13,7 @@ class ChatRequest(BaseModel):
     message: str
     user_id: str
     session_id: str
+    language_code: Optional[str] = None
 
 class ChatResponse(BaseModel):
     response: str
@@ -24,18 +25,22 @@ class ComplaintRequest(BaseModel):
     duration_min: float
     expected_fare: float
     user_id: str
+    language_code: Optional[str] = None
 
 class DraftRequest(BaseModel):
     job_id: str
     user_id: str
+    language_code: Optional[str] = None
 
 class FatigueRequest(BaseModel):
     user_id: str
     total_hours: float
+    language_code: Optional[str] = None
 
 class SOSRequest(BaseModel):
     user_id: str
     job_id: Optional[str] = None
+    language_code: Optional[str] = None
 
 class RouteSafetyRequest(BaseModel):
     job_timestamp: str

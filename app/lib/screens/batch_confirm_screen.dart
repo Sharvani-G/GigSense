@@ -217,7 +217,7 @@ class _BatchConfirmScreenState extends State<BatchConfirmScreen> {
 
       // Fire insight regeneration once
       if (uid != 'anonymous_user') {
-        final Uri url = Uri.parse('$baseUrl/weekly-insight?user_id=$uid');
+        final Uri url = Uri.parse('$baseUrl/weekly-insight?user_id=$uid&language_code=${StringsProvider.instance.lang}');
         http.get(url, headers: {'ngrok-skip-browser-warning': 'true'}).then((response) {
           debugPrint("Background batch weekly-insight regeneration triggered: ${response.statusCode}");
         }).catchError((err) {
@@ -325,7 +325,7 @@ class _BatchConfirmScreenState extends State<BatchConfirmScreen> {
                         ),
                         const SizedBox(height: 12),
                         PlayfulInput(
-                          labelText: "Platform",
+                          labelText: StringsProvider.instance.t('label_platform'),
                           dropdownItems: _platforms.map((p) => p['name']!).toList(),
                           selectedDropdownValue: _platforms.firstWhere(
                             (p) => p['id'] == row.platform,
@@ -346,7 +346,7 @@ class _BatchConfirmScreenState extends State<BatchConfirmScreen> {
                         const SizedBox(height: 16),
                         PlayfulInput(
                           labelText: "Fare (₹)",
-                          hintText: "Enter fare amount",
+                          hintText: StringsProvider.instance.t('hint_enter_fare'),
                           controller: row.fareController,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         ),
@@ -355,8 +355,8 @@ class _BatchConfirmScreenState extends State<BatchConfirmScreen> {
                           children: [
                             Expanded(
                               child: PlayfulUnitInput(
-                                labelText: "Distance",
-                                hintText: "Distance",
+                                labelText: StringsProvider.instance.t('label_distance'),
+                                hintText: StringsProvider.instance.t('label_distance'),
                                 controller: row.distanceController,
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 unitOptions: const ["km", "m"],
@@ -383,8 +383,8 @@ class _BatchConfirmScreenState extends State<BatchConfirmScreen> {
                             const SizedBox(width: 16),
                             Expanded(
                               child: PlayfulUnitInput(
-                                labelText: "Duration",
-                                hintText: "Duration",
+                                labelText: StringsProvider.instance.t('label_duration'),
+                                hintText: StringsProvider.instance.t('label_duration'),
                                 controller: row.durationController,
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 unitOptions: const ["min", "hr"],

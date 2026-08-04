@@ -210,8 +210,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
               // Phone Input
               PlayfulInput(
-                labelText: "MOBILE NUMBER (10-DIGIT)",
-                hintText: "e.g., 9876543210",
+                labelText: StringsProvider.instance.t('label_mobile_num_10_digit'),
+                hintText: StringsProvider.instance.t('hint_mobile_num_example'),
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
               ),

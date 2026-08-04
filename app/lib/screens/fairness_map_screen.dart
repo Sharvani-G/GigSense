@@ -225,7 +225,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
           platformsLabel: _platformFilter == 'all' ? StringsProvider.instance.t('map_all_platforms') : _platformFilter[0].toUpperCase() + _platformFilter.substring(1),
           averagePercentage: 0.0,
           totalTrips: totalTrips,
-          confidenceTier: "Estimated",
+          confidenceTier: "estimated",
           statusColor: const Color(0xFF94A3B8), // Gray
           interpretation: StringsProvider.instance.t('map_interpret_no_data'),
         ));
@@ -237,7 +237,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
           .map((p) => p.isNotEmpty ? p[0].toUpperCase() + p.substring(1) : '')
           .where((p) => p.isNotEmpty)
           .toSet();
-      final platformsLabel = platforms.isEmpty ? 'Other' : platforms.join(', ');
+      final platformsLabel = platforms.isEmpty ? StringsProvider.instance.t('label_other_platform') : platforms.join(', ');
 
       double totalPct = 0.0;
       int pctCount = 0;
@@ -252,11 +252,11 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
       }
       final double averagePercentage = pctCount > 0 ? (totalPct / pctCount) : 100.0;
 
-      String confidenceTier = "Estimated";
+      String confidenceTier = "estimated";
       if (totalTrips >= 15 && totalTrips < 50) {
-        confidenceTier = "Growing";
+        confidenceTier = "growing";
       } else if (totalTrips >= 50) {
-        confidenceTier = "Well-established";
+        confidenceTier = "established";
       }
 
       Color statusColor;
@@ -616,11 +616,11 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
               _buildDetailRow(StringsProvider.instance.t('map_average_pay_rate'), stats.totalTrips >= 2 ? StringsProvider.instance.t('map_pct_expected').replaceFirst('{}', stats.averagePercentage.toStringAsFixed(0)) : "N/A"),
               _buildDetailRow(
                 StringsProvider.instance.t('map_confidence_tier'),
-                stats.confidenceTier == 'Estimated'
-                    ? StringsProvider.instance.t('map_tier_estimated')
-                    : stats.confidenceTier == 'Growing'
-                        ? StringsProvider.instance.t('map_tier_growing')
-                        : StringsProvider.instance.t('map_tier_established'),
+                stats.confidenceTier == "estimated"
+                    ? StringsProvider.instance.t('label_estimated')
+                    : stats.confidenceTier == "growing"
+                        ? StringsProvider.instance.t('label_growing')
+                        : StringsProvider.instance.t('label_well_established'),
               ),
               _buildDetailRow(StringsProvider.instance.t('map_total_reported_trips'), "${stats.totalTrips}"),
 
@@ -642,7 +642,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                   ),
                 ),
               ),
-              if (stats.confidenceTier == "Estimated") ...[
+              if (stats.confidenceTier == "estimated") ...[
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -837,14 +837,23 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
             activeZones.sort((a, b) => b.averagePercentage.compareTo(a.averagePercentage));
 
             // Dynamic Summary Text
-            String summaryText = "Not enough comparative data yet. Log more jobs to see locality baselines.";
+            String summaryText = StringsProvider.instance.t('label_map_no_data_hint');
             if (activeZones.isNotEmpty) {
               final best = activeZones.first;
               final worst = activeZones.last;
+              final bestName = best.zone[0].toUpperCase() + best.zone.substring(1);
+              final worstName = worst.zone[0].toUpperCase() + worst.zone.substring(1);
               if (best.zone == worst.zone) {
-                summaryText = "This week: ${best.zone[0].toUpperCase() + best.zone.substring(1)} average is ${best.averagePercentage.toStringAsFixed(0)}% of expected fare for $platformLabel trips.";
+                summaryText = StringsProvider.instance.t('map_summary_single_zone')
+                    .replaceFirst('{}', bestName)
+                    .replaceFirst('{}', best.averagePercentage.toStringAsFixed(0))
+                    .replaceFirst('{}', platformLabel);
               } else {
-                summaryText = "This week: ${best.zone[0].toUpperCase() + best.zone.substring(1)} pays best (${best.averagePercentage.toStringAsFixed(0)}% of expected fare on average). ${worst.zone[0].toUpperCase() + worst.zone.substring(1)} trends lowest (${worst.averagePercentage.toStringAsFixed(0)}%).";
+                summaryText = StringsProvider.instance.t('map_summary_multi_zone')
+                    .replaceFirst('{}', bestName)
+                    .replaceFirst('{}', best.averagePercentage.toStringAsFixed(0))
+                    .replaceFirst('{}', worstName)
+                    .replaceFirst('{}', worst.averagePercentage.toStringAsFixed(0));
               }
             }
 
@@ -858,7 +867,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        _buildPlatformChip("All Platforms", "all"),
+                        _buildPlatformChip(StringsProvider.instance.t('label_all_platforms'), "all"),
                         const SizedBox(width: 8),
                         _buildPlatformChip("Zomato", "zomato"),
                         const SizedBox(width: 8),
@@ -879,13 +888,13 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        _buildTimeChip("All Day", "all"),
+                        _buildTimeChip(StringsProvider.instance.t('label_all_day'), "all"),
                         const SizedBox(width: 8),
-                        _buildTimeChip("🌅 Morning", "morning"),
+                        _buildTimeChip(StringsProvider.instance.t('label_morning'), "morning"),
                         const SizedBox(width: 8),
-                        _buildTimeChip("🌆 Evening", "evening"),
+                        _buildTimeChip(StringsProvider.instance.t('label_evening'), "evening"),
                         const SizedBox(width: 8),
-                        _buildTimeChip("🌙 Late-Night", "latenight"),
+                        _buildTimeChip(StringsProvider.instance.t('label_latenight'), "latenight"),
                       ],
                     ),
                   ),
@@ -1489,10 +1498,10 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                       spacing: 12,
                       runSpacing: 6,
                       children: [
-                        _buildLegendDot(PlayfulColors.quaternary, "Fair (>=100%)"),
-                        _buildLegendDot(PlayfulColors.tertiary, "Mixed (85-99%)"),
-                        _buildLegendDot(PlayfulColors.secondary, "Underpaid (<85%)"),
-                        _buildLegendDot(const Color(0xFF94A3B8), "No Data"),
+                        _buildLegendDot(PlayfulColors.quaternary, StringsProvider.instance.t('label_legend_fair')),
+                        _buildLegendDot(PlayfulColors.tertiary, StringsProvider.instance.t('label_legend_mixed')),
+                        _buildLegendDot(PlayfulColors.secondary, StringsProvider.instance.t('label_legend_underpaid')),
+                        _buildLegendDot(const Color(0xFF94A3B8), StringsProvider.instance.t('label_no_data')),
                       ],
                     ),
                   ],
@@ -1554,7 +1563,7 @@ class _FairnessMapScreenState extends State<FairnessMapScreen> {
                     Text(
                       hasData
                           ? "${s.averagePercentage.toStringAsFixed(0)}% of expected"
-                          : "No Data",
+                          : StringsProvider.instance.t('label_no_data'),
                       style: GoogleFonts.shareTechMono(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,

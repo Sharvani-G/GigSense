@@ -996,7 +996,7 @@ class _LogJobScreenState extends State<LogJobScreen> {
       });
 
       if (userId != 'anonymous_user') {
-        final Uri url = Uri.parse('$baseUrl/weekly-insight?user_id=$userId');
+        final Uri url = Uri.parse('$baseUrl/weekly-insight?user_id=$userId&language_code=${StringsProvider.instance.lang}');
         http.get(url, headers: {'ngrok-skip-browser-warning': 'true'}).then((response) {
           debugPrint("Background weekly-insight regeneration triggered: ${response.statusCode}");
         }).catchError((err) {
@@ -1376,8 +1376,8 @@ class _LogJobScreenState extends State<LogJobScreen> {
                               children: [
                                 Expanded(
                                   child: PlayfulInput(
-                                    labelText: "Area/Locality (Optional)", // Not hardcoding english strings generally but since I can't touch all strings easily right now we'll do this
-                                    hintText: "E.g., Koramangala, Indiranagar",
+                                    labelText: StringsProvider.instance.t('label_area_locality'), // Not hardcoding english strings generally but since I can't touch all strings easily right now we'll do this
+                                    hintText: StringsProvider.instance.t('hint_area_locality'),
                                     controller: _areaHintController,
                                   ),
                                 ),
@@ -1475,8 +1475,8 @@ class _LogJobScreenState extends State<LogJobScreen> {
                   
                   // Search Field
                   PlayfulInput(
-                    labelText: "Search",
-                    hintText: "Type platform name...",
+                    labelText: s.t('label_search'),
+                    hintText: s.t('hint_search_platform'),
                     controller: _searchController,
                     onTap: () {},
                   ),

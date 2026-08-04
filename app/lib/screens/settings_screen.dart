@@ -51,7 +51,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (user.isAnonymous) {
       if (mounted) {
         setState(() {
-          _name = "Guest User";
+          _name = StringsProvider.instance.t('label_guest_user');
           _workerType = "other_gig_worker";
           _phoneNumber = "";
           _profilePhotoBase64 = "";
@@ -275,10 +275,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 // Savings Goal row
                                 _buildSettingsRow(
                                   icon: Icons.savings_outlined,
-                                  label: "Savings Goal",
+                                  label: s.t('label_savings_goal'),
                                   trailingText: _savingsGoal != null
-                                      ? "₹${formatIndianCurrency((_savingsGoal!['targetAmount'] as num).toDouble())} / ${_savingsGoal!['period']}"
-                                      : "Not set",
+                                      ? "₹${formatIndianCurrency((_savingsGoal!['targetAmount'] as num).toDouble())} / ${s.t(_savingsGoal!['period'] == 'weekly' ? 'settings_weekly' : 'settings_monthly')}"
+                                      : s.t('label_not_set'),
                                   onTap: () => _showSavingsGoalBottomSheet(context),
                                 ),
                                 _buildDivider(),
@@ -309,7 +309,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 _buildSettingsRow(
                                   icon: Icons.sos_outlined,
                                   label: s.t('sos_settings'),
-                                  trailingText: "Configure",
+                                  trailingText: s.t('btn_configure'),
                                   onTap: () => _showSOSSettingsBottomSheet(context),
                                 ),
                                 _buildDivider(),
@@ -808,7 +808,7 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
     if (text.isEmpty) return null;
     final val = double.tryParse(text);
     if (val == null || val <= 0) {
-      return "Please enter a valid amount greater than 0.";
+      return StringsProvider.instance.t('snack_enter_valid_amount');
     }
     return null;
   }
@@ -991,9 +991,9 @@ class _SavingsGoalBottomSheetContentState extends State<_SavingsGoalBottomSheetC
                 fontWeight: FontWeight.w600,
                 color: PlayfulColors.foreground,
               ),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 border: InputBorder.none,
-                hintText: "e.g. 3000",
+                hintText: StringsProvider.instance.t('hint_target_amount'),
                 isDense: true,
               ),
             ),
@@ -1505,8 +1505,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                     // Phone Input
                     PlayfulInput(
-                      labelText: "MOBILE NUMBER (10-DIGIT)",
-                      hintText: "e.g., 9876543210",
+                      labelText: s.t('label_mobile_num_10_digit'),
+                      hintText: s.t('hint_mobile_num_example'),
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
                     ),
@@ -1514,8 +1514,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                     // Bio input
                     PlayfulInput(
-                      labelText: "SHORT BIO / NOTE",
-                      hintText: "e.g. Full-time Swiggy rider, Indiranagar area",
+                      labelText: s.t('label_short_bio'),
+                      hintText: s.t('hint_short_bio'),
                       controller: _bioController,
                     ),
                     const SizedBox(height: 20),
@@ -1525,8 +1525,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       children: [
                         Expanded(
                           child: PlayfulInput(
-                            labelText: "YEARS ACTIVE",
-                            hintText: "Years",
+                            labelText: s.t('label_years_active'),
+                            hintText: s.t('onboarding_exp_years_hint'),
                             controller: _expYearsController,
                             keyboardType: TextInputType.number,
                           ),
@@ -1534,8 +1534,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         const SizedBox(width: 16),
                         Expanded(
                           child: PlayfulInput(
-                            labelText: "MONTHS ACTIVE",
-                            hintText: "Months",
+                            labelText: s.t('label_months_active'),
+                            hintText: s.t('label_months'),
                             controller: _expMonthsController,
                             keyboardType: TextInputType.number,
                           ),
@@ -1546,7 +1546,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                     // Worker Type Selector (Multi-select)
                     Text(
-                      s.t('worker_type_label') + " (MULTI-SELECT)",
+                      s.t('label_worker_type_multi'),
                       style: GoogleFonts.plusJakartaSans(
                         fontWeight: FontWeight.w800,
                         fontSize: 12,
@@ -1764,7 +1764,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               controller: _emContactNameController,
                               style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.bold),
                               decoration: InputDecoration(
-                                labelText: "Contact Name",
+                                labelText: s.t('label_contact_name'),
                                 labelStyle: GoogleFonts.plusJakartaSans(fontSize: 12, color: PlayfulColors.mutedForeground),
                                 border: const OutlineInputBorder(),
                                 isDense: true,
@@ -1776,7 +1776,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               keyboardType: TextInputType.phone,
                               style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.bold),
                               decoration: InputDecoration(
-                                labelText: "Mobile Number",
+                                labelText: s.t('label_mobile_number'),
                                 labelStyle: GoogleFonts.plusJakartaSans(fontSize: 12, color: PlayfulColors.mutedForeground),
                                 border: const OutlineInputBorder(),
                                 isDense: true,
@@ -2225,8 +2225,8 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
             TextField(
               controller: phoneCtrl,
               keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: "Phone Number",
+              decoration: InputDecoration(
+                labelText: s.t('label_phone_number'),
                 border: OutlineInputBorder(),
               ),
             ),

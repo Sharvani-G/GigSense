@@ -387,8 +387,8 @@ class _ChatScreenState extends State<ChatScreen> {
           .get();
 
       if (doc.exists) {
-        final currentTitle = doc.data()?['title'] ?? 'New Chat';
-        if (currentTitle == 'New Chat') {
+        final currentTitle = doc.data()?['title'] ?? StringsProvider.instance.t('btn_new_chat');
+        if (currentTitle == StringsProvider.instance.t('btn_new_chat')) {
           final words = text.trim().split(RegExp(r'\s+'));
           final truncated = words.take(6).join(' ');
           final finalTitle = words.length > 6 ? '$truncated...' : truncated;
@@ -408,7 +408,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _streamSubscription = null;
 
     if (_activeSessionId == null) {
-      await _createNewSession(title: "New Chat");
+      await _createNewSession(title: StringsProvider.instance.t('btn_new_chat'));
     }
 
     final sessionId = _activeSessionId!;
@@ -443,6 +443,7 @@ class _ChatScreenState extends State<ChatScreen> {
         'message': text,
         'user_id': userId,
         'session_id': sessionId,
+        'language_code': StringsProvider.instance.lang,
       });
       
       final response = await client.send(request);
@@ -614,7 +615,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         final doc = docs[index];
                         final data = doc.data() as Map<String, dynamic>;
                         final sessionId = doc.id;
-                        final title = data['title'] ?? 'New Chat';
+                        final title = data['title'] ?? StringsProvider.instance.t('btn_new_chat');
                         final updatedAt = (data['updatedAt'] as Timestamp?)?.toDate();
                         final isSelected = sessionId == _activeSessionId;
 

@@ -175,7 +175,7 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
       });
 
       if (userId != 'anonymous_user') {
-        final Uri url = Uri.parse('$baseUrl/weekly-insight?user_id=$userId');
+        final Uri url = Uri.parse('$baseUrl/weekly-insight?user_id=$userId&language_code=${StringsProvider.instance.lang}');
         http.get(url, headers: {'ngrok-skip-browser-warning': 'true'}).then((response) {
           debugPrint("Background weekly-insight triggered: ${response.statusCode}");
         }).catchError((err) {
@@ -329,7 +329,7 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
                         children: [
                           Expanded(
                             child: _buildComparisonCard(
-                              title: "PLATFORM BENCHMARK",
+                              title: s.t('label_platform_benchmark'),
                               amount: platformExpected,
                               shadowColor: PlayfulColors.accent,
                             ),
@@ -337,7 +337,7 @@ class _OcrResultScreenState extends State<OcrResultScreen> {
                           const SizedBox(width: 16),
                           Expanded(
                             child: _buildComparisonCard(
-                              title: "STANDARD GIG RATE",
+                              title: s.t('label_standard_gig_rate'),
                               amount: genericExpected,
                               shadowColor: PlayfulColors.tertiary,
                             ),

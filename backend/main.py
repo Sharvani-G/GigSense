@@ -390,7 +390,7 @@ async def chat_endpoint(request: ChatRequest):
                 notes_list.append(f"- Category: {cat}, Value: {val}")
         memory_notes_str = "\n".join(notes_list)
 
-    lang_code = profile.get('preferredLanguage', 'en')
+    lang_code = request.language_code or profile.get('preferredLanguage', 'en')
     worker_type = profile.get('workerType', 'other_gig_worker')
     worker_types = profile.get('workerTypes')
     if not isinstance(worker_types, list):
@@ -814,10 +814,10 @@ def compute_weekly_forecast(user_id: str) -> dict | None:
         return None
 
 @app.get("/weekly-insight")
-async def weekly_insight(user_id: str):
+async def weekly_insight(user_id: str, language_code: Optional[str] = None):
     aggregates = get_weekly_aggregates(user_id)
     profile = get_user_profile(user_id) if user_id and user_id != 'anonymous_user' else {}
-    lang_code = profile.get('preferredLanguage', 'en') or 'en'
+    lang_code = language_code or profile.get('preferredLanguage', 'en') or 'en'
     
     placeholders = {
         'en': "Log a few jobs and I'll have your first weekly insight ready.",
@@ -963,7 +963,7 @@ async def weekly_insight(user_id: str):
 @app.post("/jobs/draft-complaint")
 async def draft_complaint_endpoint(request: ComplaintRequest):
     profile = get_user_profile(request.user_id)
-    lang_code = profile.get('preferredLanguage', 'en')
+    lang_code = request.language_code or profile.get('preferredLanguage', 'en')
     language_name = LANGUAGE_NAMES.get(lang_code, 'English')
     underpaid_diff = max(0.0, request.expected_fare - request.fare)
     
@@ -1330,7 +1330,7 @@ async def complaint_draft_endpoint(request: DraftRequest):
         
         # User profile to determine preferred language
         profile = get_user_profile(request.user_id)
-        lang_code = profile.get('preferredLanguage', 'en') or 'en'
+        lang_code = request.language_code or profile.get('preferredLanguage', 'en') or 'en'
         language_name = LANGUAGE_NAMES.get(lang_code, 'English')
         
         platform = job.get("platform") or "Platform"
@@ -1400,7 +1400,7 @@ async def complaint_draft_endpoint(request: DraftRequest):
 @app.post("/fatigue-nudge")
 async def fatigue_nudge_endpoint(request: FatigueRequest):
     profile = get_user_profile(request.user_id)
-    lang_code = profile.get('preferredLanguage', 'en')
+    lang_code = request.language_code or profile.get('preferredLanguage', 'en')
     language_name = LANGUAGE_NAMES.get(lang_code, 'English')
     
     if lang_code == 'en':
@@ -1434,7 +1434,7 @@ async def fatigue_nudge_endpoint(request: FatigueRequest):
 @app.post("/sos-message")
 async def sos_message_endpoint(request: SOSRequest):
     profile = get_user_profile(request.user_id)
-    lang_code = profile.get('preferredLanguage', 'en')
+    lang_code = request.language_code or profile.get('preferredLanguage', 'en')
     language_name = LANGUAGE_NAMES.get(lang_code, 'English')
     
     prompt = (
